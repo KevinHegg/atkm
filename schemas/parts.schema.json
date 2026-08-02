@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "parts.schema.json", "type": "object", "required": ["parts"], "additionalProperties": false,
+  "$defs": {
+    "vector": { "type": "object", "required": ["x", "y", "z"], "additionalProperties": false, "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } } },
+    "pose": { "type": "object", "required": ["position", "normal", "tangent", "rotationalSymmetry"], "additionalProperties": false, "properties": { "position": { "$ref": "#/$defs/vector" }, "normal": { "$ref": "#/$defs/vector" }, "tangent": { "$ref": "#/$defs/vector" }, "rotationalSymmetry": { "type": "number", "exclusiveMinimum": 0 } } }
+  },
+  "properties": { "parts": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false,
+    "required": ["id", "label", "componentType", "primitiveClass", "materialId", "mass", "dimensions", "handling", "ports", "affordances", "nonAffordances", "intrinsicCapabilities"],
+    "properties": {
+      "id": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 }, "componentType": { "type": "string", "minLength": 1 }, "primitiveClass": { "enum": ["fundamental", "extension", "omit"] }, "materialId": { "type": "string", "minLength": 1 }, "mass": { "type": "number", "exclusiveMinimum": 0 },
+      "dimensions": { "type": "object", "required": ["width", "height", "depth"], "additionalProperties": false, "properties": { "width": { "type": "number", "exclusiveMinimum": 0 }, "height": { "type": "number", "exclusiveMinimum": 0 }, "depth": { "type": "number", "exclusiveMinimum": 0 }, "radius": { "type": "number", "exclusiveMinimum": 0 } } },
+      "handling": { "type": "object", "required": ["workers", "clearance", "maxCarrySpeed"], "additionalProperties": false, "properties": { "workers": { "type": "integer", "minimum": 1, "maximum": 2 }, "clearance": { "type": "number", "minimum": 0 }, "maxCarrySpeed": { "type": "number", "exclusiveMinimum": 0 } } },
+      "ports": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false, "required": ["id", "kind", "pose"], "properties": { "id": { "type": "string" }, "kind": { "type": "string" }, "pose": { "$ref": "#/$defs/pose" } } } },
+      "affordances": { "type": "array", "minItems": 2, "items": { "type": "string" } }, "nonAffordances": { "type": "array", "minItems": 2, "items": { "type": "string" } }, "intrinsicCapabilities": { "type": "array", "items": { "type": "string" } }
+    }
+  } } }
+}

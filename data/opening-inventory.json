@@ -1,0 +1,18 @@
+{
+  "version": 3,
+  "countPerTeam": 24,
+  "entries": [
+    { "definitionId": "beam_short", "quantity": 2 },
+    { "definitionId": "beam_medium", "quantity": 2 },
+    { "definitionId": "beam_long", "quantity": 2 },
+    { "definitionId": "hub", "quantity": 4 },
+    { "definitionId": "axle_short", "quantity": 1 },
+    { "definitionId": "axle_long", "quantity": 1 },
+    { "definitionId": "wheel", "quantity": 2 },
+    { "definitionId": "sheave", "quantity": 2 },
+    { "definitionId": "drum", "quantity": 1 },
+    { "definitionId": "plank", "quantity": 2 },
+    { "definitionId": "rope_hook", "quantity": 2 },
+    { "definitionId": "wedge", "quantity": 3 }
+  ]
+}

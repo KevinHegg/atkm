@@ -1,0 +1,10 @@
+{
+  "fixedStep": 0.0166666667,
+  "maxMatchSeconds": 600,
+  "gravity": 650,
+  "snap": { "maxCorrection": 12, "previewDistance": 28 },
+  "joint": { "loadSmoothing": 0.18, "warningHoldSeconds": 0.4, "damagePerOverloadSecond": 0.16 },
+  "carrying": { "longPartWorkers": 2, "sweepMargin": 14 },
+  "recovery": { "floorEpsilon": 2, "maxPenetration": 8, "quarantineX": 36 },
+  "replay": { "checksumEveryTicks": 30 }
+}

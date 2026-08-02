@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-observation.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["space", "time", "objective", "humpty", "tower", "crew", "opponents", "publicSpeech", "stock", "assemblies", "opponentAssemblies", "joinOptions", "useOptions", "detachOptions", "repairOptions"],
+  "$defs": {
+    "vec3": { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }], "minItems": 3, "maxItems": 3 },
+    "pose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p", "size", "rot"],
+      "properties": { "p": { "$ref": "#/$defs/vec3" }, "size": { "$ref": "#/$defs/vec3" }, "rot": { "$ref": "#/$defs/vec3" } }
+    }
+  },
+  "properties": {
+    "space": { "type": "object", "required": ["units", "axes", "bounds", "landmarks"] },
+    "time": { "type": "object", "required": ["elapsed", "remaining", "urgency", "beat", "beatRule"] },
+    "objective": { "type": "string", "minLength": 1 },
+    "humpty": { "type": "object", "required": ["pose", "height", "integrity", "status"] },
+    "tower": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blockCount", "disturbed", "centerOfMass", "supportBounds", "signedSupportMargin", "maximumTilt", "topDisplacement", "warnings"],
+      "properties": {
+        "blockCount": { "const": 24 },
+        "disturbed": { "type": "boolean" },
+        "centerOfMass": { "$ref": "#/$defs/vec3" },
+        "supportBounds": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "signedSupportMargin": { "type": "number" },
+        "maximumTilt": { "type": "number", "minimum": 0 },
+        "topDisplacement": { "type": "number", "minimum": 0 },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "crew": { "type": "array", "maxItems": 3 },
+    "opponents": { "type": "array", "maxItems": 3 },
+    "publicSpeech": { "type": "array", "maxItems": 6 },
+    "stock": { "type": "array", "maxItems": 27 },
+    "assemblies": { "type": "array" },
+    "opponentAssemblies": { "type": "array" },
+    "joinOptions": { "type": "array", "maxItems": 12 },
+    "useOptions": { "type": "array", "maxItems": 12 },
+    "detachOptions": { "type": "array", "maxItems": 12 },
+    "repairOptions": { "type": "array", "maxItems": 8 }
+  }
+}

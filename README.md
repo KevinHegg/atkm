@@ -1,0 +1,46 @@
+# All the King's Men
+
+A PlayCanvas toy-theatre simulation in which autonomous crews build physical machines from mirrored parts to rescue or crack Humpty, the Egg King.
+
+## Requirements
+
+- Node.js 20 or newer
+- An `OPENAI_API_KEY` in `.env` for live model agents
+
+## Commands
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). The development server prints the selected model, seed, and build ID.
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run check
+```
+
+`lint` currently runs the strict TypeScript checker because the repository has no separate style linter. `check` runs type checking, tests, and the production client build.
+
+## Agent Configuration
+
+```dotenv
+AGENT_DRIVER=llm
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.4
+OPENAI_REASONING_EFFORT=none
+```
+
+Without live puzzle agents, the legacy scripted mock path is available through the server configuration. A match ends on an upright intact landing, a crack, or a draw at ten minutes.
+
+## Controls
+
+The top control bar provides pause, follow, fit, poke, sound, engineering overlay, replay, and restart. Keyboard controls are `Space`, `F`, `0`, `P`, `M`, `D`, and `R`. The engineering overlay is disabled by default.
+
+## Architecture
+
+Rapier on the server is authoritative. PlayCanvas renders and animates snapshots. Machine grammar data lives in `data/`, validation schemas in `schemas/`, shared contracts in `shared/machines.ts`, and the design/physics decisions in `docs/`.

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "benchmark-results.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runtime", "recordedAt", "results"],
+  "properties": {
+    "runtime": { "type": "string" }, "recordedAt": { "type": "string", "format": "date" },
+    "results": { "type": "array", "minItems": 5, "items": { "type": "object", "additionalProperties": false, "required": ["policy", "matches", "usefulCapabilities", "meanFirstConnectionSeconds", "validActionRate"], "properties": {
+      "policy": { "enum": ["random_legal", "nearest_compatible", "fixture_playback", "heuristic", "reasoning"] }, "matches": { "type": "integer", "minimum": 0 },
+      "usefulCapabilities": { "type": "number", "minimum": 0 }, "meanFirstConnectionSeconds": { "type": "number", "minimum": 0 }, "validActionRate": { "type": "number", "minimum": 0, "maximum": 1 }, "status": { "type": "string" }
+    } } }
+  }
+}

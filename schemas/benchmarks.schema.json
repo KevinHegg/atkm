@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "benchmarks.schema.json",
+  "type": "object",
+  "required": ["benchmarks"],
+  "additionalProperties": false,
+  "properties": {
+    "benchmarks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "description", "pass"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": {
+            "enum": ["connection", "simple_machine", "reasoning", "replay", "performance"]
+          },
+          "description": { "type": "string" },
+          "pass": {
+            "type": "object",
+            "required": ["metric", "operator", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "metric": { "type": "string" },
+              "operator": { "enum": [">=", "<=", "=="] },
+              "value": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

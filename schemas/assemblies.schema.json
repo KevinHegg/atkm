@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "assemblies.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assemblies"],
+  "properties": {
+    "assemblies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "partIds", "connections", "mass", "centerOfMass", "supportPolygon", "signedSupportMargin", "failureMargin", "capabilities", "warnings"],
+        "properties": {
+          "id": { "type": "string" },
+          "partIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+          "connections": { "type": "array", "items": { "type": "string" } },
+          "mass": { "type": "number", "exclusiveMinimum": 0 },
+          "centerOfMass": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+          "supportPolygon": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 } },
+          "signedSupportMargin": { "type": "number" },
+          "failureMargin": { "type": "number" },
+          "capabilities": { "type": "array", "items": { "type": "object" } },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

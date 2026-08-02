@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "opening-inventory.schema.json", "type": "object", "additionalProperties": false,
+  "required": ["version", "countPerTeam", "entries"],
+  "properties": { "version": { "type": "integer", "minimum": 2 }, "countPerTeam": { "const": 27 }, "entries": { "type": "array", "minItems": 12, "maxItems": 12, "items": { "type": "object", "additionalProperties": false, "required": ["definitionId", "quantity"], "properties": { "definitionId": { "type": "string", "minLength": 1 }, "quantity": { "type": "integer", "minimum": 1 } } } } }
+}

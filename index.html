@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2E3A45" />
+    <title>All the King's Men</title>
+    <link rel="stylesheet" href="/client/style.css?build=__BUILD_ID__" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="stage-shell" aria-label="The puppet theatre">
+        <div id="stage"></div>
+        <div id="title-card">
+          <span class="kicker">A penny dreadful in perpetual motion</span>
+          <h1>All the King's Men</h1>
+        </div>
+        <div id="construction-cues" aria-live="polite"></div>
+        <div id="end-card" hidden>
+          <span id="end-eyebrow">The broadside reports</span>
+          <h2 id="end-title"></h2>
+          <p id="end-copy"></p>
+          <button id="end-restart" type="button">Another performance</button>
+        </div>
+        <nav id="controls" aria-label="Spectator controls">
+          <button type="button" data-command="pause" aria-label="Pause performance" title="Pause performance (Space)"><i data-lucide="pause"></i></button>
+          <button type="button" data-command="follow" aria-label="Cinematic follow" title="Cinematic follow (F)"><i data-lucide="scan-search"></i></button>
+          <button type="button" data-command="fit" aria-label="Fit the full stage" title="Fit the full stage (0)"><i data-lucide="maximize-2"></i></button>
+          <button type="button" data-command="poke" aria-label="Poke a lower tower block" title="Poke the tower (P)"><i data-lucide="hand"></i></button>
+          <button type="button" data-command="sound" aria-label="Enable sound" title="Enable sound (M)"><i data-lucide="volume-x"></i></button>
+          <button type="button" data-command="engineering" aria-label="Show engineering overlay" title="Engineering overlay (D)"><i data-lucide="wrench"></i></button>
+          <button type="button" data-command="replay" aria-label="Replay the latest performance" title="Replay latest performance"><i data-lucide="history"></i></button>
+          <button type="button" data-command="restart" aria-label="Restart run" title="Restart run (R)"><i data-lucide="rotate-ccw"></i></button>
+        </nav>
+        <section id="engineering-overlay" aria-label="Engineering overlay" hidden>
+          <header>
+            <span>Engineering</span>
+            <output id="engineering-checksum">tick 0 / --------</output>
+          </header>
+          <div id="engineering-summary"></div>
+          <ol id="engineering-list"></ol>
+        </section>
+        <div id="replay-controls" hidden aria-label="Replay controls">
+          <input id="replay-scrubber" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay position" />
+          <output id="replay-time" for="replay-scrubber">00:00 / 00:00</output>
+          <select id="replay-speed" aria-label="Playback speed" title="Playback speed">
+            <option value="0.25">0.25x</option>
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
+          <button id="replay-live" type="button" aria-label="Return to live performance" title="Return to live performance"></button>
+        </div>
+        <div id="sidebar-dock">
+          <span id="collapsed-elapsed" aria-live="polite">00:00</span>
+          <button id="sidebar-toggle" type="button" aria-label="Collapse performance ledger" aria-expanded="true" title="Collapse performance ledger">
+            <i data-lucide="panel-right-close"></i>
+          </button>
+        </div>
+        <div id="zoom-readout" aria-hidden="true">100%</div>
+      </section>
+
+      <aside id="broadside" aria-label="Performance ledger">
+        <header id="scoreboard">
+          <div class="score-topline">
+            <span>Elapsed</span>
+            <strong id="elapsed-value">00:00</strong>
+          </div>
+          <dl class="metrics">
+            <div>
+              <dt>Humpty's height</dt>
+              <dd><span id="height-value">—</span><small>u</small></dd>
+            </div>
+            <div>
+              <dt>Integrity</dt>
+              <dd id="integrity-value">100</dd>
+            </div>
+          </dl>
+          <div id="integrity-track" aria-label="Humpty integrity">
+            <span id="integrity-fill"></span>
+          </div>
+          <div class="death-toll">
+            <span class="king">King's fallen <b id="king-deaths">0</b></span>
+            <span class="queen">Queen's fallen <b id="queen-deaths">0</b></span>
+          </div>
+        </header>
+
+        <section id="dramatis" aria-label="Agents">
+          <h2>Dramatis personae</h2>
+          <div id="agent-strip"></div>
+        </section>
+
+        <section id="transcript-panel">
+          <div class="transcript-heading">
+            <h2>The public record</h2>
+            <span id="run-meta">
+              <span id="build-label">3D live</span>
+              <span id="seed-label"></span>
+            </span>
+          </div>
+          <ol id="transcript" aria-live="polite"></ol>
+        </section>
+      </aside>
+    </main>
+    <script type="module" src="/client/main.ts?build=__BUILD_ID__"></script>
+  </body>
+</html>

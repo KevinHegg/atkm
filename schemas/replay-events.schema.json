@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "replay-events.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["events"],
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "tick", "at", "actorId", "type", "phase", "bodyIds", "checksum"],
+        "properties": {
+          "id": { "type": "string" }, "tick": { "type": "integer", "minimum": 0 }, "at": { "type": "number", "minimum": 0 },
+          "actorId": { "type": "string" }, "type": { "type": "string" }, "phase": { "enum": ["start", "progress", "success", "partial", "failure", "cancel"] },
+          "bodyIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }, "checksum": { "type": "string", "pattern": "^[0-9a-f]{8}$" },
+          "detail": { "type": "object" }
+        }
+      }
+    }
+  }
+}

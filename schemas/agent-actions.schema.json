@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-actions.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type"],
+  "properties": {
+    "type": { "enum": ["reserve", "fetch", "carry", "support", "stage", "align", "connect", "anchor", "reeve", "tension", "load", "operate", "test", "detach", "guard", "block", "strike", "sabotage", "repair", "recover", "release", "cancel"] },
+    "partId": { "type": "string", "minLength": 1 },
+    "targetId": { "type": "string", "minLength": 1 },
+    "connectionId": { "type": "string", "minLength": 1 },
+    "portId": { "type": "string", "minLength": 1 },
+    "targetPortId": { "type": "string", "minLength": 1 },
+    "method": { "enum": ["pull_pin", "remove_key", "jam_wedge", "shift_chock", "loosen_cleat", "fray_rope", "overload", "strike", "steal", "block_station"] },
+    "effort": { "type": "number", "minimum": 0, "maximum": 1 },
+    "position": { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }], "minItems": 3, "maxItems": 3 }
+  }
+}

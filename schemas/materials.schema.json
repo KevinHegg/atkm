@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "materials.schema.json",
+  "type": "object",
+  "required": ["materials"],
+  "additionalProperties": false,
+  "properties": {
+    "materials": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "label", "density", "friction", "restitution", "linearDamping", "angularDamping", "credibility", "appearance"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 }, "label": { "type": "string", "minLength": 1 },
+          "density": { "type": "number", "exclusiveMinimum": 0 }, "friction": { "type": "number", "minimum": 0 },
+          "restitution": { "type": "number", "minimum": 0, "maximum": 1 }, "linearDamping": { "type": "number", "minimum": 0 },
+          "angularDamping": { "type": "number", "minimum": 0 },
+          "credibility": { "enum": ["attested", "plausible", "game_abstraction"] }, "appearance": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

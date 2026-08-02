@@ -1,0 +1,10 @@
+{
+  "benchmarks": [
+    { "id": "valid_port_pairs", "category": "connection", "description": "Every declared compatibility pair connects in both intended orientations.", "pass": { "metric": "success_rate", "operator": ">=", "value": 1 } },
+    { "id": "invalid_port_rejection", "category": "connection", "description": "Nonsensical port pairs are rejected.", "pass": { "metric": "rejection_rate", "operator": ">=", "value": 1 } },
+    { "id": "six_machine_recognition", "category": "simple_machine", "description": "Six machine validators accept geometry variants and reject near misses.", "pass": { "metric": "case_accuracy", "operator": ">=", "value": 0.95 } },
+    { "id": "capability_gain", "category": "reasoning", "description": "A topology-aware builder gains more useful capabilities than random legal snapping.", "pass": { "metric": "relative_gain", "operator": ">=", "value": 1.5 } },
+    { "id": "same_runtime_replay", "category": "replay", "description": "A recorded action stream reproduces periodic checksums in the supported runtime.", "pass": { "metric": "divergences", "operator": "==", "value": 0 } },
+    { "id": "full_stage_performance", "category": "performance", "description": "Six workers and both kits remain within the fixed-step budget.", "pass": { "metric": "p95_tick_ms", "operator": "<=", "value": 16.67 } }
+  ]
+}

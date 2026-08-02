@@ -1,0 +1,11 @@
+first,second,joint,tolerance_distance,tolerance_angle_degrees,workers,duration_seconds,safe_load,warning_load,break_force,detach_under_load,failure_state
+rigid_peg,rigid_socket,fixed,12,12,1,3.1,1800,1450,2400,false,pulled_out
+pin_eye,hinge_cheek,revolute,10,16,1,3.4,2100,1650,2900,false,bent
+axle_shaft,bearing_bore,revolute,8,8,1,3.8,2600,2100,3600,false,bent
+hook,load_eye,revolute,14,28,1,2.4,1700,1300,2300,false,slipped
+rope_end,load_eye,rope,16,180,1,4.2,1500,1120,2050,false,broken
+rope_end,hook,rope,16,180,1,3.1,1400,1050,1900,false,slipped
+rope_end,cleat,rope,14,180,1,4.6,1350,980,1750,false,slipped
+rope_end,sheave_groove,rope,12,34,1,5.2,1300,950,1700,false,slipped
+thread_male,thread_female,thread,7,6,1,6.5,3200,2500,4200,false,pulled_out
+wedge_face,wedge_gap,contact,9,14,1,2.8,3000,2350,4300,false,slipped

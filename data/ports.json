@@ -1,0 +1,16 @@
+{
+  "ports": [
+    { "id": "rigid_peg", "label": "Round timber tenon", "primitiveClass": "fundamental", "visual": "oversized round tenon with an iron keeper band", "transmits": ["tension", "compression", "shear", "torque"] },
+    { "id": "rigid_socket", "label": "Iron-banded socket", "primitiveClass": "fundamental", "visual": "deep round socket with a black iron collar", "transmits": ["tension", "compression", "shear", "torque"] },
+    { "id": "axle_shaft", "label": "Axle journal", "primitiveClass": "fundamental", "visual": "smooth dark shaft with a bright bearing shoulder", "transmits": ["shear", "torque"] },
+    { "id": "bearing_bore", "label": "Bearing bore", "primitiveClass": "fundamental", "visual": "large bronze-lined round bore", "transmits": ["compression", "shear"] },
+    { "id": "key_flat", "label": "Captive axle key", "primitiveClass": "fundamental", "visual": "square iron key standing proud of the axle", "transmits": ["shear", "torque"] },
+    { "id": "keyway", "label": "Keyed coaxial bore", "primitiveClass": "fundamental", "visual": "round bore with one unmistakable square notch", "transmits": ["shear", "torque"] },
+    { "id": "hook", "label": "Forged rope hook", "primitiveClass": "fundamental", "visual": "large blunt-backed iron hook captive to the rope", "transmits": ["tension"] },
+    { "id": "load_eye", "label": "Closed load eye", "primitiveClass": "fundamental", "visual": "closed iron ring large enough to accept the hook", "transmits": ["tension", "shear"] },
+    { "id": "rope_end", "label": "Plain rope end", "primitiveClass": "fundamental", "visual": "served hemp end with a short visible tail", "transmits": ["tension"] },
+    { "id": "cleat", "label": "Rope cleat", "primitiveClass": "fundamental", "visual": "two broad timber horns with worn rope grooves", "transmits": ["tension"] },
+    { "id": "sheave_groove", "label": "Sheave groove", "primitiveClass": "fundamental", "visual": "deep exaggerated groove around the pulley rim", "transmits": ["tension"] },
+    { "id": "ground_foot", "label": "Iron-shod foot", "primitiveClass": "fundamental", "visual": "broad dark contact face with no snap highlight", "transmits": ["compression", "shear"] }
+  ]
+}

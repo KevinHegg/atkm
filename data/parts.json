@@ -1,0 +1,147 @@
+{
+  "parts": [
+    {
+      "id": "beam_short", "label": "short iron-banded beam", "componentType": "bar", "primitiveClass": "fundamental", "materialId": "oak", "mass": 12,
+      "dimensions": { "width": 60, "height": 14, "depth": 14 }, "handling": { "workers": 1, "clearance": 18, "maxCarrySpeed": 105 },
+      "ports": [
+        { "id": "left_tenon", "kind": "rigid_peg", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "right_tenon", "kind": "rigid_peg", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } }
+      ],
+      "affordances": ["Carries compression or tension between two locked sockets.", "Can push, brace, crank, or extend a frame."],
+      "nonAffordances": ["It cannot pivot after both tenons are locked.", "It cannot carry rope without a separate fitting."],
+      "intrinsicCapabilities": ["support", "brace", "push"]
+    },
+    {
+      "id": "beam_medium", "label": "medium iron-banded beam", "componentType": "bar", "primitiveClass": "fundamental", "materialId": "oak", "mass": 21,
+      "dimensions": { "width": 120, "height": 14, "depth": 14 }, "handling": { "workers": 1, "clearance": 28, "maxCarrySpeed": 92 },
+      "ports": [
+        { "id": "left_tenon", "kind": "rigid_peg", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "right_tenon", "kind": "rigid_peg", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } }
+      ],
+      "affordances": ["Spans a useful frame bay while keeping both ends readable.", "Can serve as a lever arm, brace, handle, or ram member."],
+      "nonAffordances": ["It needs a pivot or support to act as a lever.", "One worker must turn it through clear floor space."],
+      "intrinsicCapabilities": ["support", "brace", "push"]
+    },
+    {
+      "id": "beam_long", "label": "long iron-banded beam", "componentType": "bar", "primitiveClass": "fundamental", "materialId": "oak", "mass": 31,
+      "dimensions": { "width": 180, "height": 14, "depth": 14 }, "handling": { "workers": 2, "clearance": 42, "maxCarrySpeed": 70 },
+      "ports": [
+        { "id": "left_tenon", "kind": "rigid_peg", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "right_tenon", "kind": "rigid_peg", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } }
+      ],
+      "affordances": ["Creates a tall frame leg, long brace, lever, or ram.", "Its length gives leverage and reaches the tower from a work bay."],
+      "nonAffordances": ["It cannot pass through narrow gaps or turn without clearance.", "One worker cannot carry it at full speed."],
+      "intrinsicCapabilities": ["support", "brace", "push", "lift"]
+    },
+    {
+      "id": "hub", "label": "octagonal eight-socket hub", "componentType": "cheek", "primitiveClass": "fundamental", "materialId": "oak", "mass": 22,
+      "dimensions": { "width": 54, "height": 54, "depth": 28 }, "handling": { "workers": 1, "clearance": 24, "maxCarrySpeed": 92 },
+      "ports": [
+        { "id": "socket_e", "kind": "rigid_socket", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "socket_ne", "kind": "rigid_socket", "pose": { "position": { "x": 0.35, "y": 0.35, "z": 0 }, "normal": { "x": 0.707, "y": 0.707, "z": 0 }, "tangent": { "x": -0.707, "y": 0.707, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "socket_n", "kind": "rigid_socket", "pose": { "position": { "x": 0, "y": 0.5, "z": 0 }, "normal": { "x": 0, "y": 1, "z": 0 }, "tangent": { "x": -1, "y": 0, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "socket_nw", "kind": "rigid_socket", "pose": { "position": { "x": -0.35, "y": 0.35, "z": 0 }, "normal": { "x": -0.707, "y": 0.707, "z": 0 }, "tangent": { "x": -0.707, "y": -0.707, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "socket_w", "kind": "rigid_socket", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": -1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "socket_sw", "kind": "rigid_socket", "pose": { "position": { "x": -0.35, "y": -0.35, "z": 0 }, "normal": { "x": -0.707, "y": -0.707, "z": 0 }, "tangent": { "x": 0.707, "y": -0.707, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "socket_s", "kind": "rigid_socket", "pose": { "position": { "x": 0, "y": -0.5, "z": 0 }, "normal": { "x": 0, "y": -1, "z": 0 }, "tangent": { "x": 1, "y": 0, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "socket_se", "kind": "rigid_socket", "pose": { "position": { "x": 0.35, "y": -0.35, "z": 0 }, "normal": { "x": 0.707, "y": -0.707, "z": 0 }, "tangent": { "x": 0.707, "y": 0.707, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "axial_bore", "kind": "bearing_bore", "pose": { "position": { "x": 0, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } }
+      ],
+      "affordances": ["Locks beams at eight readable directions around one center.", "Supports an axle while allowing it to rotate."],
+      "nonAffordances": ["The bearing does not key a wheel to the axle.", "An unsupported hub can roll or tip with its assembly."],
+      "intrinsicCapabilities": ["support", "brace", "pivot"]
+    },
+    {
+      "id": "axle_short", "label": "short keyed axle", "componentType": "axle", "primitiveClass": "fundamental", "materialId": "wrought_iron", "mass": 18,
+      "dimensions": { "width": 70, "height": 12, "depth": 12 }, "handling": { "workers": 1, "clearance": 20, "maxCarrySpeed": 100 },
+      "ports": [
+        { "id": "left_journal", "kind": "axle_shaft", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "right_journal", "kind": "axle_shaft", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "left_key", "kind": "key_flat", "pose": { "position": { "x": -0.34, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "right_key", "kind": "key_flat", "pose": { "position": { "x": 0.34, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } }
+      ],
+      "affordances": ["Rotates in a hub bearing and carries keyed rotating parts.", "Transmits torque between pieces on the same axis."],
+      "nonAffordances": ["It needs at least one bearing under transverse load.", "It cannot lock into a timber socket."],
+      "intrinsicCapabilities": ["pivot", "push"]
+    },
+    {
+      "id": "axle_long", "label": "long keyed axle", "componentType": "axle", "primitiveClass": "fundamental", "materialId": "wrought_iron", "mass": 29,
+      "dimensions": { "width": 130, "height": 12, "depth": 12 }, "handling": { "workers": 1, "clearance": 34, "maxCarrySpeed": 82 },
+      "ports": [
+        { "id": "left_journal", "kind": "axle_shaft", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "right_journal", "kind": "axle_shaft", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "left_key", "kind": "key_flat", "pose": { "position": { "x": -0.38, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "right_key", "kind": "key_flat", "pose": { "position": { "x": 0.38, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } }
+      ],
+      "affordances": ["Spans two hubs or carries two wheels at a readable distance.", "Transmits torque along a common rotating axis."],
+      "nonAffordances": ["It needs wide turning clearance while carried.", "A bent or unsupported axle binds under load."],
+      "intrinsicCapabilities": ["pivot", "push"]
+    },
+    {
+      "id": "wheel", "label": "large spoked wheel", "componentType": "wheel", "primitiveClass": "fundamental", "materialId": "oak", "mass": 25,
+      "dimensions": { "width": 70, "height": 70, "depth": 14, "radius": 35 }, "handling": { "workers": 1, "clearance": 28, "maxCarrySpeed": 90 },
+      "ports": [{ "id": "keyed_bore", "kind": "keyway", "pose": { "position": { "x": 0, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } }],
+      "affordances": ["Rolls a supported load over the floor with low resistance.", "Its large radius converts axle rotation into travel."],
+      "nonAffordances": ["It has no rope groove and cannot redirect line.", "It needs a keyed axle and supported frame."],
+      "intrinsicCapabilities": ["roll"]
+    },
+    {
+      "id": "sheave", "label": "deep-groove sheave", "componentType": "sheave", "primitiveClass": "fundamental", "materialId": "oak", "mass": 14,
+      "dimensions": { "width": 48, "height": 48, "depth": 18, "radius": 24 }, "handling": { "workers": 1, "clearance": 22, "maxCarrySpeed": 100 },
+      "ports": [
+        { "id": "keyed_bore", "kind": "keyway", "pose": { "position": { "x": 0, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "free_bore", "kind": "bearing_bore", "pose": { "position": { "x": 0, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "groove", "kind": "sheave_groove", "pose": { "position": { "x": 0, "y": 0.5, "z": 0 }, "normal": { "x": 0, "y": 1, "z": 0 }, "tangent": { "x": 1, "y": 0, "z": 0 }, "rotationalSymmetry": 360 } }
+      ],
+      "affordances": ["A reeved rope changes direction around its deep groove.", "It may rotate freely on a journal or lock to a keyed axle."],
+      "nonAffordances": ["It is not a floor wheel and has no iron tire.", "It does nothing to a rope that is not visibly reeved."],
+      "intrinsicCapabilities": ["redirect_rope", "pivot"]
+    },
+    {
+      "id": "drum", "label": "rope-winding drum", "componentType": "drum", "primitiveClass": "fundamental", "materialId": "oak", "mass": 23,
+      "dimensions": { "width": 42, "height": 38, "depth": 38, "radius": 19 }, "handling": { "workers": 1, "clearance": 23, "maxCarrySpeed": 92 },
+      "ports": [
+        { "id": "keyed_bore", "kind": "keyway", "pose": { "position": { "x": 0, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "rope_cleat", "kind": "cleat", "pose": { "position": { "x": 0.44, "y": 0.15, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "crank_socket", "kind": "rigid_socket", "pose": { "position": { "x": -0.44, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } }
+      ],
+      "affordances": ["A keyed axle winds attached rope onto the visible barrel.", "A beam in the crank socket lets a worker apply torque."],
+      "nonAffordances": ["It needs a supported axle before it can carry line tension.", "Without restraint a suspended load can unwind it."],
+      "intrinsicCapabilities": ["wind_rope", "pull", "lower"]
+    },
+    {
+      "id": "plank", "label": "broad saddle plank", "componentType": "platform", "primitiveClass": "fundamental", "materialId": "oak", "mass": 28,
+      "dimensions": { "width": 180, "height": 10, "depth": 48 }, "handling": { "workers": 2, "clearance": 44, "maxCarrySpeed": 68 },
+      "ports": [
+        { "id": "left_saddle", "kind": "rigid_socket", "pose": { "position": { "x": -0.32, "y": -0.5, "z": 0 }, "normal": { "x": 0, "y": -1, "z": 0 }, "tangent": { "x": 1, "y": 0, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "right_saddle", "kind": "rigid_socket", "pose": { "position": { "x": 0.32, "y": -0.5, "z": 0 }, "normal": { "x": 0, "y": -1, "z": 0 }, "tangent": { "x": 1, "y": 0, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "end_eye", "kind": "load_eye", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } }
+      ],
+      "affordances": ["Provides a broad ramp, deck, bridge, platform, or shield.", "Two underside saddles lock onto beam tenons."],
+      "nonAffordances": ["It needs supports before carrying a raised load.", "Its broad face requires generous carrying clearance."],
+      "intrinsicCapabilities": ["support", "ramp", "brace"]
+    },
+    {
+      "id": "rope_hook", "label": "coiled rope with captive hook", "componentType": "lashing", "primitiveClass": "fundamental", "materialId": "hemp", "mass": 8,
+      "dimensions": { "width": 112, "height": 18, "depth": 18 }, "handling": { "workers": 1, "clearance": 22, "maxCarrySpeed": 96 },
+      "ports": [
+        { "id": "hook_end", "kind": "hook", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } },
+        { "id": "plain_end", "kind": "rope_end", "pose": { "position": { "x": 0.5, "y": 0, "z": 0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 360 } }
+      ],
+      "affordances": ["Carries tension between the captive hook and tied plain end.", "May pull, suspend, lower, restrain, or reeve over a sheave."],
+      "nonAffordances": ["Rope carries no compression and cannot push.", "Its finite length requires visible slack or tension."],
+      "intrinsicCapabilities": ["pull", "lift", "lower"]
+    },
+    {
+      "id": "wedge", "label": "large iron-shod wedge foot", "componentType": "brace", "primitiveClass": "fundamental", "materialId": "oak", "mass": 11,
+      "dimensions": { "width": 55, "height": 24, "depth": 30 }, "handling": { "workers": 1, "clearance": 18, "maxCarrySpeed": 106 },
+      "ports": [
+        { "id": "rear_socket", "kind": "rigid_socket", "pose": { "position": { "x": -0.5, "y": 0, "z": 0 }, "normal": { "x": -1, "y": 0, "z": 0 }, "tangent": { "x": 0, "y": 1, "z": 0 }, "rotationalSymmetry": 1 } },
+        { "id": "foot", "kind": "ground_foot", "pose": { "position": { "x": 0, "y": -0.5, "z": 0 }, "normal": { "x": 0, "y": -1, "z": 0 }, "tangent": { "x": 1, "y": 0, "z": 0 }, "rotationalSymmetry": 1 } }
+      ],
+      "affordances": ["Chocks wheels, braces feet, acts as a fulcrum, or pushes a tower block.", "A beam tenon can lock into its rear socket for striking or leverage."],
+      "nonAffordances": ["Its working faces rely on contact rather than a hidden snap.", "It can spit out when driven on a smooth unsupported surface."],
+      "intrinsicCapabilities": ["chock", "brace", "strike", "push", "pivot"]
+    }
+  ]
+}

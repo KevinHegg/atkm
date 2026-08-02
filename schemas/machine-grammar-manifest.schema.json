@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "machine-grammar-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "sources", "inventory"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 2 },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["materials", "ports", "parts", "compatibility"],
+      "properties": {
+        "materials": { "const": "data/materials.json" },
+        "ports": { "const": "data/ports.json" },
+        "parts": { "const": "data/parts.json" },
+        "compatibility": { "const": "data/compatibility-matrix.json" }
+      }
+    },
+    "inventory": { "$ref": "opening-inventory.schema.json" }
+  }
+}

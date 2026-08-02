@@ -1,0 +1,74 @@
+
+> all-the-kings-men@0.1.0 check
+> npm run typecheck && npm test && npm run build
+
+
+> all-the-kings-men@0.1.0 typecheck
+> tsc --noEmit
+
+
+> all-the-kings-men@0.1.0 test
+> tsx --test tests/*.test.ts
+
+using deprecated parameters for the initialization function; pass a single object instead
+✔ seeded random produces a reproducible tower sequence (0.668375ms)
+✔ the repair kit validates and expands to 24 neutral pieces (0.448ms)
+✔ machine, observation, replay, and benchmark contracts are strict JSON schemas (2.082125ms)
+✔ every declared connection pair is legal and unrelated ports are rejected (0.198916ms)
+✔ every snap port has a deterministic physical pose on its part (0.215375ms)
+✔ compound assemblies derive only the neutral repair capabilities (0.527583ms)
+✔ the live puzzle keeps a focused set of mechanically distinct parts (0.081459ms)
+✔ both teams receive fixed mirrored edge inventories (156.833375ms)
+✔ the center is a 36-block alternating Jenga tower on a visible plinth (193.322584ms)
+✔ Humpty rests on the visible seat and falls when support is removed (117.586667ms)
+✔ the A-frame fixture raises, holds, and lowers dynamic Humpty (414.566959ms)
+✔ the wheeled ram transfers its push to a real Jenga block (44.777042ms)
+✔ physical sabotage leaves a failed joint that can be repaired and recovered (109.621375ms)
+✔ a connection is logged from reserve through physical proof test (230.643167ms)
+✔ interrupting alignment leaves visible parts unconnected (248.042625ms)
+✔ same-runtime fixed-step snapshots retain deterministic checksums (220.23075ms)
+✔ full live inventory stays inside the fixed-step performance budget (123.716416ms)
+✔ live play exposes paced build, contest, and decisive beats (30.177083ms)
+✔ one compact team decision starts distinct physical jobs (286.28425ms)
+✔ workers route around the stone tower instead of crossing it (310.862084ms)
+✔ a worker stops at the stage wall and remains grounded (123.616041ms)
+✔ workers meeting in a narrow lane separate instead of interpenetrating (279.160291ms)
+✔ a carried long beam takes the wider route around the tower (708.219875ms)
+✔ an unfinished episode becomes a draw at ten minutes (40.475458ms)
+✔ frenetic opening work stays onstage without waking the tower (549.652541ms)
+﹣ legacy blueprint fixtures are excluded from puzzle play (0.040708ms) # SKIP
+✔ malformed actions are rejected into an explicit wait (0.092458ms)
+✔ the public cast has one Egg King and replays survive a restart (89.796625ms)
+✔ short team orders cause the next mock actions (0.756542ms)
+✔ agents receive neutral material affordances instead of suggested tactics (169.465583ms)
+✔ a rope cannot be attached directly to Humpty without the sling and tackle (188.300209ms)
+✔ the 36-block Jenga tower exposes a bounded reaction probe (53.928375ms)
+✔ Humpty only cracks from a hard fall or a strong physical projectile (129.150042ms)
+✔ an intact Humpty must stand upright before the King wins (149.032291ms)
+﹣ legacy recipe battle is not part of puzzle play (0.039042ms) # SKIP
+ℹ tests 35
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 5093.712375
+
+> all-the-kings-men@0.1.0 build
+> vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2760 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     5.31 kB │ gzip:   1.58 kB
+dist/assets/index-D5Kx6dmu.css     14.73 kB │ gzip:   3.64 kB
+dist/assets/index-CeA5s90M.js   4,028.14 kB │ gzip: 986.05 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.78s

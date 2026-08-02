@@ -1,0 +1,53 @@
+{
+  "compatibility": [
+    {
+      "class": "TENON_LOCK", "first": "rigid_peg", "second": "rigid_socket", "directional": false, "joint": "fixed",
+      "tolerance": { "distance": 8, "angleDegrees": 12 }, "action": { "workers": 1, "duration": 0.65, "supportRequired": true },
+      "dofBefore": ["translate_x", "translate_y", "translate_z", "rotate"], "dofAfter": [],
+      "compliance": 0.012, "backlash": 0.008, "damping": 0.72, "friction": 0.88,
+      "safeLoad": 1800, "warningLoad": 1400, "breakForce": 2500, "breakTorque": 920, "detachUnderLoad": false, "failureState": "pulled_out"
+    },
+    {
+      "class": "AXLE_BEARING", "first": "axle_shaft", "second": "bearing_bore", "directional": false, "joint": "revolute",
+      "tolerance": { "distance": 7, "angleDegrees": 10 }, "action": { "workers": 1, "duration": 0.75, "supportRequired": true },
+      "dofBefore": ["translate_x", "translate_y", "translate_z", "rotate"], "dofAfter": ["rotate_axis"],
+      "compliance": 0.009, "backlash": 0.012, "damping": 0.24, "friction": 0.12,
+      "safeLoad": 2400, "warningLoad": 1900, "breakForce": 3400, "breakTorque": 1150, "detachUnderLoad": false, "failureState": "bent"
+    },
+    {
+      "class": "KEYED_COAXIAL", "first": "key_flat", "second": "keyway", "directional": false, "joint": "fixed",
+      "tolerance": { "distance": 6, "angleDegrees": 8 }, "action": { "workers": 1, "duration": 0.55, "supportRequired": true },
+      "dofBefore": ["translate_x", "translate_y", "translate_z", "rotate_axis"], "dofAfter": [],
+      "compliance": 0.005, "backlash": 0.006, "damping": 0.8, "friction": 0.8,
+      "safeLoad": 2200, "warningLoad": 1700, "breakForce": 3200, "breakTorque": 1450, "detachUnderLoad": false, "failureState": "pulled_out"
+    },
+    {
+      "class": "ROPE_ATTACH", "first": "hook", "second": "load_eye", "directional": false, "joint": "rope",
+      "tolerance": { "distance": 12, "angleDegrees": 180 }, "action": { "workers": 1, "duration": 0.6, "supportRequired": false },
+      "dofBefore": ["translate_x", "translate_y", "translate_z", "rotate"], "dofAfter": ["swing", "twist"],
+      "compliance": 0.08, "backlash": 0.05, "damping": 0.58, "friction": 0.66,
+      "safeLoad": 1450, "warningLoad": 1080, "breakForce": 1950, "breakTorque": 60, "detachUnderLoad": false, "failureState": "slipped"
+    },
+    {
+      "class": "ROPE_ATTACH", "first": "rope_end", "second": "load_eye", "directional": false, "joint": "rope",
+      "tolerance": { "distance": 12, "angleDegrees": 180 }, "action": { "workers": 1, "duration": 0.75, "supportRequired": false },
+      "dofBefore": ["translate_x", "translate_y", "translate_z", "rotate"], "dofAfter": ["swing", "twist"],
+      "compliance": 0.1, "backlash": 0.06, "damping": 0.62, "friction": 0.72,
+      "safeLoad": 1350, "warningLoad": 980, "breakForce": 1850, "breakTorque": 50, "detachUnderLoad": false, "failureState": "slipped"
+    },
+    {
+      "class": "ROPE_ATTACH", "first": "rope_end", "second": "cleat", "directional": false, "joint": "rope",
+      "tolerance": { "distance": 11, "angleDegrees": 180 }, "action": { "workers": 1, "duration": 0.8, "supportRequired": true },
+      "dofBefore": ["translate_x", "translate_y", "translate_z", "rotate"], "dofAfter": ["twist"],
+      "compliance": 0.075, "backlash": 0.04, "damping": 0.72, "friction": 0.9,
+      "safeLoad": 1400, "warningLoad": 1040, "breakForce": 1900, "breakTorque": 65, "detachUnderLoad": false, "failureState": "slipped"
+    },
+    {
+      "class": "ROPE_ATTACH", "first": "rope_end", "second": "sheave_groove", "directional": false, "joint": "rope",
+      "tolerance": { "distance": 10, "angleDegrees": 40 }, "action": { "workers": 1, "duration": 0.9, "supportRequired": true },
+      "dofBefore": ["translate_x", "translate_y", "translate_z", "rotate"], "dofAfter": ["line_travel"],
+      "compliance": 0.065, "backlash": 0.04, "damping": 0.3, "friction": 0.18,
+      "safeLoad": 1300, "warningLoad": 950, "breakForce": 1750, "breakTorque": 40, "detachUnderLoad": false, "failureState": "slipped"
+    }
+  ]
+}

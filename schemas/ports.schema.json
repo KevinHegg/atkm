@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "ports.schema.json", "type": "object",
+  "required": ["ports"], "additionalProperties": false,
+  "properties": { "ports": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false,
+    "required": ["id", "label", "primitiveClass", "visual", "transmits"],
+    "properties": { "id": { "type": "string", "minLength": 1 }, "label": { "type": "string" }, "primitiveClass": { "enum": ["fundamental", "extension", "omit"] }, "visual": { "type": "string" }, "transmits": { "type": "array", "uniqueItems": true, "items": { "enum": ["tension", "compression", "shear", "torque"] } } }
+  } } }
+}

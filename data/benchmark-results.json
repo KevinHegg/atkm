@@ -1,0 +1,11 @@
+{
+  "runtime": "node-rapier2d-same-runtime",
+  "recordedAt": "2026-08-01",
+  "results": [
+    { "policy": "random_legal", "matches": 0, "usefulCapabilities": 0, "meanFirstConnectionSeconds": 0, "validActionRate": 0, "status": "not run in this local acceptance pass" },
+    { "policy": "nearest_compatible", "matches": 0, "usefulCapabilities": 0, "meanFirstConnectionSeconds": 0, "validActionRate": 0, "status": "not run in this local acceptance pass" },
+    { "policy": "fixture_playback", "matches": 0, "usefulCapabilities": 0, "meanFirstConnectionSeconds": 0, "validActionRate": 0, "status": "fixtures validated structurally; match benchmark pending" },
+    { "policy": "heuristic", "matches": 0, "usefulCapabilities": 0, "meanFirstConnectionSeconds": 0, "validActionRate": 0, "status": "not run in this local acceptance pass" },
+    { "policy": "reasoning", "matches": 0, "usefulCapabilities": 0, "meanFirstConnectionSeconds": 0, "validActionRate": 0, "status": "requires model-backed evaluation" }
+  ]
+}

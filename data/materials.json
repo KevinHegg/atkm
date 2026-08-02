@@ -1,0 +1,12 @@
+{
+  "materials": [
+    { "id": "ash", "label": "Ash", "density": 690, "friction": 0.72, "restitution": 0.08, "linearDamping": 0.12, "angularDamping": 0.18, "credibility": "attested", "appearance": "pale straight grain with iron wear marks" },
+    { "id": "oak", "label": "Oak", "density": 750, "friction": 0.78, "restitution": 0.06, "linearDamping": 0.14, "angularDamping": 0.2, "credibility": "attested", "appearance": "dark coarse grain with pegged joinery" },
+    { "id": "wrought_iron", "label": "Wrought iron", "density": 7750, "friction": 0.52, "restitution": 0.12, "linearDamping": 0.05, "angularDamping": 0.08, "credibility": "attested", "appearance": "blackened forged iron with hammered edges" },
+    { "id": "bronze", "label": "Bronze", "density": 8800, "friction": 0.42, "restitution": 0.1, "linearDamping": 0.04, "angularDamping": 0.06, "credibility": "attested", "appearance": "dull golden bearing metal" },
+    { "id": "hemp", "label": "Hemp rope", "density": 1450, "friction": 0.82, "restitution": 0.02, "linearDamping": 0.28, "angularDamping": 0.32, "credibility": "attested", "appearance": "thick three-strand tan line with eye splices" },
+    { "id": "canvas_leather", "label": "Canvas and leather", "density": 930, "friction": 0.86, "restitution": 0.03, "linearDamping": 0.3, "angularDamping": 0.34, "credibility": "plausible", "appearance": "heavy canvas with dark leather edging and iron eyes" },
+    { "id": "hornbeam", "label": "Hornbeam", "density": 790, "friction": 0.74, "restitution": 0.07, "linearDamping": 0.13, "angularDamping": 0.19, "credibility": "plausible", "appearance": "dense pale wood polished at threads" },
+    { "id": "limestone", "label": "Limestone", "density": 2400, "friction": 0.9, "restitution": 0.04, "linearDamping": 0.08, "angularDamping": 0.12, "credibility": "attested", "appearance": "chipped warm gray stone" }
+  ]
+}
