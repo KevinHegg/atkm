@@ -12,11 +12,14 @@ export type PortKind =
   | "sheave_groove"
   | "ground_foot";
 
-export type ConnectionClass =
-  | "TENON_LOCK"
-  | "AXLE_BEARING"
-  | "KEYED_COAXIAL"
-  | "ROPE_ATTACH";
+export const CONNECTION_CLASSES = [
+  "TENON_LOCK",
+  "AXLE_BEARING",
+  "KEYED_COAXIAL",
+  "ROPE_ATTACH",
+] as const;
+
+export type ConnectionClass = (typeof CONNECTION_CLASSES)[number];
 
 export type PrimitiveClass = "fundamental" | "extension" | "omit";
 export type PartLifecycleState =

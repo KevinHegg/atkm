@@ -1,83 +1,129 @@
 # Implementation Notes
 
-Date: 2026-08-01
+Date: 2026-08-03
 
-## Completed Mechanical Slice
+## Current Core Legibility Reset
 
-- The central pier is 24 individually dynamic oak blocks in eight alternating
-  courses plus a separate dynamic top support. The visible pier is generated
-  from authoritative snapshot bodies; the old decorative duplicate is gone.
-- Humpty is a heavy dynamic rounded body. Opening settlement is completed before
-  curtain-up, then tower and shell bodies sleep until an explicit probe, impact,
-  or rescue wakes them.
-- Every team owns exactly 27 persistent pieces: 4 short spars, 4 long spars, 4
-  bearing nodes, 2 deck panels, 2 axles, 2 wheel/drums, 2 sheave blocks, 2 ropes,
-  2 wedges, 1 threaded spindle, 1 nut/slider, and 1 sling.
-- Inventory occupies two mirrored x lanes at the stage edges and reachable depth
-  rows from backdrop to apron. No complete machine or loose projectile is added
-  to puzzle play.
-- Workers fetch, lift, carry, stage, align, connect, recover, sabotage, and repair
-  through visible task phases. Parts remain dynamic and are moved with bounded
-  spring, damping, torque, gravity compensation, load-speed braking, and swept
-  load footprints. Long spars and broad decks reserve a helper.
-- Snap completion creates Rapier fixed, revolute, rope, prismatic-thread, or
-  contact constraints. Misaligned, blocked, occupied, overlapping, unsupported,
-  or fast-moving joins are rejected. Flexible rope reach is measured from the
-  persistent rope body rather than treating the six-metre line as a rigid bar.
-- The Queen's commissioned shot launches an existing wheel/drum or wedge. The
-  projectile remains in the ledger and must be recovered; no stone is spawned.
-- Failed joints remove their physical constraint and preserve damaged state.
-  Repair requires physical realignment before a new joint is created. Recovery
-  now has carry, release, and gravity-settle phases.
-- Assembly observations include live center of mass, support span, signed tipping
-  margin, binding risk, buckling risk, joint utilization, rope state, and neutral
-  derived capabilities. The legal join frontier is capped at 12 diverse options;
-  an opening team state is about 14 KB.
-- GPT-5.4 receives first choice of work whenever a crew member is idle. Requests
-  are suppressed while every worker is already occupied, and named completion
-  targets used by the local continuity policy are stripped from model input.
-  Invalid, late, or unavailable responses fall back to physical local initiative
-  without pausing the world.
-- Six simple-machine recognizers derive evidence from typed parts and connected
-  geometry. No `machineType`, blueprint ID, recipe, or graph hash is sent to an
-  agent.
-- A bounded tower probe reports input impulse, estimated reaction force, selected
-  block displacement, neighboring motion, angular motion, and signed support
-  margin, and aborts if the tower approaches its safety thresholds.
+- The running app now starts from `server/core` rather than the archived
+  scripted match code. `npm run dev` serves one local HTTP/WebSocket process
+  with Vite middleware and a PlayCanvas client.
+- Rapier 3D is the only gameplay physics authority. The server creates and steps
+  the world at 60 Hz, and the client renders snapshot bodies without Ammo,
+  browser rigid bodies, or browser collision components. Rapier's shared WASM
+  runtime initializes once even when the server resets or tests create another
+  world.
+- The central stack is a 36-block Jenga tower: twelve alternating courses, three
+  dynamic oak timbers per course, no block-to-block joints, and a computed
+  tower-height placement for the royal seat and Humpty.
+- The royal seat and Humpty are dynamic bodies supported by contact. Removing a
+  top support changes the seat response through physics rather than through a
+  scripted pose.
+- Six workers are kinematic Rapier capsule bodies with character-controller
+  sweeps. Direct blocked sweeps stop instead of sliding a worker through or
+  around the tower, while the two-worker carry fixture still routes a long beam
+  around the center at safe depth.
+- The opening kit now matches the frozen 24-piece-per-team manifest: three beam
+  lengths, four hubs, two axle lengths, wheels, sheaves, one winding drum,
+  planks, hooked ropes, and wedge feet. The nine visual families are mirrored,
+  persistent, placed on edge racks, and checked for no late spawning.
+- Connections now carry one of four explicit classes. Tenon and keyed coaxial
+  joins are fixed, axle bearings are revolute, and rope attachments use a
+  finite-length rope joint with observable slack. Requests and family pairs are
+  validated before the joint is created, and snapshots count each class.
+- Diagnostics expose the physics adapter, one-world count, fixed-step rate,
+  units, dynamic body count, joint count, tower and inventory counts, illegal
+  transform writes, penetration counts, Humpty support contacts, tower contacts,
+  and render divergence.
+- The deterministic lever and ramp now route workers and frozen-kit parts from
+  their real opening rack poses. The ram keys two wheels to one long axle, pins
+  that axle through a broad-plank chassis bearing, tenon-locks a long beam to
+  the chassis, rolls on both wheels, and drives a fourth-course tower timber
+  through measured contact.
+- The deterministic hoist braces a long axle, keys a deep-groove sheave to it,
+  attaches both ends of one hooked rope, and raises a broad-plank proof load.
+  Tension shortens the live rope joints; the fixture passes only after measured
+  upward travel, positive line tension, low slack, and explicit joint tests.
+- The default development server now starts a seeded autonomous match after one
+  second. `shared/agent-rules.ts` enumerates 31 strategic rules with stable IDs,
+  team and objective eligibility, phase, weight, observable preconditions,
+  public action packets, connection class where relevant, and structured
+  simple-machine ingredients and capabilities for compound rules. Six independent
+  worker lanes choose and execute their opening concurrently over the same physics world. The
+  opening uses separated rack aisles and work bays so each figure can act on the
+  same tick without interpenetration. Subsequent choices use the seed and repeat
+  penalties. After the opening, one Red team lane and one Green team lane run
+  concurrently. Red evaluates an escalade and rescue hoist; Green evaluates a
+  wheel bombard, wheeled ram, pivoted striker, and counterweight sling. Weighted
+  seeded selection is repeatable but varies across
+  seeds. Success records the relevant contacts, joint classes, climb or load
+  travel, line state, wheel rotation, projectile motion, and tower-timber
+  displacement. Per-figure rules, complete choice sets, selected plan IDs, and
+  machine evidence appear in snapshots; manual control cancels every
+  autonomous lane first.
+- `AGENT_DRIVER=llm` now runs a bounded asynchronous Responses API strategist.
+  It receives only objectives, triggers, observed facts, and currently eligible
+  IDs. Structured responses are validated against the advertised choices;
+  timeout, service failure, or an invented ID falls back to the seeded director
+  while Rapier continues stepping. Failed machine work records its evidence,
+  keeps the changed world, excludes the attempted class, and makes one recovery
+  choice.
+- The client restores user-enabled Web Audio cues and local recorded lines for
+  Humpty and the Mad Queen, with browser speech as the fallback for unexpected
+  text. Royal speech events animate Humpty's mouth or the Queen's
+  head, crown, and scepter. Worksite events produce throttled step, fastening,
+  rope, launch, impact, and crack cues without adding media assets.
+- Autonomous connections use IDs derived from class and body IDs, so concurrent
+  Red and Green assembly cannot collide in the joint ledger. Public `wait`
+  actions may include a destination and route a figure there physically before
+  waiting, which lets plans muster crews without private movement authority.
+- The right performance ledger can collapse from its always-reachable stage
+  control. The preference persists across reloads, the camera refits after the
+  width transition, and mobile keeps the full stage without the redundant dock.
+- Red's objective is an intact, low-speed, one-second stand on the stage floor.
+  Green's objective is zero integrity before that stand; a floor impact at or
+  above 3.0 m/s produces the current terminal crack. Simply reaching floor
+  height no longer awards Green the match.
 
 ## Verification
 
-`npm run check` covers strict TypeScript, grammar and schema contracts, mirrored
-inventory, dynamic pier count, connection legality, six simple machines,
-finite-force logistics, worker routing, sabotage/repair/recovery, replay
-checksums, ten-minute draw, Humpty fracture, upright landing, performance, and a
-production Vite build. Human-only acceptance fixtures are documented in
-`docs/worked-assemblies.md` and are not available to agents.
+`npm run typecheck` passes strict TypeScript. `npm test` runs the reset
+tests covering the single authority, render-path absence of gameplay physics,
+fixed-step determinism, transform-write tripwire, 36-block tower geometry,
+Humpty/seat/tower contact, worker collision, two-worker carrying, idle
+stability, mirrored inventory, four connection classes and joint kinds, and the
+public reset action vocabulary. The fixture regression also runs the lever,
+ramp, ram, and hoist from fresh fixed-seed worlds and checks the machines'
+exact joint-class inventories, tested rope path, line tension, and slack.
+The autonomous-match regressions verify six choices on one tick, concurrent
+Red and Green machine operation, clean manual takeover, six observed-fact plan
+builders, recovery, seeded selection variation across all six classes, model
+ID validation, and a scripted model driver through the public boundary. The fixed-seed round remains free
+of late inventory and illegal transform writes. Separate contract tests cover rule
+uniqueness, legal-action-only packets, all four frozen connection classes, all
+five simple-machine ingredients, all six machine capabilities, climb target
+validation, and both objective outcomes.
 
 ## Known Limits
 
-- Rapier 2D remains the gameplay authority while PlayCanvas/Ammo is a corrected
-  presentation layer. Depth participates in layout, routing, swept clearance,
-  and observations, but not full 3D rigid-body contact. A server-side Ammo
-  migration was deliberately not attempted in this pass.
-- Rope has persistent endpoints, physical rope joints, free-length reach, load,
-  slack/tension state, and rendered path cues, but not yet a multi-segment
-  sheave-wrap solver with conserved arc length and derailment.
-- Support polygon, buckling, and binding values are conservative live estimates,
-  not a finite-element structural solver.
-- The dormant recipe-era server code still exists for old replay compatibility,
-  but puzzle mode rejects its actions and creates none of its useful objects.
-- Policy matchups are explicitly marked unrun in `data/benchmark-results.json`;
-  model-backed comparative balance needs a separate credit-bearing evaluation.
-- The final live API verification returned `429` because the configured account
-  had no remaining credits. The game remains playable through local initiative;
-  GPT-5.4 resumes automatically after credit is available and the server restarts.
+- The pivoted striker and counterweight sling are selectable and physically
+  staged, but collision-blocked routes can still leave either incomplete. The
+  recovery ledger deliberately reports that result and selects a different
+  class instead of awarding synthetic success.
+- Rope behavior uses a deterministic two-span proxy rather than a full flexible
+  cable solver. Attached rope coils become non-solid physics sensors while the
+  finite-length joints carry load, and the client renders each live span.
+- Several historical docs and archived files intentionally remain for audit
+  context and may describe the old Rapier 2D, Pixi, browser Ammo, or recipe-era
+  implementation.
+- The refreshed normal camera shows Gate D passing with both edge inventories;
+  permanent acceptance evidence still needs to be captured with the complete
+  fixture sequence.
 
 ## Next Highest-Value Work
 
-1. Replace the remaining presentation Ammo bodies with transform-only entities,
-   or migrate the authority to one headless 3D Bullet world.
-2. Add a routed rope solver with sheave wrap, slack propagation, overload,
-   derailment, and persistent fraying geometry.
-3. Add an automated multi-policy match runner and tune from completion rate,
-   capability diversity, time-to-first-machine, and outcome balance.
+1. Capture permanent browser evidence for the autonomous match, royal audio
+   control, recovery, and fixtures.
+2. Tune the Green staging lanes so the striker and sling complete more often
+   without relaxing collision or evidence requirements.
+3. Replace the deterministic two-span rope proxy only if full cable wrapping is
+   needed for autonomous match tactics.

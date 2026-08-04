@@ -12,11 +12,16 @@ is failing:
 5. nine-family, 24-piece mirrored kit and four connection classes;
 6. rescue/attack fixtures, diagnostics, and browser acceptance.
 
-The current repository has not passed Gate 1's engine requirement: gameplay is
-still authoritative Rapier 2D while PlayCanvas/Ammo presents snapshots. Do not
-describe the full repair as complete until that architecture and the meter-unit
-contract are resolved. Later work may preserve and test the repaired tower,
-support, locomotion, lifecycle, kit, and fixtures without mislabeling Gate 1.
+Current reset status: Gate 1 is executable in `server/core` as one
+server-authoritative Rapier 3D world, with PlayCanvas consuming snapshots only.
+Gates 2 through 5 are also executable: a 36-block, 12-course tower, a
+physical Humpty seat, collision-aware worker capsules, and two-worker carry
+fixtures. The opening inventory now matches the frozen nine-family,
+24-piece-per-team manifest, and connections are represented separately as
+`TENON_LOCK`, `AXLE_BEARING`, `KEYED_COAXIAL`, and `ROPE_ATTACH`. Do not
+describe the full repair as complete until Gate 6 browser acceptance is current;
+older docs/archive files still describe previous Rapier 2D, Pixi, and Ammo
+passes.
 
 ## Commands
 
@@ -41,8 +46,28 @@ support, locomotion, lifecycle, kit, and fixtures without mislabeling Gate 1.
 - Keep inventory persistent. No useful part may spawn, clone, vanish, or be
   replaced after the opening ledger is created.
 
+## Contraption Extension Contract
+
+The frozen opening inventory and four connection classes remain fixed, but the
+strategy layer may now enumerate unexpected contraptions from them. Agents may
+choose a recipe permutation exposed by `/contraptions` or the model request:
+the recipe can reorder crew roles and simple-machine ingredients, and it must
+expand to a public action packet against visible body IDs. The action system
+and Rapier world remain the only authorities. An invented ID, private force,
+teleport, new part, or unadvertised connection is rejected. A blocked recipe
+is evidence for the next choice, not permission to reset the stage.
+
+`/agent-context` is the repository MCP-style contract surface. It returns this
+file, the public rule endpoints, source-of-truth files, and the invariants that
+an external agent must follow. Keep `shared/agent-rules.ts`,
+`server/core/compound-plans.ts`, and `server/core/contraption-grammar.ts`
+synchronized when adding a new recipe family.
+
 ## Scope Freeze
 
 The repair kit has nine visual families and four connection classes. Do not add
-gears, racks, screws, crossbows, torsion bundles, cams, belts, chains, complex
-rope networks, procedural machine generators, or named machine recipes.
+new physical families, connection classes, or post-start inventory without a
+separate design decision. Recipe composition is allowed within the visible
+kit; it cannot grant compatibility, spawn parts, create private actions, or
+bypass the four frozen connection classes. A future family such as a screw or
+cam needs its own inventory, ports, physics, and acceptance gate.

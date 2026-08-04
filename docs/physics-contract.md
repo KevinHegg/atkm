@@ -17,21 +17,25 @@
 
 ## Current Compliance Status
 
-- Gameplay is authoritative in the server's Rapier 2D world. The PlayCanvas
-  scene consumes snapshots and does not decide outcomes or construction poses.
-- The PlayCanvas scene still initializes presentation rigid bodies through its
-  Ammo integration. That means the requested PlayCanvas/Ammo-only single-world
-  architecture has **not** been reached, even though duplicate gameplay
-  authority has been removed from the repaired puzzle path.
-- Legacy stage coordinates are still pixel-like world units. The code records
-  `world.lengthUnit = 52`, but tower and kit dimensions are not consistently
-  authored in meters. A unit migration remains required before claiming the
-  meter contract.
-- `illegalTransformWrites` is exposed in diagnostics but is not yet backed by a
-  complete write-site interceptor. The audit and tests cover known gameplay
-  paths; the counter alone is not proof that every future transform write is
-  legal.
-- `deepBodyPenetrations` counts contact separation beyond 1.9 stage units,
-  approximately the requested 0.01 m tolerance under the tower scale. Smaller
-  solver corrections remain observable through contact tests but are not
-  reported as deep violations.
+- Gameplay is authoritative in the server's Rapier 3D world. The PlayCanvas
+  scene consumes snapshots and does not decide outcomes, construction poses, or
+  body contacts.
+- The live client path creates transform-only PlayCanvas entities. The reset
+  tests scan the client for browser Ammo, rigid-body components, and collision
+  components.
+- The core reset exports an `m-kg-s-N-Nm` diagnostics contract, and the tower,
+  seat, Humpty, workers, and frozen 24-piece-per-team kit are authored in
+  metre-scale values.
+- `illegalTransformWrites` is backed by the reset world's pose-write path and a
+  test tripwire. Initial construction and explicit reset remain the allowed
+  direct-write boundaries.
+- `deepBodyPenetrations` reports solver contacts deeper than 0.02 m. Smaller
+  support contacts remain observable through direct contact tests.
+- `TENON_LOCK` and `KEYED_COAXIAL` create fixed joints, `AXLE_BEARING`
+  creates a revolute joint, and `ROPE_ATTACH` creates a finite-length rope
+  joint. Family compatibility is checked before a physical joint is created.
+- Current automated coverage includes the single authority, 60 Hz stepping,
+  deterministic replay, 36-block tower geometry, Humpty/seat/tower contact,
+  worker collision sweeps, two-worker carrying, idle stability, persistent
+  mirrored inventory matched against the opening manifest, all four connection
+  classes, and illegal-write diagnostics.

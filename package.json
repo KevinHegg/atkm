@@ -12,11 +12,10 @@
     "check": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
-    "@dimforge/rapier2d-compat": "^0.18.2",
+    "@dimforge/rapier3d-compat": "^0.18.2",
     "dotenv": "^16.6.1",
     "lucide": "^0.468.0",
     "playcanvas": "^2.21.3",
-    "sync-ammo": "^0.1.2",
     "vite": "^6.1.0",
     "ws": "^8.18.0"
   },

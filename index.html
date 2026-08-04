@@ -3,65 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#2E3A45" />
+    <meta name="theme-color" content="#11191d" />
     <title>All the King's Men</title>
     <link rel="stylesheet" href="/client/style.css?build=__BUILD_ID__" />
   </head>
   <body>
     <main id="app">
-      <section id="stage-shell" aria-label="The puppet theatre">
+      <section id="stage-shell" aria-label="The physical theatre">
         <div id="stage"></div>
-        <div id="title-card">
-          <span class="kicker">A penny dreadful in perpetual motion</span>
+
+        <header id="title-card">
+          <span>A penny dreadful in perpetual motion</span>
           <h1>All the King's Men</h1>
-        </div>
-        <div id="construction-cues" aria-live="polite"></div>
-        <div id="end-card" hidden>
-          <span id="end-eyebrow">The broadside reports</span>
-          <h2 id="end-title"></h2>
-          <p id="end-copy"></p>
-          <button id="end-restart" type="button">Another performance</button>
-        </div>
-        <nav id="controls" aria-label="Spectator controls">
-          <button type="button" data-command="pause" aria-label="Pause performance" title="Pause performance (Space)"><i data-lucide="pause"></i></button>
-          <button type="button" data-command="follow" aria-label="Cinematic follow" title="Cinematic follow (F)"><i data-lucide="scan-search"></i></button>
-          <button type="button" data-command="fit" aria-label="Fit the full stage" title="Fit the full stage (0)"><i data-lucide="maximize-2"></i></button>
-          <button type="button" data-command="poke" aria-label="Poke a lower tower block" title="Poke the tower (P)"><i data-lucide="hand"></i></button>
-          <button type="button" data-command="sound" aria-label="Enable sound" title="Enable sound (M)"><i data-lucide="volume-x"></i></button>
-          <button type="button" data-command="engineering" aria-label="Show engineering overlay" title="Engineering overlay (D)"><i data-lucide="wrench"></i></button>
-          <button type="button" data-command="replay" aria-label="Replay the latest performance" title="Replay latest performance"><i data-lucide="history"></i></button>
-          <button type="button" data-command="restart" aria-label="Restart run" title="Restart run (R)"><i data-lucide="rotate-ccw"></i></button>
+        </header>
+
+        <nav id="controls" aria-label="Theatre controls">
+          <button type="button" data-command="pause" aria-label="Pause" title="Pause"><i data-lucide="pause"></i></button>
+          <button type="button" data-command="fit" aria-label="Fit the stage" title="Fit the stage"><i data-lucide="maximize-2"></i></button>
+          <button type="button" data-command="poke" aria-label="Test the tower" title="Test the tower"><i data-lucide="hand"></i></button>
+          <button type="button" data-command="sound" aria-label="Enable sound" title="Enable sound"><i data-lucide="volume-x"></i></button>
+          <button type="button" data-command="engineering" aria-label="Show engineering diagnostics" title="Engineering diagnostics"><i data-lucide="wrench"></i></button>
+          <button type="button" data-command="restart" aria-label="Reset the laboratory" title="Reset the laboratory"><i data-lucide="rotate-ccw"></i></button>
         </nav>
-        <section id="engineering-overlay" aria-label="Engineering overlay" hidden>
-          <header>
-            <span>Engineering</span>
-            <output id="engineering-checksum">tick 0 / --------</output>
-          </header>
-          <div id="engineering-summary"></div>
-          <ol id="engineering-list"></ol>
-        </section>
-        <div id="replay-controls" hidden aria-label="Replay controls">
-          <input id="replay-scrubber" type="range" min="0" max="1" step="0.01" value="0" aria-label="Replay position" />
-          <output id="replay-time" for="replay-scrubber">00:00 / 00:00</output>
-          <select id="replay-speed" aria-label="Playback speed" title="Playback speed">
-            <option value="0.25">0.25x</option>
-            <option value="0.5">0.5x</option>
-            <option value="1" selected>1x</option>
-            <option value="2">2x</option>
-            <option value="4">4x</option>
-          </select>
-          <button id="replay-live" type="button" aria-label="Return to live performance" title="Return to live performance"></button>
+
+        <div id="mode-mark" aria-live="polite">
+          <span>Legibility lab</span>
+          <strong id="stage-time">00:00</strong>
         </div>
+
+        <section id="engineering-overlay" hidden aria-label="Engineering diagnostics">
+          <header>
+            <strong>Physical evidence</strong>
+            <output id="engineering-tick">tick 0</output>
+          </header>
+          <dl id="engineering-values"></dl>
+        </section>
+
         <div id="sidebar-dock">
-          <span id="collapsed-elapsed" aria-live="polite">00:00</span>
-          <button id="sidebar-toggle" type="button" aria-label="Collapse performance ledger" aria-expanded="true" title="Collapse performance ledger">
+          <span id="collapsed-elapsed">00:00</span>
+          <button id="sidebar-toggle" type="button" aria-label="Collapse ledger" aria-expanded="true" title="Collapse ledger">
             <i data-lucide="panel-right-close"></i>
           </button>
         </div>
-        <div id="zoom-readout" aria-hidden="true">100%</div>
       </section>
 
       <aside id="broadside" aria-label="Performance ledger">
+        <nav id="sidebar-nav" aria-label="Game workspaces" role="tablist">
+          <button type="button" class="sidebar-tab active" data-sidebar-view="watch" role="tab" aria-selected="true" title="Watch the current match"><i data-lucide="eye"></i><span>Watch</span></button>
+          <button type="button" class="sidebar-tab" data-sidebar-view="archive" role="tab" aria-selected="false" title="Browse match archive"><i data-lucide="history"></i><span>Archive</span></button>
+          <button type="button" class="sidebar-tab" data-sidebar-view="organize" role="tab" aria-selected="false" title="Organize a match"><i data-lucide="clipboard-list"></i><span>Organize</span></button>
+        </nav>
+
+        <div id="watch-panel" class="sidebar-panel" data-sidebar-panel="watch">
         <header id="scoreboard">
           <div class="score-topline">
             <span>Elapsed</span>
@@ -70,36 +63,110 @@
           <dl class="metrics">
             <div>
               <dt>Humpty's height</dt>
-              <dd><span id="height-value">—</span><small>u</small></dd>
+              <dd><span id="height-value">--</span><small> m</small></dd>
             </div>
             <div>
               <dt>Integrity</dt>
               <dd id="integrity-value">100</dd>
             </div>
           </dl>
-          <div id="integrity-track" aria-label="Humpty integrity">
-            <span id="integrity-fill"></span>
-          </div>
-          <div class="death-toll">
-            <span class="king">King's fallen <b id="king-deaths">0</b></span>
-            <span class="queen">Queen's fallen <b id="queen-deaths">0</b></span>
-          </div>
+          <div id="integrity-track" aria-label="Humpty integrity"><span id="integrity-fill"></span></div>
         </header>
 
-        <section id="dramatis" aria-label="Agents">
-          <h2>Dramatis personae</h2>
-          <div id="agent-strip"></div>
+        <section id="match-panel" aria-label="Autonomous match">
+          <div class="section-heading">
+            <h2>Autonomous match</h2>
+            <output id="match-status">waiting</output>
+          </div>
+          <div class="match-turnline"><strong id="match-turn">0 active</strong><span id="match-phase">Muster</span><span id="rule-count">0 rules</span></div>
+          <dl id="match-objectives">
+            <div><dt>Red</dt><dd id="king-objective">Awaiting the bell.</dd></div>
+            <div><dt>Green</dt><dd id="queen-objective">Awaiting the bell.</dd></div>
+          </dl>
+          <dl id="match-machines">
+            <div><dt>Red machine</dt><dd id="king-machine">awaiting parts</dd></div>
+            <div><dt>Green machine</dt><dd id="queen-machine">awaiting parts</dd></div>
+          </dl>
+          <dl id="match-rules">
+            <div><dt>Red figures</dt><dd id="king-rule">not moving</dd></div>
+            <div><dt>Green figures</dt><dd id="queen-rule">not moving</dd></div>
+          </dl>
         </section>
 
+        <section id="gate-panel" aria-label="Reset gates">
+          <div class="section-heading">
+            <h2>Physical gates</h2>
+            <span id="connection-label">connecting</span>
+          </div>
+          <ol id="gate-list"></ol>
+        </section>
+
+        <details id="command-desk">
+          <summary><span>Command desk</span><i data-lucide="chevron-down"></i></summary>
+          <div class="command-fields">
+            <label>Worker<select id="worker-select"><option value="">Workers locked</option></select></label>
+            <label>Order<select id="action-select"></select></label>
+            <label>Object<select id="target-select"><option value="">Select an object</option></select></label>
+            <label id="secondary-field" class="connection-only" hidden>Second object<select id="secondary-select"><option value="">Select an object</option></select></label>
+            <label id="connection-class-field" class="connection-only" hidden>Connection<select id="connection-class-select"></select></label>
+            <button id="issue-order" type="button" disabled><i data-lucide="send"></i><span>Issue order</span></button>
+          </div>
+          <div id="fixture-strip" aria-label="Physical demonstrations">
+            <button type="button" data-fixture="lever">Lever</button>
+            <button type="button" data-fixture="ramp">Ramp</button>
+            <button type="button" data-fixture="ram">Ram</button>
+            <button type="button" data-fixture="hoist">Hoist</button>
+            <button type="button" data-fixture="transport">Carry</button>
+          </div>
+          <p id="command-feedback" role="status">Worker actions unlock after grounding is proven.</p>
+        </details>
+
         <section id="transcript-panel">
-          <div class="transcript-heading">
+          <div class="section-heading">
             <h2>The public record</h2>
-            <span id="run-meta">
-              <span id="build-label">3D live</span>
-              <span id="seed-label"></span>
-            </span>
+            <span id="run-meta"><b id="build-label">3D live</b><b id="seed-label">seed 1881</b></span>
           </div>
           <ol id="transcript" aria-live="polite"></ol>
+        </section>
+        </div>
+
+        <section id="archive-panel" class="sidebar-panel" data-sidebar-panel="archive" hidden aria-label="Match archive" role="tabpanel">
+          <header class="workspace-heading">
+            <div><span class="workspace-kicker">Recorded matches</span><h2>Replay archive</h2></div>
+            <output id="archive-status">live session</output>
+          </header>
+          <p class="workspace-intro">Choose a public match record, then scrub through its physical snapshots.</p>
+          <ol id="archive-list" aria-label="Past games"></ol>
+          <div id="replay-console" hidden>
+            <div class="replay-titleline"><strong id="replay-name">No replay selected</strong><span id="replay-time">00:00 / 00:00</span></div>
+            <input id="replay-scrubber" type="range" min="0" max="0" step="1" value="0" aria-label="Replay position" />
+            <div class="replay-controls">
+              <button type="button" data-replay-command="back" aria-label="Previous replay frame" title="Previous replay frame"><i data-lucide="skip-back"></i></button>
+              <button type="button" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
+              <button type="button" data-replay-command="forward" aria-label="Next replay frame" title="Next replay frame"><i data-lucide="skip-forward"></i></button>
+              <label>Speed<select id="replay-speed" aria-label="Replay speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label>
+              <button type="button" data-replay-command="live" aria-label="Return to live match" title="Return to live match"><i data-lucide="radio"></i></button>
+            </div>
+          </div>
+          <p id="archive-feedback" class="workspace-feedback">The server keeps a session archive of public snapshots.</p>
+        </section>
+
+        <section id="organize-panel" class="sidebar-panel" data-sidebar-panel="organize" hidden aria-label="Game organizer" role="tabpanel">
+          <header class="workspace-heading">
+            <div><span class="workspace-kicker">Match preparation</span><h2>Organize a game</h2></div>
+            <output id="organize-status">ready</output>
+          </header>
+          <p class="workspace-intro">Set a seed and pace for the next theatre. The two royal objectives and public machine rules remain in force.</p>
+          <form id="organize-form">
+            <label>Match seed<input id="organize-seed" type="number" min="0" max="999999" value="1881" /></label>
+            <label>Opening pace<select id="organize-speed"><option value="0.5">Measured</option><option value="1" selected>Standard</option><option value="2">Urgent</option></select></label>
+            <div class="organize-objective red"><strong>Red</strong><span>Bring Humpty safely to the stage floor.</span></div>
+            <div class="organize-objective green"><strong>Green</strong><span>Crack Humpty before he stands on the floor.</span></div>
+            <button id="launch-match" type="submit"><i data-lucide="rocket"></i><span>Launch new match</span></button>
+          </form>
+          <div class="organize-contract"><span>Agent contract</span><strong>31 rules · 4 connections · recipe permutations</strong><a href="/agent-context" target="_blank" rel="noreferrer">Open repo contract</a></div>
+          <div class="organize-recipes"><span>Recipe pool</span><strong id="organize-recipe-summary">Loading machine recipes...</strong></div>
+          <p id="organize-feedback" class="workspace-feedback">Launching a match preserves the current one in the archive.</p>
         </section>
       </aside>
     </main>
