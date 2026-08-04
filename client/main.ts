@@ -46,6 +46,7 @@ const url = new URL(location.href);
 if (!url.searchParams.has("mode")) url.searchParams.set("mode", CORE_MODE);
 if (!url.searchParams.has("seed")) url.searchParams.set("seed", "1881");
 if (url.href !== location.href) history.replaceState({}, "", url);
+const staticPreview = location.hostname.endsWith(".github.io") || url.searchParams.get("preview") === "static";
 
 const stage = required<HTMLElement>("stage");
 const world = new LabWorld(stage);
@@ -139,14 +140,18 @@ for (const connectionClass of CONNECTION_CLASSES) {
   connectionClassSelect.append(option);
 }
 
-connect();
 installControls();
 renderIcons();
 applySidebarState(sidebarCollapsed, false);
 setSidebarView("watch");
-void refreshArchiveList();
-void refreshContraptionSummary();
-archiveTimer = window.setInterval(() => void refreshArchiveList(), 2500);
+if (staticPreview) {
+  void loadStaticPreview();
+} else {
+  connect();
+  void refreshArchiveList();
+  void refreshContraptionSummary();
+  archiveTimer = window.setInterval(() => void refreshArchiveList(), 2500);
+}
 
 function required<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -186,6 +191,28 @@ function connect(): void {
     startPolling();
     reconnectTimer = window.setTimeout(connect, 1000);
   });
+}
+
+async function loadStaticPreview(): Promise<void> {
+  document.body.classList.add("static-preview");
+  connectionLabel.textContent = "preview";
+  connectionLabel.classList.add("open");
+  try {
+    const assetUrl = new URL("demo-snapshot.json", new URL(".", location.href));
+    const response = await fetch(assetUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Preview ${response.status}`);
+    const snapshot = await response.json() as CoreSnapshot;
+    latest = snapshot;
+    presentSnapshot(snapshot, false);
+    archiveStatus.textContent = "static preview";
+    archiveFeedback.textContent = "Recorded stage state. Run the theatre server for live autonomous play.";
+    archiveCount.textContent = "1 preview";
+    organizeStatus.textContent = "preview";
+    commandFeedback.textContent = "Static preview only. Live orders are available from the local theatre server.";
+  } catch (error) {
+    connectionLabel.textContent = "unavailable";
+    commandFeedback.textContent = error instanceof Error ? error.message : "Preview unavailable.";
+  }
 }
 
 function startPolling(): void {
@@ -735,6 +762,10 @@ function isConnectionAction(action: LegalActionRequest["action"]): boolean {
 }
 
 async function send(command: CoreClientCommand): Promise<void> {
+  if (staticPreview) {
+    commandFeedback.textContent = "Static preview only. Run the theatre server for live orders.";
+    return;
+  }
   if (socket?.readyState === WebSocket.OPEN && command.type !== "reset") {
     socket.send(JSON.stringify(command));
     return;
