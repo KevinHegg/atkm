@@ -209,6 +209,8 @@ export class LabWorld {
     else if (state.kind === "cradle") this.createCradleVisual(root);
     else if (state.kind === "humpty") this.createHumptyVisual(root, state);
     else if (state.kind === "part") this.createPartVisual(root, state);
+    else if (state.kind === "queen-device") this.createQueenDeviceVisual(root, state);
+    else if (state.kind === "queen-bolt") this.createQueenBoltVisual(root, state);
     else if (state.kind === "worker") this.createWorkerVisual(root, state.id, state.team ?? "king");
     const position = new pc.Vec3(state.position.x, state.position.y, state.position.z);
     const rotation = new pc.Quat(
@@ -426,6 +428,41 @@ export class LabWorld {
         this.teamMaterial(team),
       );
     }
+  }
+
+  private createQueenDeviceVisual(root: pc.Entity, state: CoreBodyState): void {
+    const dark = this.material("queen-engine-dark", palette.ink, .18);
+    const green = this.material("queen-engine-green", palette.queen, .24);
+    const gold = this.material("queen-engine-gold", palette.gold, .62, .5);
+    const iron = this.material("queen-engine-iron", palette.iron, .58, .7);
+    this.primitive("command-post-base", "cylinder", root, new pc.Vec3(0, -.58, 0), new pc.Vec3(.94, .16, .94), dark);
+    this.primitive("command-post-body", "box", root, new pc.Vec3(0, -.08, 0), new pc.Vec3(.62, 1.02, .62), green);
+    this.primitive("command-post-collar", "cylinder", root, new pc.Vec3(0, .38, 0), new pc.Vec3(.76, .12, .76), iron);
+    this.primitive("command-post-crown", "cylinder", root, new pc.Vec3(0, .61, 0), new pc.Vec3(.52, .13, .52), gold);
+    for (let index = 0; index < 5; index += 1) {
+      const angle = index / 5 * Math.PI * 2;
+      this.primitive(
+        "command-post-point",
+        "cone",
+        root,
+        new pc.Vec3(Math.cos(angle) * .22, .82, Math.sin(angle) * .22),
+        new pc.Vec3(.1, .38, .1),
+        gold,
+        new pc.Vec3(0, 0, index * 9 - 18),
+      );
+    }
+    this.primitive("command-post-eye", "sphere", root, new pc.Vec3(0, .08, -.34), new pc.Vec3(.13, .13, .045), gold);
+    this.teamWrap(root, "queen", new pc.Vec3(.72, .05, .72), new pc.Vec3(0, -.42, 0));
+    void state;
+  }
+
+  private createQueenBoltVisual(root: pc.Entity, state: CoreBodyState): void {
+    const gold = this.material("queen-bolt-gold", palette.gold, .7, .58);
+    const iron = this.material("queen-bolt-iron", palette.iron, .55, .72);
+    this.primitive("crown-bolt-core", "sphere", root, pc.Vec3.ZERO, new pc.Vec3(.28, .28, .28), iron);
+    this.primitive("crown-bolt-cap", "cylinder", root, new pc.Vec3(0, .04, 0), new pc.Vec3(.2, .06, .2), gold);
+    this.primitive("crown-bolt-tip", "cone", root, new pc.Vec3(0, .17, 0), new pc.Vec3(.11, .25, .11), gold);
+    void state;
   }
 
   private createTowerBlockVisual(root: pc.Entity, state: CoreBodyState): void {

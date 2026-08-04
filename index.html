@@ -39,12 +39,6 @@
           <dl id="engineering-values"></dl>
         </section>
 
-        <div id="sidebar-dock">
-          <span id="collapsed-elapsed">00:00</span>
-          <button id="sidebar-toggle" type="button" aria-label="Collapse ledger" aria-expanded="true" title="Collapse ledger">
-            <i data-lucide="panel-right-close"></i>
-          </button>
-        </div>
       </section>
 
       <aside id="broadside" aria-label="Performance ledger">
@@ -52,9 +46,15 @@
           <button type="button" class="sidebar-tab active" data-sidebar-view="watch" role="tab" aria-selected="true" title="Watch the current match"><i data-lucide="eye"></i><span>Watch</span></button>
           <button type="button" class="sidebar-tab" data-sidebar-view="archive" role="tab" aria-selected="false" title="Browse match archive"><i data-lucide="history"></i><span>Archive</span></button>
           <button type="button" class="sidebar-tab" data-sidebar-view="organize" role="tab" aria-selected="false" title="Organize a match"><i data-lucide="clipboard-list"></i><span>Organize</span></button>
+          <button id="sidebar-toggle" type="button" aria-label="Collapse ledger" aria-expanded="true" title="Collapse ledger"><i data-lucide="panel-right-close"></i></button>
+          <div id="sidebar-context" aria-live="polite"><span id="collapsed-context">Model-led match</span><strong id="collapsed-status-value">00:00</strong></div>
         </nav>
 
         <div id="watch-panel" class="sidebar-panel" data-sidebar-panel="watch">
+        <header class="workspace-heading watch-workspace-heading">
+          <div><span class="workspace-kicker">Live theatre</span><h2>Watch current match</h2></div>
+          <output id="watch-workspace-status">waiting</output>
+        </header>
         <header id="scoreboard">
           <div class="score-topline">
             <span>Elapsed</span>
@@ -87,6 +87,10 @@
             <div><dt>Red machine</dt><dd id="king-machine">awaiting parts</dd></div>
             <div><dt>Green machine</dt><dd id="queen-machine">awaiting parts</dd></div>
           </dl>
+          <dl id="queen-advantage">
+            <div><dt>Queen's edge</dt><dd id="queen-advantage-state">command post intact</dd></div>
+            <div><dt>Physical reserve</dt><dd id="queen-advantage-meta">2 / 2 crown bolts · 100% integrity</dd></div>
+          </dl>
           <dl id="match-rules">
             <div><dt>Red figures</dt><dd id="king-rule">not moving</dd></div>
             <div><dt>Green figures</dt><dd id="queen-rule">not moving</dd></div>
@@ -96,7 +100,7 @@
         <section id="gate-panel" aria-label="Reset gates">
           <div class="section-heading">
             <h2>Physical gates</h2>
-            <span id="connection-label">connecting</span>
+            <span class="gate-meta"><output id="gate-summary">0/9 cleared</output><span id="connection-label">connecting</span></span>
           </div>
           <ol id="gate-list"></ol>
         </section>
@@ -136,6 +140,7 @@
             <output id="archive-status">live session</output>
           </header>
           <p class="workspace-intro">Choose a public match record, then scrub through its physical snapshots.</p>
+          <div class="archive-summary"><span id="archive-count">0 records</span><span>public snapshots</span></div>
           <ol id="archive-list" aria-label="Past games"></ol>
           <div id="replay-console" hidden>
             <div class="replay-titleline"><strong id="replay-name">No replay selected</strong><span id="replay-time">00:00 / 00:00</span></div>
@@ -164,7 +169,7 @@
             <div class="organize-objective green"><strong>Green</strong><span>Crack Humpty before he stands on the floor.</span></div>
             <button id="launch-match" type="submit"><i data-lucide="rocket"></i><span>Launch new match</span></button>
           </form>
-          <div class="organize-contract"><span>Agent contract</span><strong>31 rules · 4 connections · recipe permutations</strong><a href="/agent-context" target="_blank" rel="noreferrer">Open repo contract</a></div>
+          <div class="organize-contract"><span>Agent contract</span><strong>33 rules · 4 connections · recipe permutations</strong><a href="/agent-context" target="_blank" rel="noreferrer">Open repo contract</a></div>
           <div class="organize-recipes"><span>Recipe pool</span><strong id="organize-recipe-summary">Loading machine recipes...</strong></div>
           <p id="organize-feedback" class="workspace-feedback">Launching a match preserves the current one in the archive.</p>
         </section>

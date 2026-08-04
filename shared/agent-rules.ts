@@ -433,6 +433,32 @@ export const AGENT_RULES = [
     when: ["An owned part is dropped and reachable.", "The required handling crew is free."],
     actions: ["fetch", "recover", "carry", "release"],
   },
+  {
+    id: "fire-queen-crown-bolt",
+    label: "Fire the Queen's crown bolt",
+    category: "operation",
+    teams: ["queen"],
+    objectiveIds: ["green-crack"],
+    phases: ["contest"],
+    weight: 1.55,
+    when: ["The Queen's command post is intact and armed.", "A crown bolt remains and Humpty is still aloft."],
+    actions: ["fetch", "hold", "operate"],
+    simpleMachines: ["wheel-and-axle", "lever"],
+    capabilities: ["launch", "strike"],
+  },
+  {
+    id: "strike-queen-command-post",
+    label: "Strike the Queen's command post",
+    category: "operation",
+    teams: ["king"],
+    objectiveIds: ["red-rescue"],
+    phases: ["contest"],
+    weight: 1.5,
+    when: ["The Queen's command post is exposed.", "Red can reach it before the crown bolt is fired."],
+    actions: ["fetch", "strike", "wait"],
+    simpleMachines: ["lever", "wedge"],
+    capabilities: ["strike"],
+  },
 ] as const satisfies readonly AgentRuleDefinition[];
 
 export const AGENT_RULES_BY_ID: ReadonlyMap<string, AgentRuleDefinition> = new Map(

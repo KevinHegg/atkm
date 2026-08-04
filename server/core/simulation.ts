@@ -829,7 +829,7 @@ export class CoreSimulation {
       bodies: this.physics.snapshotBodies(),
       workers: this.workers(),
       connections: this.connections(),
-      events: this.events.slice(0, 60),
+      events: this.events.slice(0, 120),
       diagnostics: {
         ...this.physics.diagnostics(),
         llmEnabled: this.match.snapshot().driver === "llm",

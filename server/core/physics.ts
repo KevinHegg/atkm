@@ -6,6 +6,7 @@ import {
   type CoreBodyKind,
   type CoreBodyState,
   type CoreDiagnostics,
+  type QueenAdvantageState,
   type CoreShape,
   type ConnectionClass,
   type PartFamily,
@@ -43,6 +44,8 @@ const RAM_SADDLE_FORWARD = .52;
 const RAM_SADDLE_HEIGHT = .19;
 const SUPPORT_EPSILON = 0.025;
 const WORKER_COLLISION_GROUP = 0x0004;
+const QUEEN_ENGINE_COLLISION_GROUP = 0x1000;
+const QUEEN_PROJECTILE_COLLISION_GROUP = 0x2000;
 const ALL_COLLISION_GROUPS = 0xffff;
 
 export interface BodyRecord {
@@ -102,6 +105,7 @@ export class CorePhysicsWorld {
   private workerPenetrations = 0;
   private deepBodyPenetrations = 0;
   private carriedPartPenetrations = 0;
+  private readonly queenBoltImpactIds = new Set<string>();
   private penetrationEvidenceRecords: Array<{
     tick: number;
     firstId: string;
@@ -149,6 +153,7 @@ export class CorePhysicsWorld {
   step(): void {
     this.world.step();
     this.tickValue += 1;
+    this.resolveQueenBoltImpacts();
     this.auditInventory();
     this.auditPenetrations();
   }
@@ -383,6 +388,85 @@ export class CorePhysicsWorld {
     }
     record.integrity = Math.max(0, record.integrity - amount);
     return record.integrity;
+  }
+
+  queenAdvantageState(): QueenAdvantageState {
+    const device = this.records.get("queen-command-post");
+    const boltIds = ["queen-crown-bolt-1", "queen-crown-bolt-2"];
+    const firedBoltIds = boltIds.filter((id) => this.records.get(id)?.variant?.startsWith("spent"));
+    const deviceIntegrity = device?.integrity ?? 0;
+    const charges = Math.max(0, boltIds.length - firedBoltIds.length);
+    return {
+      deviceId: "queen-command-post",
+      deviceIntegrity,
+      charges,
+      maxCharges: boltIds.length,
+      armed: deviceIntegrity > 0 && charges > 0,
+      disabled: deviceIntegrity <= 0,
+      firedBoltIds,
+    };
+  }
+
+  ensureQueenAdvantage(): void {
+    if (!this.records.has("queen-command-post")) this.createQueenAdvantage();
+  }
+
+  fireQueenBolt(targetId = "humpty"): { ok: boolean; boltId?: string; message?: string } {
+    const state = this.queenAdvantageState();
+    if (state.disabled) return { ok: false, message: "The Queen's command post is broken." };
+    if (state.charges <= 0) return { ok: false, message: "The Queen's crown bolts are spent." };
+    const target = this.bodyPosition(targetId);
+    if (!target) return { ok: false, message: "The crown bolt has no target." };
+    const bolt = ["queen-crown-bolt-1", "queen-crown-bolt-2"]
+      .map((id) => this.records.get(id))
+      .find((record) => record && !record.variant?.startsWith("spent"));
+    if (!bolt) return { ok: false, message: "No unfired crown bolt remains." };
+    const origin = this.bodyPosition(bolt.id);
+    if (!origin) return { ok: false, message: "The crown bolt has no physical origin." };
+    const direction = normalizeVec(subtractVec({ ...target, y: target.y + .8 }, origin));
+    bolt.body.setGravityScale(1, true);
+    for (const collider of bolt.colliders) {
+      collider.setSensor(false);
+      collider.setCollisionGroups(interactionGroups(
+        QUEEN_PROJECTILE_COLLISION_GROUP,
+        ALL_COLLISION_GROUPS,
+      ));
+    }
+    this.applyImpulse(bolt.id, scaleVec(direction, 75));
+    this.applyTorqueImpulse(bolt.id, { x: 1.2, y: 2.1, z: .8 });
+    bolt.variant = `spent crown bolt ${state.charges}`;
+    return { ok: true, boltId: bolt.id };
+  }
+
+  strikeQueenDevice(actorIds: readonly string[]): { ok: boolean; integrity?: number; message?: string } {
+    const device = this.records.get("queen-command-post");
+    const devicePosition = this.bodyPosition("queen-command-post");
+    if (!device || !devicePosition || device.kind !== "queen-device") {
+      return { ok: false, message: "The Queen's command post is missing." };
+    }
+    if ((device.integrity ?? 0) <= 0) return { ok: false, message: "The command post is already broken." };
+    const positions = actorIds
+      .map((id) => this.bodyPosition(id))
+      .filter((position): position is Vec3 => Boolean(position));
+    if (positions.length !== actorIds.length || positions.length === 0) {
+      return { ok: false, message: "The striking crew has no physical formation." };
+    }
+    const center = positions.reduce((sum, position) => addVec(sum, position), { x: 0, y: 0, z: 0 });
+    center.x /= positions.length;
+    center.y /= positions.length;
+    center.z /= positions.length;
+    if (Math.hypot(devicePosition.x - center.x, devicePosition.z - center.z) > 1.85) {
+      return { ok: false, message: "The striking crew is out of reach." };
+    }
+    const direction = normalizeVec({
+      x: devicePosition.x - center.x,
+      y: .18,
+      z: devicePosition.z - center.z,
+    });
+    this.applyImpulse("queen-command-post", scaleVec(direction, 3.6 * positions.length));
+    const integrity = this.applyDamage("queen-command-post", 28 * positions.length) ?? 0;
+    if (integrity <= 0) device.variant = "broken queen command post";
+    return { ok: true, integrity };
   }
 
   settleBody(id: string): boolean {
@@ -1002,6 +1086,76 @@ export class CorePhysicsWorld {
     }
   }
 
+  private createQueenAdvantage(): void {
+    const deviceBody = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(3.8, .78, -2.42)
+        .setGravityScale(0)
+        .setLinearDamping(.3)
+        .setAngularDamping(.45)
+        .setCcdEnabled(true),
+    );
+    const deviceCollider = this.world.createCollider(
+      RAPIER.ColliderDesc.roundCuboid(.44, .7, .44, .07)
+        .setMass(32)
+        .setFriction(.78)
+        .setRestitution(.12)
+        .setContactSkin(.001)
+        .setSensor(true),
+      deviceBody,
+    );
+    deviceCollider.setCollisionGroups(interactionGroups(
+      QUEEN_ENGINE_COLLISION_GROUP,
+      QUEEN_ENGINE_COLLISION_GROUP,
+    ));
+    this.addRecord({
+      id: "queen-command-post",
+      kind: "queen-device",
+      shape: "round-box",
+      body: deviceBody,
+      colliders: [deviceCollider],
+      size: { x: .88, y: 1.4, z: .88 },
+      dynamic: true,
+      team: "queen",
+      variant: "mad queen command post",
+      integrity: 100,
+    });
+    for (const [index, x] of [2.98, 3.36].entries()) {
+      const boltBody = this.world.createRigidBody(
+        RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(x, .18, -2.42)
+          .setGravityScale(0)
+          .setLinearDamping(.12)
+          .setAngularDamping(.2)
+          .setCcdEnabled(true),
+      );
+      const boltCollider = this.world.createCollider(
+        RAPIER.ColliderDesc.ball(.14)
+          .setMass(4.5)
+          .setFriction(.38)
+          .setRestitution(.32)
+          .setContactSkin(.001)
+          .setSensor(true),
+        boltBody,
+      );
+      boltCollider.setCollisionGroups(interactionGroups(
+        QUEEN_ENGINE_COLLISION_GROUP,
+        QUEEN_ENGINE_COLLISION_GROUP,
+      ));
+      this.addRecord({
+        id: `queen-crown-bolt-${index + 1}`,
+        kind: "queen-bolt",
+        shape: "sphere",
+        body: boltBody,
+        colliders: [boltCollider],
+        size: { x: .28, y: .28, z: .28 },
+        dynamic: true,
+        team: "queen",
+        variant: "loaded crown bolt",
+      });
+    }
+  }
+
   private createWorkers(): void {
     for (const team of ["king", "queen"] as const) {
       const side = team === "king" ? -1 : 1;
@@ -1310,6 +1464,18 @@ export class CorePhysicsWorld {
     const current = new Set(this.inventoryIds());
     for (const id of current) {
       if (!this.initialInventoryIds.has(id)) this.lateCreatedInventory += 1;
+    }
+  }
+
+  private resolveQueenBoltImpacts(): void {
+    for (const boltId of ["queen-crown-bolt-1", "queen-crown-bolt-2"]) {
+      if (this.queenBoltImpactIds.has(boltId)) continue;
+      const bolt = this.records.get(boltId);
+      if (!bolt?.variant?.startsWith("spent")) continue;
+      if (this.contactCount(boltId, "humpty") <= 0) continue;
+      this.queenBoltImpactIds.add(boltId);
+      bolt.variant = "spent crown bolt impact";
+      this.applyDamage("humpty", 62);
     }
   }
 

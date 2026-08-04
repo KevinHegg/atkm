@@ -19,6 +19,7 @@ import { AGENT_OBJECTIVES, AGENT_RULES } from "../shared/agent-rules.js";
 import { OpenAiAgentStrategist } from "./core/agent-strategist.js";
 import { expandContraptionPlans } from "./core/contraption-grammar.js";
 import { observedCompoundPlans } from "./core/compound-plans.js";
+import { specialPlans } from "./core/special-plans.js";
 import { REPO_AGENT_CONTEXT } from "./core/repo-context.js";
 import { ReplayArchive } from "./core/replay-archive.js";
 import { CoreSimulation } from "./core/simulation.js";
@@ -115,7 +116,10 @@ const httpServer = createServer((request, response) => {
       ? [requestedTeam]
       : ["king", "queen"];
     const contraptions = teams.flatMap((team) =>
-      expandContraptionPlans(observedCompoundPlans(simulation.physics, team)).map((plan) => ({
+      [
+        ...expandContraptionPlans(observedCompoundPlans(simulation.physics, team)),
+        ...specialPlans(simulation.physics, team),
+      ].map((plan) => ({
         id: plan.id,
         basePlanId: plan.baseId ?? plan.id,
         composition: plan.composition ?? [],

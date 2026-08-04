@@ -27,6 +27,7 @@ import {
   expandContraptionPlans,
   planBaseId,
 } from "./contraption-grammar.js";
+import { specialPlans } from "./special-plans.js";
 import { REPO_AGENT_CONTEXT_TEXT } from "./repo-context.js";
 import { CorePhysicsWorld } from "./physics.js";
 
@@ -302,6 +303,7 @@ export class MockMatchDirector {
         [...this.selectedMachinePlans].map(([team, plan]) => [team, plan.id]),
       ),
       machineEvidence: [...this.machineEvidence],
+      queenAdvantage: this.physics.queenAdvantageState(),
       nextMoveIn: idleCountdowns.length > 0 ? Math.min(...idleCountdowns) : 0,
     };
     if (this.outcome) state.outcome = this.outcome;
@@ -347,6 +349,7 @@ export class MockMatchDirector {
   }
 
   private startCompoundPlans(): void {
+    this.physics.ensureQueenAdvantage();
     this.combatPlansStarted = true;
     this.phase = "contest";
     for (const lane of this.lanes) lane.actions.cancelAll("", false);
@@ -364,7 +367,10 @@ export class MockMatchDirector {
     const options = new Map<Team, CompoundPlanOption[]>();
     for (const teamLane of teamLanes) {
       const observed = observedCompoundPlans(this.physics, teamLane.team);
-      const available = expandContraptionPlans(observed);
+      const available = [
+        ...expandContraptionPlans(observed),
+        ...specialPlans(this.physics, teamLane.team),
+      ];
       this.machinePlanOptions[teamLane.team] = available.map((plan) => ({
         id: plan.id,
         ruleId: plan.ruleId,
@@ -618,7 +624,12 @@ export class MockMatchDirector {
   private chooseMachinePlan(options: readonly CompoundPlanOption[]): CompoundPlanOption | undefined {
     const eligible = options.filter((option) => option.eligible);
     if (eligible.length === 0) return undefined;
-    const canonical = eligible.filter((option) => !option.id.includes(":") && !option.composition?.length);
+    const canonical = eligible.filter((option) =>
+      !option.id.includes(":") &&
+      !option.composition?.length &&
+      option.ruleId !== "fire-queen-crown-bolt" &&
+      option.ruleId !== "strike-queen-command-post",
+    );
     const choices = canonical.length > 0 ? canonical : eligible;
     const total = choices.reduce((sum, option) => sum + option.weight, 0);
     let roll = this.strategyRandom.range(0, total);
@@ -799,6 +810,34 @@ export class MockMatchDirector {
     if (!plan || this.completedMachineTeams.has(team)) return true;
     if (plan.composition?.length) return this.finalizeHybridMachinePlan(team, plan, actions);
     const baseId = planBaseId(plan);
+    if (plan.ruleId === "fire-queen-crown-bolt") {
+      const state = this.physics.queenAdvantageState();
+      const passed = Boolean(plan.parts.bolt && state.firedBoltIds.includes(plan.parts.bolt));
+      this.machinePlans.queen = passed ? "crown bolt fired" : "crown bolt misfired";
+      if (passed) this.machineEvidence.add(`green:crown-bolt:${plan.parts.bolt}`);
+      this.emit({
+        text: passed
+          ? "Green's mad Queen fires a physical crown bolt into the theatre."
+          : "Green reaches the command post, but the crown bolt sequence fails.",
+        team,
+        technical: `match:machine:queen:${passed ? "pass" : "incomplete"}:plan:${plan.id}:bolt:${plan.parts.bolt ?? "none"}`,
+      });
+      return passed;
+    }
+    if (plan.ruleId === "strike-queen-command-post") {
+      const state = this.physics.queenAdvantageState();
+      const passed = state.disabled;
+      this.machinePlans.king = passed ? "command post broken" : "command post damaged";
+      if (passed) this.machineEvidence.add("red:queen-command-post-broken");
+      this.emit({
+        text: passed
+          ? "Red's second strike breaks the Queen's command post before it can fire again."
+          : `Red batters the command post to ${Math.round(state.deviceIntegrity)}% integrity, but it still threatens the stage.`,
+        team,
+        technical: `match:machine:king:${passed ? "pass" : "incomplete"}:plan:${plan.id}:integrity:${Math.round(state.deviceIntegrity)}`,
+      });
+      return passed;
+    }
     if (baseId === "escalade-ramp") {
       const passed = this.redClimbGain >= .11 && this.machineEvidence.has("red:ramp-supported");
       if (this.redClimbGain >= .11) this.machineEvidence.add(`red:climbed:${this.redClimbGain.toFixed(2)}m`);

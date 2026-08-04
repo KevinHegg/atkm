@@ -147,6 +147,8 @@ export class CoreActionSystem {
     else if (action === "carry" || action === "assistCarry" || action === "stage") this.updateCarry(dt);
     else if (action === "release") this.updateRelease(dt);
     else if (action === "push" || action === "pull") this.updatePush(dt);
+    else if (action === "operate") this.updateOperate(dt);
+    else if (action === "strike") this.updateStrike(dt);
     else if (action === "align" || action === "turn") this.updateAlign(dt);
     else if (action === "connect" || action === "hookRope" || action === "reeveRope") {
       this.updateConnect(dt);
@@ -217,6 +219,9 @@ export class CoreActionSystem {
     if (new Set(request.actorIds).size !== request.actorIds.length) {
       return { ok: false, message: "A worker cannot fill two carry positions." };
     }
+    if ((request.action === "operate" || request.action === "strike") && !request.targetId) {
+      return { ok: false, message: `${actionLabel(request.action)} needs a visible target.` };
+    }
     if (request.targetId) {
       const target = this.physics.records.get(request.targetId);
       if (!target) return { ok: false, message: "That object is not in this world." };
@@ -241,6 +246,22 @@ export class CoreActionSystem {
       }
       if (request.action === "tension" && target.family !== "rope") {
         return { ok: false, message: "Tension needs one of the visible rope pieces." };
+      }
+      if (request.action === "operate") {
+        if (target.kind !== "queen-device") {
+          return { ok: false, message: "Operate needs the Queen's physical command post." };
+        }
+        if (actors.some((actor) => actor?.team !== "queen")) {
+          return { ok: false, message: "Only Green can operate the Queen's command post." };
+        }
+      }
+      if (request.action === "strike") {
+        if (target.kind !== "queen-device") {
+          return { ok: false, message: "Strike needs the Queen's physical command post." };
+        }
+        if (actors.some((actor) => actor?.team !== "king")) {
+          return { ok: false, message: "Only Red can strike the Queen's command post." };
+        }
       }
     }
     if (["carry", "stage", "push", "pull"].includes(request.action) && !request.destination) {
@@ -293,6 +314,71 @@ export class CoreActionSystem {
       }
     }
     return { ok: true };
+  }
+
+  private updateOperate(dt: number): void {
+    const active = this.requireActive();
+    const targetId = active.request.targetId;
+    const target = targetId ? this.physics.records.get(targetId) : undefined;
+    if (!targetId || !target || target.kind !== "queen-device") {
+      return this.cancelActive("The Queen's command post is no longer available.");
+    }
+    if (active.phase === "starting") {
+      active.phase = "approach";
+      active.phaseElapsed = 0;
+      active.workGoals = this.workGoals(targetId, active.request.actorIds);
+      this.setCommandPostRoutes(active);
+      this.reserveWorkPoses(active);
+      for (const id of active.request.actorIds) this.setWorkerPhase(id, "routing");
+    }
+    if (active.phase === "approach") {
+      const arrived = this.routeWorkers(active, active.workGoals ?? new Map(), 1.55, dt, .02) ||
+        this.workersNearGoals(active, .9);
+      if (!arrived) return this.guardTimeout(30);
+      active.phase = "work";
+      active.phaseElapsed = 0;
+      for (const id of active.request.actorIds) this.setWorkerPhase(id, "testing");
+      return;
+    }
+    if (active.phase === "work" && active.phaseElapsed >= .48) {
+      const result = this.physics.fireQueenBolt();
+      if (!result.ok) return this.cancelActive(result.message ?? "The command post cannot fire.");
+      this.complete(`${this.actorNames(active.request.actorIds)} operate the command post and fire a crown bolt at Humpty.`);
+    }
+  }
+
+  private updateStrike(dt: number): void {
+    const active = this.requireActive();
+    const targetId = active.request.targetId;
+    const target = targetId ? this.physics.records.get(targetId) : undefined;
+    if (!targetId || !target || target.kind !== "queen-device") {
+      return this.cancelActive("The Queen's command post is no longer available.");
+    }
+    if (active.phase === "starting") {
+      active.phase = "approach";
+      active.phaseElapsed = 0;
+      active.workGoals = this.workGoals(targetId, active.request.actorIds);
+      this.setCommandPostRoutes(active);
+      this.reserveWorkPoses(active);
+      for (const id of active.request.actorIds) this.setWorkerPhase(id, "routing");
+    }
+    if (active.phase === "approach") {
+      const arrived = this.routeWorkers(active, active.workGoals ?? new Map(), 1.45, dt, .02) ||
+        this.workersNearGoals(active, .9);
+      if (!arrived) return this.guardTimeout(30);
+      active.phase = "work";
+      active.phaseElapsed = 0;
+      for (const id of active.request.actorIds) this.setWorkerPhase(id, "pushing");
+      return;
+    }
+    if (active.phase === "work" && active.phaseElapsed >= .42) {
+      const result = this.physics.strikeQueenDevice(active.request.actorIds);
+      if (!result.ok) return this.cancelActive(result.message ?? "The striking crew cannot reach the command post.");
+      const status = result.integrity && result.integrity > 0
+        ? ` The command post falls to ${Math.round(result.integrity)}% integrity.`
+        : " The command post breaks apart.";
+      this.complete(`${this.actorNames(active.request.actorIds)} strike the Queen's command post.${status}`);
+    }
   }
 
   private startNext(): void {
@@ -3105,6 +3191,27 @@ export class CoreActionSystem {
     }));
   }
 
+  private setCommandPostRoutes(active: ActiveAction): void {
+    const team = this.workers.get(active.request.actorIds[0] ?? "")?.team ?? "king";
+    const stagingX = team === "queen" ? 4.85 : -4.85;
+    for (const [id, goal] of active.workGoals ?? []) {
+      const current = this.physics.bodyPosition(id) ?? goal;
+      active.routes.set(id, [
+        { x: stagingX, y: .775, z: current.z },
+        { x: stagingX, y: .775, z: -2.72 },
+        { x: goal.x, y: .775, z: -2.72 },
+        goal,
+      ]);
+    }
+  }
+
+  private workersNearGoals(active: ActiveAction, tolerance: number): boolean {
+    return [...(active.workGoals ?? [])].every(([id, goal]) => {
+      const position = this.physics.bodyPosition(id);
+      return position ? distance3(position, goal) <= tolerance : false;
+    });
+  }
+
   private alignmentWorkGoals(
     targetId: string,
     actorIds: string[],
@@ -3935,6 +4042,8 @@ function plainObject(record: { family?: string; kind: string; variant?: string }
   if (record.family) return record.family;
   if (record.kind === "tower-block") return "tower timber";
   if (record.kind === "cradle") return "cradle";
+  if (record.kind === "queen-device") return "Queen's command post";
+  if (record.kind === "queen-bolt") return "crown bolt";
   return "object";
 }
 

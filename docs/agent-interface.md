@@ -22,7 +22,7 @@ order cancels every individual and team lane first.
 ## Enumerable Objectives And Rules
 
 `shared/agent-rules.ts` is the public strategy contract. It currently contains
-two objectives and 31 rules. Every rule has a stable ID, eligible teams,
+two objectives and 33 rules. Every rule has a stable ID, eligible teams,
 objective IDs, phases, base weight, human-readable preconditions, and a packet
 made only from public legal actions. Connection rules name one of the four
 frozen connection classes. Compound rules also enumerate their simple-machine
@@ -36,7 +36,8 @@ as JSON.
 
 The match snapshot exposes the current rule and applicable IDs for each figure,
 the two machine-plan states, measured machine evidence, and concurrent
-busy-worker and total-move counts. A rule can enter a
+busy-worker and total-move counts, plus the Queen's command-post integrity and
+remaining crown-bolt charges. A rule can enter a
 figure's choice set only when its observed facts are true; listing a connection
 or operation rule does not grant a recipe, create a joint, move a body, or
 bypass action validation.
@@ -64,9 +65,11 @@ collision-aware climbing and carrying, approach, alignment, joint creation,
 load test, operation, interruption, and recovery. `climb` is public but accepts
 only a live plank or beam with a measured rise. `push` is also the projectile
 operation: it applies worker force to a persistent body and succeeds from
-measured travel or load displacement. There is no attack, damage, or spawn
-shortcut. `LEGAL_ACTIONS` in `shared/core-protocol.ts` is the complete runtime
-vocabulary.
+measured travel or load displacement. `operate` is the Green-only command-post
+action that launches an existing crown bolt through Rapier. `strike` is the
+Red-only counterplay action that damages that post from a collision-aware crew
+pose. There is no private attack, damage, or spawn shortcut. `LEGAL_ACTIONS` in
+`shared/core-protocol.ts` is the complete runtime vocabulary.
 
 `connect` is a persistent job with visible reserve, fetch, carry, stage, align, and lock phases. `sabotage` requires a real connection, compatible method, reach, contest phase, time, and exposure. `repair` targets the same failed connection record. `recover` walks the same persistent body back to stock.
 

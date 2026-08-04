@@ -32,7 +32,9 @@ export type CoreBodyKind =
   | "cradle"
   | "humpty"
   | "worker"
-  | "part";
+  | "part"
+  | "queen-device"
+  | "queen-bolt";
 
 export type CoreShape =
   | "box"
@@ -135,6 +137,8 @@ export type LegalActionName =
   | "pull"
   | "turn"
   | "test"
+  | "operate"
+  | "strike"
   | "release"
   | "detach"
   | "recover"
@@ -213,8 +217,19 @@ export interface CoreMatchState {
   machinePlanOptions: Record<Team, MachinePlanOptionState[]>;
   selectedMachinePlanIds: Partial<Record<Team, string>>;
   machineEvidence: string[];
+  queenAdvantage: QueenAdvantageState;
   nextMoveIn: number;
   outcome?: "king" | "queen" | "draw";
+}
+
+export interface QueenAdvantageState {
+  deviceId: string;
+  deviceIntegrity: number;
+  charges: number;
+  maxCharges: number;
+  armed: boolean;
+  disabled: boolean;
+  firedBoltIds: string[];
 }
 
 export interface MachinePlanOptionState {
@@ -288,6 +303,8 @@ export const LEGAL_ACTIONS: readonly LegalActionName[] = [
   "pull",
   "turn",
   "test",
+  "operate",
+  "strike",
   "release",
   "detach",
   "recover",

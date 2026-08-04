@@ -53,12 +53,12 @@ const audio = new WorksiteAudio();
 const transcript = required<HTMLOListElement>("transcript");
 const elapsedValue = required<HTMLElement>("elapsed-value");
 const stageTime = required<HTMLElement>("stage-time");
-const collapsedElapsed = required<HTMLElement>("collapsed-elapsed");
 const heightValue = required<HTMLElement>("height-value");
 const integrityValue = required<HTMLElement>("integrity-value");
 const integrityFill = required<HTMLElement>("integrity-fill");
 const modeLabel = required<HTMLElement>("mode-mark").querySelector("span");
 const matchStatus = required<HTMLOutputElement>("match-status");
+const watchWorkspaceStatus = required<HTMLOutputElement>("watch-workspace-status");
 const matchTurn = required<HTMLElement>("match-turn");
 const matchPhase = required<HTMLElement>("match-phase");
 const ruleCount = required<HTMLElement>("rule-count");
@@ -66,13 +66,18 @@ const kingObjective = required<HTMLElement>("king-objective");
 const queenObjective = required<HTMLElement>("queen-objective");
 const kingMachine = required<HTMLElement>("king-machine");
 const queenMachine = required<HTMLElement>("queen-machine");
+const queenAdvantageState = required<HTMLElement>("queen-advantage-state");
+const queenAdvantageMeta = required<HTMLElement>("queen-advantage-meta");
 const kingRule = required<HTMLElement>("king-rule");
 const queenRule = required<HTMLElement>("queen-rule");
 const gateList = required<HTMLOListElement>("gate-list");
+const gateSummary = required<HTMLOutputElement>("gate-summary");
 const connectionLabel = required<HTMLElement>("connection-label");
 const seedLabel = required<HTMLElement>("seed-label");
 const buildLabel = required<HTMLElement>("build-label");
 const sidebarToggle = required<HTMLButtonElement>("sidebar-toggle");
+const collapsedContext = required<HTMLElement>("collapsed-context");
+const collapsedStatusValue = required<HTMLElement>("collapsed-status-value");
 const engineeringOverlay = required<HTMLElement>("engineering-overlay");
 const engineeringTick = required<HTMLOutputElement>("engineering-tick");
 const engineeringValues = required<HTMLDListElement>("engineering-values");
@@ -89,6 +94,7 @@ const sidebarTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-side
 const sidebarPanels = [...document.querySelectorAll<HTMLElement>("[data-sidebar-panel]")];
 const archiveStatus = required<HTMLOutputElement>("archive-status");
 const archiveList = required<HTMLOListElement>("archive-list");
+const archiveCount = required<HTMLElement>("archive-count");
 const archiveFeedback = required<HTMLElement>("archive-feedback");
 const replayConsole = required<HTMLElement>("replay-console");
 const replayName = required<HTMLElement>("replay-name");
@@ -219,7 +225,6 @@ function presentSnapshot(snapshot: CoreSnapshot, live: boolean): void {
   const elapsed = formatElapsed(snapshot.elapsed);
   elapsedValue.textContent = elapsed;
   stageTime.textContent = elapsed;
-  collapsedElapsed.textContent = elapsed;
   seedLabel.textContent = `seed ${snapshot.seed}`;
   buildLabel.textContent = `build ${snapshot.build}`;
   const humpty = snapshot.bodies.find((body) => body.id === "humpty");
@@ -233,6 +238,7 @@ function presentSnapshot(snapshot: CoreSnapshot, live: boolean): void {
   renderMatch(snapshot);
   renderGates(snapshot);
   renderDiagnostics(snapshot);
+  updateSidebarContext();
   populateTargets(snapshot);
   if (live) {
     archiveStatus.textContent = archiveDurable ? "durable archive" : "session archive";
@@ -259,6 +265,7 @@ function renderEvents(snapshot: CoreSnapshot): void {
 function renderMatch(snapshot: CoreSnapshot): void {
   const match = snapshot.match;
   matchStatus.textContent = match.outcome ?? match.status;
+  watchWorkspaceStatus.textContent = match.outcome ?? match.status;
   matchStatus.dataset.status = match.status;
   matchStatus.dataset.outcome = match.outcome ?? "";
   matchTurn.textContent = `${match.busyWorkers} active / ${match.moves} moves`;
@@ -268,6 +275,14 @@ function renderMatch(snapshot: CoreSnapshot): void {
   queenObjective.textContent = match.queenObjective;
   kingMachine.textContent = match.machinePlans.king;
   queenMachine.textContent = match.machinePlans.queen;
+  const advantage = match.queenAdvantage;
+  queenAdvantageState.textContent = advantage.disabled
+    ? "command post broken"
+    : advantage.armed
+      ? "crown bolt armed"
+      : "crown bolts spent";
+  queenAdvantageState.dataset.state = advantage.disabled ? "broken" : advantage.armed ? "armed" : "spent";
+  queenAdvantageMeta.textContent = `${advantage.charges} / ${advantage.maxCharges} crown bolts · ${Math.round(advantage.deviceIntegrity)}% integrity`;
   kingRule.textContent = teamRuleText(snapshot, "king");
   queenRule.textContent = teamRuleText(snapshot, "queen");
   if (modeLabel) {
@@ -327,12 +342,29 @@ function renderGates(snapshot: CoreSnapshot): void {
     ["H", "Autonomous", snapshot.match.driver !== "manual" && snapshot.match.moves > 0],
     ["I", "LLM match", snapshot.match.driver === "llm" && diagnostics.llmEnabled],
   ] as const;
+  let passCount = 0;
+  let currentCount = 0;
   gateList.replaceChildren(...rows.map(([letter, label, pass], index) => {
+    if (pass) passCount += 1;
+    const current = !pass && rows.slice(0, index).every((row) => row[2]);
+    if (current) currentCount += 1;
+    const state = pass ? "pass" : current ? "current" : "locked";
+    const stateLabel = pass ? "Cleared" : current ? "Next" : "Inactive";
     const item = document.createElement("li");
-    item.className = pass ? "pass" : rows.slice(0, index).every((row) => row[2]) ? "current" : "locked";
-    item.innerHTML = `<b>Gate ${letter}</b><span>${label}</span>`;
+    item.className = state;
+    item.dataset.state = state;
+    item.title = `Gate ${letter}: ${stateLabel}. ${label}`;
+    item.setAttribute("aria-label", `Gate ${letter}, ${label}, ${stateLabel}`);
+    const heading = document.createElement("b");
+    heading.textContent = `Gate ${letter}`;
+    const detail = document.createElement("span");
+    detail.textContent = label;
+    const status = document.createElement("em");
+    status.textContent = stateLabel;
+    item.append(heading, detail, status);
     return item;
   }));
+  gateSummary.textContent = `${passCount}/9 cleared · ${currentCount > 0 ? `${currentCount} next` : "all staged"}`;
 }
 
 function renderDiagnostics(snapshot: CoreSnapshot): void {
@@ -370,12 +402,12 @@ function renderDiagnostics(snapshot: CoreSnapshot): void {
 function populateTargets(snapshot: CoreSnapshot): void {
   if (targetSelect.options.length > 1) return;
   const options = snapshot.bodies
-    .filter((body) => body.kind === "part" || body.kind === "tower-block" || body.kind === "cradle")
+    .filter((body) => body.kind === "part" || body.kind === "tower-block" || body.kind === "cradle" || body.kind === "queen-device" || body.kind === "queen-bolt")
     .sort((left, right) => left.id.localeCompare(right.id));
   for (const body of options) {
     const option = document.createElement("option");
     option.value = body.id;
-    option.textContent = body.kind === "part" ? `${body.team}: ${body.family} ${body.variant ?? ""}` : body.id;
+    option.textContent = body.kind === "part" ? `${body.team}: ${body.family} ${body.variant ?? ""}` : body.kind === "queen-device" ? "queen: command post" : body.kind === "queen-bolt" ? `queen: ${body.variant ?? "crown bolt"}` : body.id;
     targetSelect.append(option);
     secondarySelect.append(option.cloneNode(true));
   }
@@ -402,6 +434,26 @@ function setSidebarView(view: "watch" | "archive" | "organize"): void {
     tab.setAttribute("aria-selected", String(active));
   }
   for (const panel of sidebarPanels) panel.hidden = panel.dataset.sidebarPanel !== view;
+  updateSidebarContext();
+}
+
+function updateSidebarContext(): void {
+  if (sidebarView === "watch") {
+    collapsedContext.textContent = modeLabel?.textContent ?? "Live match";
+    collapsedStatusValue.textContent = latest ? formatElapsed(latest.elapsed) : "00:00";
+    return;
+  }
+  if (sidebarView === "archive") {
+    collapsedContext.textContent = replayEntry
+      ? replayEntry.summary.live ? "Live replay" : "Past replay"
+      : "Replay archive";
+    collapsedStatusValue.textContent = replayEntry
+      ? replayTime.textContent ?? "00:00"
+      : archiveStatus.textContent ?? "ready";
+    return;
+  }
+  collapsedContext.textContent = "Organize a game";
+  collapsedStatusValue.textContent = organizeStatus.textContent ?? "ready";
 }
 
 async function refreshArchiveList(): Promise<void> {
@@ -411,6 +463,8 @@ async function refreshArchiveList(): Promise<void> {
     const payload = await response.json() as { durable: boolean; replays: ReplaySummary[] };
     archiveDurable = payload.durable;
     archiveStatus.textContent = payload.durable ? "durable archive" : "session archive";
+    archiveCount.textContent = `${payload.replays.length} ${payload.replays.length === 1 ? "record" : "records"}`;
+    updateSidebarContext();
     archiveList.replaceChildren(...payload.replays.map((summary) => {
       const item = document.createElement("li");
       const button = document.createElement("button");
@@ -480,6 +534,7 @@ function presentReplayFrame(): void {
   replayScrubber.max = String(Math.max(0, replayEntry.frames.length - 1));
   replayScrubber.value = String(replayFrameIndex);
   replayTime.textContent = `${formatElapsed(frame.elapsed)} / ${formatElapsed(replayEntry.summary.duration)}`;
+  updateSidebarContext();
 }
 
 function updateReplayControls(): void {
@@ -514,6 +569,7 @@ function returnToLive(): void {
   if (latest) presentSnapshot(latest, true);
   archiveStatus.textContent = archiveDurable ? "durable archive" : "session archive";
   archiveFeedback.textContent = "The server keeps a session archive of public snapshots.";
+  updateSidebarContext();
 }
 
 function installControls(): void {
@@ -583,6 +639,7 @@ function installControls(): void {
     const pace = Number(organizeSpeed.value);
     organizeSeed.value = String(seed);
     organizeStatus.textContent = "launching";
+    updateSidebarContext();
     organizeFeedback.textContent = "The current match is being archived and the new theatre is mustering.";
     returnToLive();
     setSidebarView("organize");
@@ -590,6 +647,7 @@ function installControls(): void {
       void send({ type: "time-scale", value: pace });
       organizeStatus.textContent = "live";
       organizeFeedback.textContent = `Match seed ${seed} launched at ${pace}x opening pace.`;
+      updateSidebarContext();
       void refreshArchiveList();
     });
   });

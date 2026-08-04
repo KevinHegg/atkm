@@ -60,8 +60,9 @@ is evidence for the next choice, not permission to reset the stage.
 `/agent-context` is the repository MCP-style contract surface. It returns this
 file, the public rule endpoints, source-of-truth files, and the invariants that
 an external agent must follow. Keep `shared/agent-rules.ts`,
-`server/core/compound-plans.ts`, and `server/core/contraption-grammar.ts`
-synchronized when adding a new recipe family.
+`server/core/compound-plans.ts`, `server/core/special-plans.ts`, and
+`server/core/contraption-grammar.ts` synchronized when adding a new recipe
+family or public operation.
 
 ## Scope Freeze
 
@@ -70,4 +71,7 @@ new physical families, connection classes, or post-start inventory without a
 separate design decision. Recipe composition is allowed within the visible
 kit; it cannot grant compatibility, spawn parts, create private actions, or
 bypass the four frozen connection classes. A future family such as a screw or
-cam needs its own inventory, ports, physics, and acceptance gate.
+cam needs its own inventory, ports, physics, and acceptance gate. The Queen's
+command post and loaded crown bolts are non-inventory stage fixtures: visible,
+pre-authored bodies with enumerated `operate` and `strike` actions, finite
+charges, and a destructible integrity state.

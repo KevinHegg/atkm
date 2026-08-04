@@ -19,6 +19,7 @@ import {
 import { CoreSimulation } from "../server/core/simulation.js";
 import { evaluateMatchObjective } from "../server/core/mock-director.js";
 import { observedCompoundPlans } from "../server/core/compound-plans.js";
+import { queenAdvantagePlans, redCounterplayPlans } from "../server/core/special-plans.js";
 import { expandContraptionPlans } from "../server/core/contraption-grammar.js";
 import { REPO_AGENT_CONTEXT } from "../server/core/repo-context.js";
 import { ReplayArchive } from "../server/core/replay-archive.js";
@@ -535,6 +536,38 @@ test("the six compound plans are derived from visible stage facts", async () => 
   }
 });
 
+test("the Queen's advantage is a finite physical body with public counterplay", async () => {
+  const isolated = await CorePhysicsWorld.create(1881);
+  try {
+    isolated.ensureQueenAdvantage();
+    const device = isolated.records.get("queen-command-post");
+    assert.equal(device?.kind, "queen-device");
+    assert.equal(device?.dynamic, true);
+    assert.equal(device?.integrity, 100);
+    assert.equal(isolated.inventoryIds("king").length, INVENTORY_COUNT);
+    assert.equal(isolated.inventoryIds("queen").length, INVENTORY_COUNT);
+    assert.deepEqual(isolated.queenAdvantageState(), {
+      deviceId: "queen-command-post",
+      deviceIntegrity: 100,
+      charges: 2,
+      maxCharges: 2,
+      armed: true,
+      disabled: false,
+      firedBoltIds: [],
+    });
+    assert.equal(queenAdvantagePlans(isolated)[0]?.requests.at(-1)?.action, "operate");
+    assert.equal(redCounterplayPlans(isolated)[0]?.requests.at(-1)?.action, "strike");
+    const fired = isolated.fireQueenBolt();
+    assert.equal(fired.ok, true);
+    assert.equal(isolated.queenAdvantageState().charges, 1);
+    assert.ok((isolated.bodyLinearVelocity(fired.boltId ?? "")?.x ?? 0) < 0);
+    assert.equal(isolated.applyDamage("queen-command-post", 100), 0);
+    assert.equal(isolated.queenAdvantageState().disabled, true);
+  } finally {
+    isolated.free();
+  }
+});
+
 test("the repo contract expands observed machines into legal crew permutations", async () => {
   const isolated = await CorePhysicsWorld.create(1881);
   try {
@@ -851,7 +884,7 @@ test("the public action surface contains only the reset vocabulary", () => {
   assert.deepEqual(LEGAL_ACTIONS, [
     "reserve", "fetch", "climb", "carry", "assistCarry", "stage", "hold", "align",
     "connect", "hookRope", "reeveRope", "tension", "push", "pull", "turn",
-    "test", "release", "detach", "recover", "wait", "cancel",
+    "test", "operate", "strike", "release", "detach", "recover", "wait", "cancel",
   ]);
 });
 
