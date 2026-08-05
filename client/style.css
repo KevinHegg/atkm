@@ -262,6 +262,7 @@ button { cursor: pointer; }
 #archive-list button:hover, #archive-list button:focus-visible, #archive-list button.active { background: rgba(232, 178, 58, .25); outline: none; }
 .archive-row-title { display: flex; justify-content: space-between; gap: 5px; font-family: "IBM Plex Mono", monospace; font-size: 9px; text-transform: uppercase; }
 .archive-row-meta { display: flex; justify-content: space-between; gap: 5px; color: rgba(23, 19, 16, .7); font-family: "IBM Plex Mono", monospace; font-size: 7px; }
+.archive-row-description { color: rgba(23, 19, 16, .82); font-size: 10px; line-height: 1.15; }
 #replay-console { margin: 0 12px; padding: 8px; border-block: 1px solid var(--ink); }
 .replay-titleline { display: flex; justify-content: space-between; gap: 7px; font-family: "IBM Plex Mono", monospace; font-size: 8px; text-transform: uppercase; }
 .replay-titleline strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

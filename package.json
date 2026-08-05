@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server/index.ts",
+    "generate:public-replays": "tsx scripts/generate-public-replays.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",

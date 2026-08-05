@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-08-05T00:00:00.000Z",
+  "build": "public-demo-0805",
+  "frameInterval": 1.5,
+  "replays": [
+    {
+      "id": "red-hoist-vs-green-sling",
+      "seed": 1881,
+      "build": "public-demo-0805",
+      "driver": "mock",
+      "status": "active",
+      "duration": 120,
+      "frameCount": 81,
+      "createdAt": "2026-08-05T00:00:00.000Z",
+      "live": false,
+      "title": "Red Hoist vs Green Sling",
+      "description": "Red rigs a routed hoist while Green builds a counterweight sling.",
+      "path": "red-hoist-vs-green-sling.json"
+    },
+    {
+      "id": "red-hoist-vs-wheel-shot",
+      "seed": 4199,
+      "build": "public-demo-0805",
+      "driver": "mock",
+      "status": "active",
+      "duration": 120,
+      "frameCount": 81,
+      "createdAt": "2026-08-05T00:00:00.000Z",
+      "live": false,
+      "title": "Red Hoist vs Wheel Shot",
+      "description": "Green answers the rescue line with a ramped wheel bombard.",
+      "path": "red-hoist-vs-wheel-shot.json"
+    },
+    {
+      "id": "red-hoist-vs-pivot-striker",
+      "seed": 7331,
+      "build": "public-demo-0805",
+      "driver": "mock",
+      "status": "active",
+      "duration": 120,
+      "frameCount": 81,
+      "createdAt": "2026-08-05T00:00:00.000Z",
+      "live": false,
+      "title": "Red Hoist vs Pivot Striker",
+      "description": "A beam and fulcrum striker contests Red's rescue hoist.",
+      "path": "red-hoist-vs-pivot-striker.json"
+    }
+  ]
+}

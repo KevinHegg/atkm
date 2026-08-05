@@ -48,6 +48,18 @@ if (!url.searchParams.has("seed")) url.searchParams.set("seed", "1881");
 if (url.href !== location.href) history.replaceState({}, "", url);
 const staticPreview = location.hostname.endsWith(".github.io") || url.searchParams.get("preview") === "static";
 
+interface PublicReplaySummary extends ReplaySummary {
+  title?: string;
+  description?: string;
+  path: string;
+}
+
+interface PublicReplayManifest {
+  generatedAt: string;
+  build: string;
+  replays: PublicReplaySummary[];
+}
+
 const stage = required<HTMLElement>("stage");
 const world = new LabWorld(stage);
 const audio = new WorksiteAudio();
@@ -122,10 +134,12 @@ let sidebarView: "watch" | "archive" | "organize" = "watch";
 let replayEntry: ReplayArchiveEntry | undefined;
 let replayFrameIndex = 0;
 let replayPlaying = false;
-let replayRemainder = 0;
+let replayClock = 0;
 let replayTimer = 0;
 let archiveTimer = 0;
 let archiveDurable = false;
+let publicReplayBaseUrl: URL | undefined;
+let publicReplaySummaries: PublicReplaySummary[] = [];
 
 for (const action of LEGAL_ACTIONS) {
   const option = document.createElement("option");
@@ -197,6 +211,22 @@ async function loadStaticPreview(): Promise<void> {
   document.body.classList.add("static-preview");
   connectionLabel.textContent = "preview";
   connectionLabel.classList.add("open");
+  organizeStatus.textContent = "preview";
+  commandFeedback.textContent = "Static preview only. Live orders are available from the local theatre server.";
+  try {
+    const replays = await refreshStaticArchiveList();
+    if (replays.length > 0) {
+      const requestedReplay = url.searchParams.get("replay");
+      const selected = replays.find((summary) => summary.id === requestedReplay) ?? replays[0];
+      if (!selected) throw new Error("Public replay manifest is empty.");
+      await openReplay(selected.id, { autoplay: true });
+      organizeRecipeSummary.textContent = "3 packaged autonomous games";
+      return;
+    }
+  } catch (error) {
+    archiveFeedback.textContent = error instanceof Error ? error.message : "Public replays unavailable.";
+  }
+
   try {
     const assetUrl = new URL("demo-snapshot.json", new URL(".", location.href));
     const response = await fetch(assetUrl, { cache: "no-store" });
@@ -207,8 +237,6 @@ async function loadStaticPreview(): Promise<void> {
     archiveStatus.textContent = "static preview";
     archiveFeedback.textContent = "Recorded stage state. Run the theatre server for live autonomous play.";
     archiveCount.textContent = "1 preview";
-    organizeStatus.textContent = "preview";
-    commandFeedback.textContent = "Static preview only. Live orders are available from the local theatre server.";
   } catch (error) {
     connectionLabel.textContent = "unavailable";
     commandFeedback.textContent = error instanceof Error ? error.message : "Preview unavailable.";
@@ -271,7 +299,7 @@ function presentSnapshot(snapshot: CoreSnapshot, live: boolean): void {
     archiveStatus.textContent = archiveDurable ? "durable archive" : "session archive";
     organizeStatus.textContent = "ready";
   } else {
-    archiveStatus.textContent = "replay view";
+    archiveStatus.textContent = staticPreview ? "public demo reel" : "replay view";
   }
 }
 
@@ -493,31 +521,64 @@ async function refreshArchiveList(): Promise<void> {
     archiveStatus.textContent = payload.durable ? "durable archive" : "session archive";
     archiveCount.textContent = `${payload.replays.length} ${payload.replays.length === 1 ? "record" : "records"}`;
     updateSidebarContext();
-    archiveList.replaceChildren(...payload.replays.map((summary) => {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.replayId = summary.id;
-      button.classList.toggle("active", replayEntry?.summary.id === summary.id);
-      const title = document.createElement("span");
-      title.className = "archive-row-title";
-      const name = document.createElement("strong");
-      name.textContent = summary.live ? "Live match" : `Match ${summary.id}`;
-      const status = document.createElement("span");
-      status.textContent = summary.outcome ? `${summary.outcome} wins` : summary.status;
-      title.append(name, status);
-      const meta = document.createElement("span");
-      meta.className = "archive-row-meta";
-      meta.textContent = `seed ${summary.seed} · ${summary.driver} · ${formatElapsed(summary.duration)} · ${summary.frameCount} frames`;
-      button.append(title, meta);
-      button.addEventListener("click", () => void openReplay(summary.id));
-      item.append(button);
-      return item;
-    }));
+    renderArchiveList(payload.replays);
     if (payload.replays.length === 0) archiveFeedback.textContent = "No match has been recorded yet.";
   } catch (error) {
     archiveFeedback.textContent = error instanceof Error ? error.message : "Archive unavailable.";
   }
+}
+
+async function refreshStaticArchiveList(): Promise<PublicReplaySummary[]> {
+  const manifestUrl = new URL("replays/manifest.json", new URL(".", location.href));
+  const response = await fetch(manifestUrl, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Public replays ${response.status}`);
+  const manifest = await response.json() as PublicReplayManifest;
+  publicReplayBaseUrl = new URL(".", manifestUrl);
+  publicReplaySummaries = manifest.replays;
+  archiveDurable = false;
+  archiveStatus.textContent = "public demo reel";
+  archiveCount.textContent = `${manifest.replays.length} ${manifest.replays.length === 1 ? "game" : "games"}`;
+  archiveFeedback.textContent = `Packaged autonomous games generated for ${manifest.build}.`;
+  renderArchiveList(manifest.replays);
+  updateSidebarContext();
+  return manifest.replays;
+}
+
+function renderArchiveList(summaries: ReplaySummary[]): void {
+  archiveList.replaceChildren(...summaries.map((summary) => {
+    const publicSummary = asPublicReplaySummary(summary);
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.replayId = summary.id;
+    button.classList.toggle("active", replayEntry?.summary.id === summary.id);
+    const title = document.createElement("span");
+    title.className = "archive-row-title";
+    const name = document.createElement("strong");
+    name.textContent = publicSummary?.title ?? (summary.live ? "Live match" : `Match ${summary.id}`);
+    const status = document.createElement("span");
+    status.textContent = summary.outcome ? `${summary.outcome} wins` : summary.status;
+    title.append(name, status);
+    const meta = document.createElement("span");
+    meta.className = "archive-row-meta";
+    meta.textContent = `seed ${summary.seed} · ${summary.driver === "mock" ? "synthetic" : summary.driver} · ${formatElapsed(summary.duration)} · ${summary.frameCount} frames`;
+    button.append(title, meta);
+    if (publicSummary?.description) {
+      const description = document.createElement("span");
+      description.className = "archive-row-description";
+      description.textContent = publicSummary.description;
+      button.append(description);
+    }
+    button.addEventListener("click", () => void openReplay(summary.id, { autoplay: staticPreview }));
+    item.append(button);
+    return item;
+  }));
+}
+
+function asPublicReplaySummary(summary: ReplaySummary): PublicReplaySummary | undefined {
+  return "path" in summary && typeof summary.path === "string"
+    ? summary as PublicReplaySummary
+    : undefined;
 }
 
 async function refreshContraptionSummary(): Promise<void> {
@@ -534,25 +595,43 @@ async function refreshContraptionSummary(): Promise<void> {
   }
 }
 
-async function openReplay(id: string): Promise<void> {
+async function openReplay(id: string, options: { autoplay?: boolean } = {}): Promise<void> {
   archiveFeedback.textContent = "Loading public snapshots...";
   try {
-    const response = await fetch(`/archive/${encodeURIComponent(id)}?at=${Date.now()}`, { cache: "no-store" });
+    const response = await fetch(replayUrl(id), { cache: "no-store" });
     if (!response.ok) throw new Error(`Replay ${response.status}`);
     replayEntry = await response.json() as ReplayArchiveEntry;
     replayFrameIndex = 0;
     replayPlaying = false;
-    replayRemainder = 0;
+    syncReplayClockToFrame();
     setSidebarView("archive");
     replayConsole.hidden = false;
-    replayName.textContent = replayEntry.summary.live ? "Live match snapshot" : `Match ${replayEntry.summary.id}`;
-    archiveFeedback.textContent = `${replayEntry.frames.length} public snapshots loaded. The live match continues independently.`;
+    replayName.textContent = replayTitle(replayEntry.summary);
+    archiveFeedback.textContent = staticPreview
+      ? `${replayEntry.frames.length} public snapshots loaded.`
+      : `${replayEntry.frames.length} public snapshots loaded. The live match continues independently.`;
     presentReplayFrame();
+    replayPlaying = Boolean(options.autoplay);
     updateReplayControls();
-    void refreshArchiveList();
+    if (staticPreview) renderArchiveList(publicReplaySummaries);
+    else void refreshArchiveList();
   } catch (error) {
     archiveFeedback.textContent = error instanceof Error ? error.message : "Replay unavailable.";
   }
+}
+
+function replayUrl(id: string): string {
+  if (!staticPreview) return `/archive/${encodeURIComponent(id)}?at=${Date.now()}`;
+  const summary = publicReplaySummaries.find((candidate) => candidate.id === id);
+  if (!summary || !publicReplayBaseUrl) throw new Error(`Unknown public replay ${id}`);
+  const replayUrl = new URL(summary.path, publicReplayBaseUrl);
+  replayUrl.searchParams.set("at", String(Date.now()));
+  return replayUrl.href;
+}
+
+function replayTitle(summary: ReplaySummary): string {
+  const publicSummary = publicReplaySummaries.find((candidate) => candidate.id === summary.id);
+  return publicSummary?.title ?? (summary.live ? "Live match snapshot" : `Match ${summary.id}`);
 }
 
 function presentReplayFrame(): void {
@@ -574,19 +653,38 @@ function updateReplayControls(): void {
   }
 }
 
+function syncReplayClockToFrame(): void {
+  if (!replayEntry) {
+    replayClock = 0;
+    return;
+  }
+  const first = replayEntry.frames[0];
+  const current = replayEntry.frames[replayFrameIndex];
+  replayClock = Math.max(0, (current?.elapsed ?? first?.elapsed ?? 0) - (first?.elapsed ?? 0));
+}
+
 function advanceReplay(): void {
   if (!replayPlaying || !replayEntry) return;
-  replayRemainder += Number(replaySpeed.value) * .1;
-  const framesToAdvance = Math.floor(replayRemainder);
-  replayRemainder -= framesToAdvance;
-  const next = Math.min(replayEntry.frames.length - 1, replayFrameIndex + framesToAdvance);
-  if (next === replayFrameIndex && replayFrameIndex >= replayEntry.frames.length - 1) {
+  const first = replayEntry.frames[0];
+  const final = replayEntry.frames.at(-1);
+  if (!first || !final) return;
+  replayClock += Number(replaySpeed.value) * .1;
+  const targetElapsed = first.elapsed + replayClock;
+  let next = replayFrameIndex;
+  while (next < replayEntry.frames.length - 1 && (replayEntry.frames[next + 1]?.elapsed ?? Infinity) <= targetElapsed) {
+    next += 1;
+  }
+  if (targetElapsed >= final.elapsed) {
+    replayFrameIndex = replayEntry.frames.length - 1;
     replayPlaying = false;
+    presentReplayFrame();
     updateReplayControls();
     return;
   }
-  replayFrameIndex = next;
-  presentReplayFrame();
+  if (next !== replayFrameIndex) {
+    replayFrameIndex = next;
+    presentReplayFrame();
+  }
 }
 
 function returnToLive(): void {
@@ -595,8 +693,10 @@ function returnToLive(): void {
   replayConsole.hidden = true;
   updateReplayControls();
   if (latest) presentSnapshot(latest, true);
-  archiveStatus.textContent = archiveDurable ? "durable archive" : "session archive";
-  archiveFeedback.textContent = "The server keeps a session archive of public snapshots.";
+  archiveStatus.textContent = staticPreview ? "public demo reel" : archiveDurable ? "durable archive" : "session archive";
+  archiveFeedback.textContent = staticPreview
+    ? "Choose a packaged game from the public replay archive."
+    : "The server keeps a session archive of public snapshots.";
   updateSidebarContext();
 }
 
@@ -636,14 +736,16 @@ function installControls(): void {
       if (command === "back") {
         replayPlaying = false;
         replayFrameIndex = Math.max(0, replayFrameIndex - 1);
+        syncReplayClockToFrame();
         presentReplayFrame();
       } else if (command === "forward") {
         replayPlaying = false;
         replayFrameIndex = Math.min((replayEntry?.frames.length ?? 1) - 1, replayFrameIndex + 1);
+        syncReplayClockToFrame();
         presentReplayFrame();
       } else if (command === "play") {
+        if (!replayPlaying) syncReplayClockToFrame();
         replayPlaying = !replayPlaying;
-        replayRemainder = 0;
       } else if (command === "live") {
         setSidebarView("watch");
         returnToLive();
@@ -654,12 +756,12 @@ function installControls(): void {
   replayScrubber.addEventListener("input", () => {
     if (!replayEntry) return;
     replayPlaying = false;
-    replayRemainder = 0;
     replayFrameIndex = Number(replayScrubber.value);
+    syncReplayClockToFrame();
     presentReplayFrame();
     updateReplayControls();
   });
-  replaySpeed.addEventListener("change", () => { replayRemainder = 0; });
+  replaySpeed.addEventListener("change", syncReplayClockToFrame);
   replayTimer = window.setInterval(advanceReplay, 100);
   organizeForm.addEventListener("submit", (event) => {
     event.preventDefault();

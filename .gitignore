@@ -4,4 +4,4 @@ node_modules/
 runs/*.ndjson
 .local/
 dist/
-replays/
+/replays/
