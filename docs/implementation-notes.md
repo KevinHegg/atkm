@@ -103,6 +103,28 @@ uniqueness, legal-action-only packets, all four frozen connection classes, all
 five simple-machine ingredients, all six machine capabilities, climb target
 validation, and both objective outcomes.
 
+## Gate 6 Browser Acceptance
+
+Date: 2026-08-05
+
+- Browser build `0805011641` started at
+  `http://127.0.0.1:5173/?mode=legibility-lab&seed=1881` with the configured
+  LLM driver. The snapshot recorded `llm` and `autonomous` gate evidence after
+  six model-led moves.
+- The watch ledger now scrolls correctly at 1280 x 720, the command desk opens
+  with fixture controls reachable, and closed command-desk contents do not
+  overlap or intercept transcript clicks.
+- Browser controls ran the fixture sequence: Carry, Lever, Ramp, Ram, and
+  Hoist. The visible gate panel reported `9/9 cleared - all staged`.
+- The final browser diagnostics reported Rapier 3D, one physics world, 36 tower
+  bodies, 24 King parts, 24 Queen parts, zero illegal pose writes, zero late
+  inventory, zero worker penetrations, zero carried-part penetrations, zero
+  deep penetrations, zero client Ammo bodies, and zero render lag.
+- Screenshot evidence:
+  `docs/screenshots/gate6-browser-acceptance-2026-08-05.png`.
+- The browser console contained only PlayCanvas deprecation warnings for
+  `createTorus` and `createMesh`; no application errors were observed.
+
 ## Known Limits
 
 - The pivoted striker and counterweight sling are selectable and physically
@@ -115,15 +137,13 @@ validation, and both objective outcomes.
 - Several historical docs and archived files intentionally remain for audit
   context and may describe the old Rapier 2D, Pixi, browser Ammo, or recipe-era
   implementation.
-- The refreshed normal camera shows Gate D passing with both edge inventories;
-  permanent acceptance evidence still needs to be captured with the complete
-  fixture sequence.
+- The refreshed normal camera has current Gate 6 evidence, but the ram fixture
+  can still produce brief contact-correction diagnostics while passing through
+  legal measured contact. The final post-hoist acceptance state is clean.
 
 ## Next Highest-Value Work
 
-1. Capture permanent browser evidence for the autonomous match, royal audio
-   control, recovery, and fixtures.
-2. Tune the Green staging lanes so the striker and sling complete more often
+1. Tune the Green staging lanes so the striker and sling complete more often
    without relaxing collision or evidence requirements.
-3. Replace the deterministic two-span rope proxy only if full cable wrapping is
+2. Replace the deterministic two-span rope proxy only if full cable wrapping is
    needed for autonomous match tactics.

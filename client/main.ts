@@ -328,6 +328,7 @@ function teamRuleText(snapshot: CoreSnapshot, team: "king" | "queen"): string {
 
 function renderGates(snapshot: CoreSnapshot): void {
   const diagnostics = snapshot.diagnostics;
+  const completed = new Set(snapshot.completedFixtures);
   const clientDivergence = window.__HUMPTY_LAB__?.maxPoseDivergence ?? 0;
   const gateA =
     diagnostics.physicsAdapter === "rapier3d" &&
@@ -366,8 +367,8 @@ function renderGates(snapshot: CoreSnapshot): void {
     ["E", "Lever + ramp", snapshot.completedFixtures.includes("lever") && snapshot.completedFixtures.includes("ramp")],
     ["F", "Wheeled ram", snapshot.completedFixtures.includes("ram")],
     ["G", "Routed hoist", snapshot.completedFixtures.includes("hoist")],
-    ["H", "Autonomous", snapshot.match.driver !== "manual" && snapshot.match.moves > 0],
-    ["I", "LLM match", snapshot.match.driver === "llm" && diagnostics.llmEnabled],
+    ["H", "Autonomous", completed.has("autonomous") || (snapshot.match.driver !== "manual" && snapshot.match.moves > 0)],
+    ["I", "LLM match", completed.has("llm") || (snapshot.match.driver === "llm" && diagnostics.llmEnabled)],
   ] as const;
   let passCount = 0;
   let currentCount = 0;
@@ -766,7 +767,7 @@ async function send(command: CoreClientCommand): Promise<void> {
     commandFeedback.textContent = "Static preview only. Run the theatre server for live orders.";
     return;
   }
-  if (socket?.readyState === WebSocket.OPEN && command.type !== "reset") {
+  if (socket?.readyState === WebSocket.OPEN && command.type !== "reset" && command.type !== "run-fixture") {
     socket.send(JSON.stringify(command));
     return;
   }

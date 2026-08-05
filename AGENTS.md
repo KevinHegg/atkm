@@ -12,16 +12,15 @@ is failing:
 5. nine-family, 24-piece mirrored kit and four connection classes;
 6. rescue/attack fixtures, diagnostics, and browser acceptance.
 
-Current reset status: Gate 1 is executable in `server/core` as one
-server-authoritative Rapier 3D world, with PlayCanvas consuming snapshots only.
-Gates 2 through 5 are also executable: a 36-block, 12-course tower, a
-physical Humpty seat, collision-aware worker capsules, and two-worker carry
-fixtures. The opening inventory now matches the frozen nine-family,
-24-piece-per-team manifest, and connections are represented separately as
-`TENON_LOCK`, `AXLE_BEARING`, `KEYED_COAXIAL`, and `ROPE_ATTACH`. Do not
-describe the full repair as complete until Gate 6 browser acceptance is current;
-older docs/archive files still describe previous Rapier 2D, Pixi, and Ammo
-passes.
+Current reset status: Gates 1 through 6 are executable and browser-accepted in
+`server/core` as one server-authoritative Rapier 3D world, with PlayCanvas
+consuming snapshots only. The current browser acceptance records a 36-block,
+12-course tower, a physical Humpty seat, collision-aware worker capsules,
+two-worker carry, the frozen nine-family, 24-piece-per-team manifest, the four
+connection classes (`TENON_LOCK`, `AXLE_BEARING`, `KEYED_COAXIAL`,
+`ROPE_ATTACH`), deterministic rescue/attack fixtures, diagnostics, autonomous
+play, and the LLM driver path. Older docs/archive files still describe previous
+Rapier 2D, Pixi, and Ammo passes.
 
 ## Commands
 

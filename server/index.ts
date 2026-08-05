@@ -59,6 +59,30 @@ let latestSnapshotPayload = JSON.stringify(initialSnapshot);
 let accumulator = 0;
 let previousTime = performance.now();
 
+async function replaceSimulation(
+  nextSeed: number,
+  options: { preserveGateEvidence?: boolean } = {},
+): Promise<void> {
+  const completedFixtures = options.preserveGateEvidence
+    ? simulation.completedFixtureIds()
+    : [];
+  replayArchive.finalize(simulation.snapshot());
+  await replayArchive.flush();
+  simulation.destroy();
+  simulation = await CoreSimulation.create({
+    seed: nextSeed,
+    build: buildId,
+    autoMatch,
+    strategist: createStrategist(),
+    completedFixtures,
+  });
+  accumulator = 0;
+  previousTime = performance.now();
+  const resetSnapshot = simulation.snapshot();
+  replayArchive.start(resetSnapshot);
+  latestSnapshotPayload = JSON.stringify(resetSnapshot);
+}
+
 let vite: ViteDevServer;
 const httpServer = createServer((request, response) => {
   const requestUrl = new URL(request.url ?? "/", `http://${host}:${port}`);
@@ -169,23 +193,13 @@ const httpServer = createServer((request, response) => {
     readJsonBody(request)
       .then(async (command) => {
         if (command.type === "reset") {
-          replayArchive.finalize(simulation.snapshot());
-          await replayArchive.flush();
-          simulation.destroy();
-          simulation = await CoreSimulation.create({
-            seed: command.seed ?? seed,
-            build: buildId,
-            autoMatch,
-            strategist: createStrategist(),
-          });
-          accumulator = 0;
-          previousTime = performance.now();
-          const resetSnapshot = simulation.snapshot();
-          replayArchive.start(resetSnapshot);
-          latestSnapshotPayload = JSON.stringify(resetSnapshot);
+          await replaceSimulation(command.seed ?? seed);
           response.writeHead(204, noCacheHeaders);
           response.end();
           return;
+        }
+        if (command.type === "run-fixture") {
+          await replaceSimulation(simulation.seed, { preserveGateEvidence: true });
         }
         const result = simulation.handleCommand(command);
         response.writeHead(result.ok ? 200 : 409, {

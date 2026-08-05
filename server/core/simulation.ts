@@ -25,6 +25,7 @@ export interface CoreSimulationOptions {
   build: string;
   autoMatch?: boolean;
   strategist?: AgentStrategist | undefined;
+  completedFixtures?: Iterable<string>;
 }
 
 function stageOneWorkerPart(
@@ -133,6 +134,7 @@ export class CoreSimulation {
       options.autoMatch ?? false,
       options.strategist,
     );
+    for (const fixture of options.completedFixtures ?? []) this.completedFixtures.add(fixture);
     this.addEvent("The legibility lab is ready. Physical authority: Rapier 3D.");
   }
 
@@ -146,6 +148,7 @@ export class CoreSimulation {
     const steps = Math.max(1, Math.min(8, Math.round(this.timeScale)));
     for (let index = 0; index < steps; index += 1) {
       this.match.update();
+      this.recordMatchGateEvidence();
       this.actions.update(CORE_FIXED_DT);
       for (const team of this.autonomousTeams) team.actions.update(CORE_FIXED_DT);
       for (const lane of this.autonomousLanes) lane.actions.update(CORE_FIXED_DT);
@@ -817,6 +820,8 @@ export class CoreSimulation {
   }
 
   snapshot(): CoreSnapshot {
+    this.recordMatchGateEvidence();
+    const match = this.match.snapshot();
     const snapshot: CoreSnapshot = {
       type: "core-snapshot",
       mode: CORE_MODE,
@@ -832,13 +837,18 @@ export class CoreSimulation {
       events: this.events.slice(0, 120),
       diagnostics: {
         ...this.physics.diagnostics(),
-        llmEnabled: this.match.snapshot().driver === "llm",
+        llmEnabled: match.driver === "llm",
       },
-      match: this.match.snapshot(),
+      match,
       completedFixtures: [...this.completedFixtures],
     };
     if (this.selectedFixture) snapshot.selectedFixture = this.selectedFixture;
     return snapshot;
+  }
+
+  completedFixtureIds(): string[] {
+    this.recordMatchGateEvidence();
+    return [...this.completedFixtures];
   }
 
   destroy(): void {
@@ -1017,6 +1027,12 @@ export class CoreSimulation {
       this.paused = true;
     }
     this.fixtureWasBusy = false;
+  }
+
+  private recordMatchGateEvidence(): void {
+    const match = this.match.snapshot();
+    if (match.driver !== "manual" && match.moves > 0) this.completedFixtures.add("autonomous");
+    if (match.driver === "llm") this.completedFixtures.add("llm");
   }
 
   private observeRampFixture(): void {
