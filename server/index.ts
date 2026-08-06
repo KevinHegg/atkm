@@ -16,7 +16,6 @@ import {
   type Team,
 } from "../shared/core-protocol.js";
 import { AGENT_OBJECTIVES, AGENT_RULES } from "../shared/agent-rules.js";
-import { OpenAiAgentStrategist } from "./core/agent-strategist.js";
 import { expandContraptionPlans } from "./core/contraption-grammar.js";
 import { observedCompoundPlans } from "./core/compound-plans.js";
 import { specialPlans } from "./core/special-plans.js";
@@ -30,10 +29,7 @@ loadEnv({ path: resolve(root, ".env") });
 const port = Number(process.env.PORT ?? 5173);
 const host = process.env.HOST ?? "127.0.0.1";
 const seed = Number(process.env.SEED ?? 1881);
-const agentDriver = process.env.AGENT_DRIVER ?? "mock";
-const autoMatch = agentDriver !== "off";
-const llmEnabled = agentDriver === "llm" && Boolean(process.env.OPENAI_API_KEY);
-const agentModel = process.env.OPENAI_MODEL ?? "gpt-5.4";
+const autoMatch = true;
 const buildId = new Date().toISOString().replace(/\D/g, "").slice(4, 14);
 const noCacheHeaders = {
   "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -42,14 +38,10 @@ const noCacheHeaders = {
   "X-Humpty-Build": buildId,
 };
 
-const createStrategist = () => llmEnabled
-  ? new OpenAiAgentStrategist(process.env.OPENAI_API_KEY!, agentModel)
-  : undefined;
 let simulation = await CoreSimulation.create({
   seed,
   build: buildId,
   autoMatch,
-  strategist: createStrategist(),
 });
 const replayArchive = new ReplayArchive(resolve(root, ".local", "replays"));
 await replayArchive.load();
@@ -73,7 +65,6 @@ async function replaceSimulation(
     seed: nextSeed,
     build: buildId,
     autoMatch,
-    strategist: createStrategist(),
     completedFixtures,
   });
   accumulator = 0;
@@ -94,8 +85,8 @@ const httpServer = createServer((request, response) => {
     response.end(
       JSON.stringify({
         ok: true,
-        driver: autoMatch ? llmEnabled ? "llm" : "mock" : "manual-legality-lab",
-        llm: llmEnabled,
+        driver: "deterministic-siege",
+        llm: false,
         physics: "rapier3d",
         worlds: 1,
         mode: CORE_MODE,
@@ -130,7 +121,25 @@ const httpServer = createServer((request, response) => {
     response.end(JSON.stringify({
       ...REPO_AGENT_CONTEXT,
       agentsMd: readFileSync(resolve(root, "AGENTS.md"), "utf8"),
-      endpoints: ["/rules", "/contraptions", "/archive"],
+      endpoints: ["/battle-rules", "/snapshot", "/archive", "/command"],
+    }));
+    return;
+  }
+  if (requestUrl.pathname === "/battle-rules") {
+    const battle = simulation.snapshot().match.battle;
+    response.writeHead(200, {
+      "Content-Type": "application/json",
+      ...noCacheHeaders,
+    });
+    response.end(JSON.stringify({
+      contractVersion: REPO_AGENT_CONTEXT.contractVersion,
+      turns: battle?.maxRounds ?? 10,
+      objectives: {
+        king: "Keep Humpty uncracked through the tenth resolution.",
+        queen: "Crack Humpty before the tenth resolution.",
+      },
+      targetClasses: ["foundation", "tower-face", "humpty", "enemy-machine"],
+      units: battle?.units ?? [],
     }));
     return;
   }
@@ -314,8 +323,7 @@ httpServer.listen(port, host, () => {
   console.log("  ALL THE KING'S MEN / CORE LEGIBILITY LAB");
   console.log(`  Local theatre: http://${host}:${port}/?mode=${CORE_MODE}&seed=${seed}`);
   console.log("  Physics:       Rapier 3D, server authoritative, 60 Hz");
-  console.log(`  Agent driver:  ${autoMatch ? llmEnabled ? `llm (${agentModel})` : "mock (automatic)" : "manual"}`);
-  if (agentDriver === "llm" && !llmEnabled) console.log("  LLM agents:    credential unavailable; using the seeded fallback");
+  console.log("  Commander:     deterministic simultaneous orders");
   console.log(`  Live build:    ${buildId}`);
   console.log("");
 });

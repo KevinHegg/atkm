@@ -84,7 +84,7 @@ export class LabWorld {
   private readonly resizeObserver: ResizeObserver;
   private orbitYaw = 32;
   private orbitPitch = -16;
-  private orbitDistance = 21.5;
+  private orbitDistance = 23.5;
   private dragging = false;
   private pointerX = 0;
   private pointerY = 0;
@@ -103,7 +103,7 @@ export class LabWorld {
   constructor(host: HTMLElement) {
     this.host = host;
     this.canvas = document.createElement("canvas");
-    this.canvas.setAttribute("aria-label", "Three-dimensional physical legibility laboratory");
+    this.canvas.setAttribute("aria-label", "Three-dimensional siege battlefield");
     host.replaceChildren(this.canvas);
     this.app = new pc.Application(this.canvas, {
       mouse: new pc.Mouse(this.canvas),
@@ -115,7 +115,7 @@ export class LabWorld {
         powerPreference: "high-performance",
       },
     });
-    this.app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+    this.app.setCanvasFillMode(pc.FILLMODE_NONE);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
     this.app.scene.ambientLight = new pc.Color(0.235, 0.24, 0.225);
     this.app.scene.exposure = 1.15;
@@ -176,8 +176,12 @@ export class LabWorld {
   fit(): void {
     this.orbitYaw = 32;
     this.orbitPitch = -16;
-    this.orbitDistance = 21.5;
+    this.orbitDistance = 23.5;
     this.cameraTarget.set(0, 2.15, -0.2);
+  }
+
+  resizeToHost(): void {
+    this.resize();
   }
 
   speak(speaker: "humpty" | "queen", durationSeconds: number): void {
@@ -210,7 +214,7 @@ export class LabWorld {
     else if (state.kind === "humpty") this.createHumptyVisual(root, state);
     else if (state.kind === "part") this.createPartVisual(root, state);
     else if (state.kind === "battle-machine") this.createBattleMachineVisual(root, state);
-    else if (state.kind === "battle-projectile") this.createBattleProjectileVisual(root);
+    else if (state.kind === "battle-projectile") this.createBattleProjectileVisual(root, state);
     else if (state.kind === "queen-device") this.createQueenDeviceVisual(root, state);
     else if (state.kind === "queen-bolt") this.createQueenBoltVisual(root, state);
     else if (state.kind === "worker") this.createWorkerVisual(root, state.id, state.team ?? "king");
@@ -475,6 +479,17 @@ export class LabWorld {
     const padding = this.material("rescue-padding", new pc.Color(.67, .63, .48), .08);
     const team = state.team ?? "king";
     const variant = state.variant ?? "";
+    if (variant.includes("field engineer wagon")) {
+      this.primitive("engineer-chassis", "box", root, new pc.Vec3(0, -.22, 0), new pc.Vec3(1.82, .34, 1.22), dark);
+      this.primitive("engineer-chest", "box", root, new pc.Vec3(-.28, .18, 0), new pc.Vec3(.8, .54, .92), timber);
+      this.primitive("engineer-anvil", "box", root, new pc.Vec3(.46, .28, 0), new pc.Vec3(.5, .16, .3), iron);
+      this.primitive("engineer-anvil-foot", "box", root, new pc.Vec3(.46, .02, 0), new pc.Vec3(.18, .42, .18), iron);
+      for (const x of [-.68, .68]) {
+        for (const z of [-.54, .54]) this.primitive("engineer-wheel", "cylinder", root, new pc.Vec3(x, -.42, z), new pc.Vec3(.34, .16, .34), iron, new pc.Vec3(90, 0, 0));
+      }
+      this.teamWrap(root, team, new pc.Vec3(1.05, .07, .18), new pc.Vec3(0, .49, -.48));
+      return;
+    }
     if (variant.includes("rescue winch")) {
       this.primitive("winch-base", "box", root, new pc.Vec3(0, -.6, 0), new pc.Vec3(1.45, .2, 1.35), dark);
       for (const x of [-.52, .52]) {
@@ -528,10 +543,31 @@ export class LabWorld {
       this.teamWrap(root, team, new pc.Vec3(1.2, .07, .18), new pc.Vec3(0, -.48, .76));
       return;
     }
+    if (variant.includes("siege ballista")) {
+      this.primitive("ballista-base", "box", root, new pc.Vec3(.15, -.38, 0), new pc.Vec3(2.18, .26, 1.3), dark);
+      this.primitive("ballista-stock", "box", root, new pc.Vec3(-.08, .12, 0), new pc.Vec3(2.45, .18, .2), timber);
+      this.primitive("ballista-bow", "box", root, new pc.Vec3(-.76, .16, 0), new pc.Vec3(.16, .18, 1.45), timber);
+      for (const z of [-.72, .72]) this.primitive("ballista-tip", "cylinder", root, new pc.Vec3(-.76, .16, z), new pc.Vec3(.09, .22, .09), iron);
+      this.primitive("ballista-crank", "cylinder", root, new pc.Vec3(.62, .08, 0), new pc.Vec3(.28, .86, .28), iron, new pc.Vec3(90, 0, 0));
+      this.primitive("ballista-bolt", "cylinder", root, new pc.Vec3(-.32, .28, 0), new pc.Vec3(.07, 1.75, .07), iron, new pc.Vec3(0, 0, 90));
+      this.primitive("ballista-tip", "cone", root, new pc.Vec3(-1.23, .28, 0), new pc.Vec3(.14, .28, .14), iron, new pc.Vec3(0, 0, 90));
+      for (const x of [-.7, .7]) {
+        for (const z of [-.57, .57]) this.primitive("ballista-wheel", "cylinder", root, new pc.Vec3(x, -.55, z), new pc.Vec3(.34, .15, .34), iron, new pc.Vec3(90, 0, 0));
+      }
+      this.teamWrap(root, team, new pc.Vec3(1.15, .07, .18), new pc.Vec3(.2, .44, -.62));
+      return;
+    }
     this.primitive("battle-machine", "box", root, pc.Vec3.ZERO, state.size, timber);
   }
 
-  private createBattleProjectileVisual(root: pc.Entity): void {
+  private createBattleProjectileVisual(root: pc.Entity, state: CoreBodyState): void {
+    if (state.variant?.includes("ballista bolt")) {
+      const iron = this.material("ballista-bolt-iron", palette.iron, .5, .68);
+      const wood = this.material("ballista-bolt-shaft", palette.oakDark, .15);
+      this.primitive("bolt-shaft", "cylinder", root, pc.Vec3.ZERO, new pc.Vec3(.055, .54, .055), wood, new pc.Vec3(0, 0, 90));
+      this.primitive("bolt-head", "cone", root, new pc.Vec3(-.32, 0, 0), new pc.Vec3(.11, .18, .11), iron, new pc.Vec3(0, 0, 90));
+      return;
+    }
     const stone = this.material("siege-stone", new pc.Color(.26, .25, .22), .08);
     const iron = this.material("siege-stone-band", palette.iron, .38, .36);
     this.primitive("siege-stone", "sphere", root, pc.Vec3.ZERO, new pc.Vec3(.38, .38, .38), stone);

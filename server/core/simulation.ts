@@ -173,6 +173,9 @@ export class CoreSimulation {
       if (ok) this.addEvent("A measured test force reaches a tower timber.", bodyId);
       return ok ? { ok } : { ok, message: `Unknown dynamic body ${bodyId}` };
     }
+    if (command.type === "battle-order") {
+      return this.match.submitOrder(command.team, command.unitId, command.action, command.targetId);
+    }
     if (command.type === "legal-action") {
       this.match.stopForManualControl();
       return this.actions.submit(command.request);

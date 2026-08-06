@@ -396,60 +396,39 @@ test("the long keyed axle remains a one-worker load", async () => {
   }
 });
 
-test("the battle director advances both three-person crews through plan, operation, impact, and response", async () => {
+test("the siege director reveals and resolves one simultaneous order per team", async () => {
   const simulation = await CoreSimulation.create({
-    seed: 7331,
+    seed: 4198,
     build: "test",
     autoMatch: true,
   });
   try {
-    const starts = new Map(simulation.physics.workerIds().map((id) => [
-      id,
-      simulation.physics.bodyPosition(id),
-    ]));
-    const maximumWorkerTravel = new Map(simulation.physics.workerIds().map((id) => [id, 0]));
     assert.equal(simulation.handleCommand({ type: "time-scale", value: 8 }).ok, true);
-    let concurrentMachineWork = false;
-    let planObserved = false;
-    while (simulation.snapshot().elapsed < 60 && simulation.snapshot().match.status !== "complete") {
+    while ((simulation.snapshot().match.battle?.history.length ?? 0) < 1) {
       simulation.step();
-      concurrentMachineWork ||= simulation.autonomousTeams.every((lane) => lane.actions.isBusy());
-      planObserved ||= simulation.snapshot().events.some(
-        (event) => event.technical?.startsWith("battle:chain:") && event.technical.includes(":plan:"),
-      );
-      for (const id of simulation.physics.workerIds()) {
-        const start = starts.get(id);
-        const current = simulation.physics.bodyPosition(id);
-        if (start && current) {
-          maximumWorkerTravel.set(id, Math.max(maximumWorkerTravel.get(id) ?? 0, distance(start, current)));
-        }
-      }
     }
     const snapshot = simulation.snapshot();
     assert.equal(snapshot.match.driver, "mock");
-    assert.ok(snapshot.match.status === "active" || snapshot.match.status === "complete");
-    assert.equal(snapshot.match.kingObjective, "Keep Humpty uncracked until the ten-minute bell.");
-    assert.equal(snapshot.match.queenObjective, "Crack Humpty before the ten-minute bell.");
+    assert.equal(snapshot.match.status, "active");
+    assert.equal(snapshot.match.kingObjective, "Keep Humpty uncracked through ten simultaneous siege turns.");
+    assert.equal(snapshot.match.queenObjective, "Crack Humpty before the tenth turn is resolved.");
     assert.ok(snapshot.match.timeRemaining <= CORE_MATCH_DURATION_SECONDS);
-    assert.equal(snapshot.match.rulebookSize, 4);
+    assert.equal(snapshot.match.rulebookSize, 7);
     assert.equal(Object.keys(snapshot.match.activeRuleIds).length, 6);
-    assert.ok(snapshot.match.moves >= 6);
-    assert.ok(planObserved);
-    assert.ok(concurrentMachineWork, "Red and Green never operated their machines concurrently");
+    assert.equal(snapshot.match.moves, 2);
     assert.ok(snapshot.match.battle);
-    assert.equal(snapshot.match.battle.machines.length, 4);
+    assert.equal(snapshot.match.battle.maxRounds, 10);
+    assert.equal(snapshot.match.battle.units.length, 6);
+    assert.equal(snapshot.match.battle.targets.length, 3);
+    assert.equal(snapshot.match.battle.history.length, 1);
     assert.deepEqual(
-      new Set(snapshot.match.battle.machines.map((machine) => machine.id)),
-      new Set(["red-rescue-winch", "red-catch-sledge", "green-battering-ram", "green-stone-thrower"]),
+      new Set(snapshot.match.battle.units.map((unit) => unit.id)),
+      new Set(["red-engineers", "red-rescue-winch", "red-catch-sledge", "green-battering-ram", "green-stone-thrower", "green-ballista"]),
     );
-    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("ram-impact:")));
-    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("stone-impact:")));
-    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("catch:")));
-    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("chain:king:")));
-    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("chain:queen:")));
-    for (const id of simulation.physics.workerIds()) {
-      assert.ok((maximumWorkerTravel.get(id) ?? 0) > .25, `${id} did not leave its opening pose`);
-    }
+    assert.ok(snapshot.events.some((event) => event.technical === "siege:round:1:reveal"));
+    assert.ok(snapshot.events.some((event) => event.technical === "siege:round:1:resolved"));
+    assert.equal(snapshot.match.battle.history[0]?.kingOrder.status, "resolved");
+    assert.equal(snapshot.match.battle.history[0]?.queenOrder.status, "resolved");
     assert.equal(snapshot.diagnostics.illegalTransformWrites, 0);
     assert.equal(snapshot.diagnostics.lateCreatedInventory, 0);
   } finally {
@@ -457,23 +436,34 @@ test("the battle director advances both three-person crews through plan, operati
   }
 });
 
-test("both teams choose concurrently and manual control cancels every autonomous lane", async () => {
+test("both teams can seal hidden orders before the same reveal", async () => {
   const simulation = await CoreSimulation.create({
     seed: 1881,
     build: "test",
     autoMatch: true,
   });
   try {
-    while (simulation.snapshot().elapsed < .8) simulation.step();
-    const autonomous = simulation.snapshot();
-    const planEvents = autonomous.events.filter((event) =>
-      event.technical?.startsWith("battle:chain:") && event.technical.includes(":plan:"));
-    assert.equal(autonomous.match.moves, 2);
-    assert.equal(autonomous.match.busyWorkers, 6);
-    assert.equal(planEvents.length, 2);
-    assert.equal(new Set(planEvents.map((event) => event.tick)).size, 1);
-    assert.ok(autonomous.workers.every((worker) => worker.phase !== "idle"));
-    assert.equal(Object.keys(autonomous.match.activeRuleIds).length, 6);
+    assert.equal(simulation.handleCommand({
+      type: "battle-order",
+      team: "king",
+      unitId: "red-engineers",
+      action: "fortify",
+      targetId: "foundation",
+    }).ok, true);
+    assert.equal(simulation.handleCommand({
+      type: "battle-order",
+      team: "queen",
+      unitId: "green-battering-ram",
+      action: "breach",
+      targetId: "foundation",
+    }).ok, true);
+    assert.deepEqual(new Set(simulation.snapshot().match.battle?.sealedTeams), new Set(["king", "queen"]));
+    assert.deepEqual(simulation.snapshot().match.battle?.orders, {});
+    while (simulation.snapshot().match.battle?.phase === "planning") simulation.step();
+    const revealed = simulation.snapshot();
+    assert.equal(revealed.match.battle?.orders.king?.unitId, "red-engineers");
+    assert.equal(revealed.match.battle?.orders.queen?.unitId, "green-battering-ram");
+    assert.equal(revealed.events.filter((event) => event.technical === "siege:round:1:reveal").length, 1);
 
     const result = simulation.handleCommand({
       type: "legal-action",
@@ -481,8 +471,6 @@ test("both teams choose concurrently and manual control cancels every autonomous
     });
     assert.equal(result.ok, true);
     assert.equal(simulation.snapshot().match.driver, "manual");
-    assert.ok(simulation.autonomousLanes.every((lane) => !lane.actions.isBusy()));
-    assert.ok(simulation.autonomousTeams.every((lane) => !lane.actions.isBusy()));
   } finally {
     simulation.destroy();
   }
@@ -568,7 +556,7 @@ test("the Queen's advantage is a finite physical body with public counterplay", 
   }
 });
 
-test("the repo contract expands observed machines into legal crew permutations", async () => {
+test("the legacy lab still expands fixtures while the repo contract points to the siege", async () => {
   const isolated = await CorePhysicsWorld.create(1881);
   try {
     const base = observedCompoundPlans(isolated, "queen");
@@ -580,8 +568,9 @@ test("the repo contract expands observed machines into legal crew permutations",
     assert.ok(expanded.every((plan) => plan.requests.length > 0));
     assert.ok(expanded.every((plan) => plan.requests.every((request) =>
       request.actorIds.every((actorId) => isolated.workerIds("queen").includes(actorId)))));
-    assert.equal(REPO_AGENT_CONTEXT.contractVersion, "contraption-repo-v3");
-    assert.ok(REPO_AGENT_CONTEXT.mcpTools.includes("list_observed_contraptions"));
+    assert.equal(REPO_AGENT_CONTEXT.contractVersion, "simultaneous-siege-v1");
+    assert.ok(REPO_AGENT_CONTEXT.sourceOfTruth.includes("server/core/siege-rules.ts"));
+    assert.ok(REPO_AGENT_CONTEXT.mcpTools.includes("list_legal_siege_orders"));
   } finally {
     isolated.free();
   }
@@ -640,26 +629,33 @@ test("the fixed-seed autonomous battle replays exactly", async () => {
     try {
       assert.equal(simulation.handleCommand({ type: "time-scale", value: 8 }).ok, true);
       const choices = new Map<string, string>();
-      while (simulation.snapshot().elapsed < 15) {
+      while (simulation.snapshot().match.status !== "complete") {
         simulation.step();
         for (const event of simulation.snapshot().events) {
-          if (event.technical?.startsWith("battle:")) choices.set(event.id, event.technical);
+          if (event.technical?.startsWith("siege:")) choices.set(event.id, event.technical);
         }
       }
       return {
         rules: [...choices.values()],
         plans: simulation.snapshot().match.selectedMachinePlanIds,
+        history: simulation.snapshot().match.battle?.history,
+        outcome: simulation.snapshot().match.outcome,
       };
     } finally {
       simulation.destroy();
     }
   };
-  const first = await play(7331);
-  const replay = await play(7331);
+  const first = await play(4198);
+  const replay = await play(4198);
   assert.deepEqual(first, replay);
-  assert.ok(first.rules.some((entry) => entry.startsWith("battle:impact:ram-impact")));
-  assert.ok(first.rules.some((entry) => entry.startsWith("battle:impact:stone-impact")));
-  assert.deepEqual(first.plans, { king: "red-deploy-catch-sledge", queen: "green-fire-stone" });
+  assert.ok(first.rules.includes("siege:round:1:reveal"));
+  assert.ok(first.rules.includes("siege:round:1:resolved"));
+  assert.equal(first.history?.length, 10);
+  assert.ok(first.history?.some((record) => record.queenOrder.unitId === "green-battering-ram"));
+  assert.ok(first.history?.some((record) => record.queenOrder.unitId === "green-stone-thrower"));
+  assert.equal(first.outcome, "king");
+  assert.ok(first.plans.king);
+  assert.ok(first.plans.queen);
 });
 
 test("seeded siege doctrines advertise three distinct opening stone targets", async () => {
@@ -720,12 +716,14 @@ test("model decisions are rejected unless every ID was advertised", () => {
   }), /unlisted rule/);
 });
 
-test("a scripted model strategist drives the same public action boundary", async () => {
+test("the battle commander stays deterministic even when an LLM strategist is available", async () => {
   const decisions = new Map<string, StrategyDecision>();
+  let requests = 0;
   const strategist: AgentStrategist = {
     enabled: true,
     name: "scripted-test",
     request(request) {
+      requests += 1;
       decisions.set(request.id, {
         figures: (request.figures ?? []).map((figure) => ({
           workerId: figure.workerId,
@@ -755,13 +753,13 @@ test("a scripted model strategist drives the same public action boundary", async
   });
   try {
     simulation.handleCommand({ type: "time-scale", value: 8 });
-    while (simulation.snapshot().elapsed < 15) simulation.step();
+    while ((simulation.snapshot().match.battle?.history.length ?? 0) < 1) simulation.step();
     const snapshot = simulation.snapshot();
-    assert.equal(snapshot.match.driver, "llm");
-    assert.equal(snapshot.diagnostics.llmEnabled, true);
-    assert.equal(snapshot.match.selectedMachinePlanIds.queen, "green-fire-stone");
-    assert.equal(snapshot.match.selectedMachinePlanIds.king, "red-deploy-catch-sledge");
-    assert.ok(snapshot.events.some((event) => event.technical?.endsWith("source:llm")));
+    assert.equal(snapshot.match.driver, "mock");
+    assert.equal(snapshot.diagnostics.llmEnabled, false);
+    assert.equal(requests, 0);
+    assert.equal(snapshot.match.battle?.history.length, 1);
+    assert.ok(snapshot.events.some((event) => event.technical === "siege:round:1:resolved"));
   } finally {
     simulation.destroy();
   }

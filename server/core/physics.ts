@@ -55,16 +55,19 @@ const QUEEN_CROWN_BOLT_IDS = Array.from(
 );
 
 export const BATTLE_MACHINE_IDS = [
+  "red-engineers",
   "red-rescue-winch",
   "red-catch-sledge",
   "green-battering-ram",
   "green-stone-thrower",
+  "green-ballista",
 ] as const;
 
 const GREEN_STONE_IDS = Array.from({ length: 5 }, (_, index) => `green-siege-stone-${index + 1}`);
+const GREEN_BALLISTA_BOLT_IDS = Array.from({ length: 5 }, (_, index) => `green-ballista-bolt-${index + 1}`);
 
 export interface BattlePhysicsEvent {
-  type: "ram-impact" | "stone-impact" | "catch" | "deployment" | "machine-disabled" | "winch-pull" | "line-snap";
+  type: "ram-impact" | "stone-impact" | "ballista-shot" | "catch" | "deployment" | "machine-disabled" | "winch-pull" | "line-snap";
   machineId: string;
   targetId: string;
   value: number;
@@ -169,9 +172,11 @@ export class CorePhysicsWorld {
     this.createLiteralTower();
     this.createCradle();
     this.createHumpty();
-    this.createInventoryRacks();
-    this.createOpeningInventory();
     if (battleMode) this.createBattleMachines();
+    else {
+      this.createInventoryRacks();
+      this.createOpeningInventory();
+    }
     this.createWorkers(battleMode);
   }
 
@@ -585,7 +590,7 @@ export class CorePhysicsWorld {
     return profiles[this.seed % profiles.length]?.[shotIndex] ?? "tower-08-2";
   }
 
-  operateBattleMachine(machineId: string): BattleMachineOperationResult {
+  operateBattleMachine(machineId: string, preferredTargetId?: string): BattleMachineOperationResult {
     const machine = this.records.get(machineId);
     if (!machine || machine.kind !== "battle-machine") {
       return { ok: false, message: "That machine is not on the battlefield." };
@@ -631,7 +636,9 @@ export class CorePhysicsWorld {
         .map((id) => this.records.get(id))
         .find((record) => record?.variant === "loaded siege stone");
       if (!stone) return { ok: false, message: "The stone thrower has spent its ammunition." };
-      const targetId = this.battleStoneTargetId();
+      const targetId = preferredTargetId && this.records.has(preferredTargetId)
+        ? preferredTargetId
+        : this.battleStoneTargetId();
       stone.variant = `fired siege stone ${GREEN_STONE_IDS.indexOf(stone.id) + 1}`;
       stone.body.setGravityScale(1, true);
       for (const collider of stone.colliders) {
@@ -660,6 +667,39 @@ export class CorePhysicsWorld {
       };
     }
     return { ok: false, message: "That machine has no public operation." };
+  }
+
+  fireBattleBallista(preferredTargetId: string): BattleMachineOperationResult {
+    const machine = this.records.get("green-ballista");
+    if (!machine || (machine.integrity ?? 0) <= 0) return { ok: false, message: "The siege ballista is disabled." };
+    const bolt = GREEN_BALLISTA_BOLT_IDS
+      .map((id) => this.records.get(id))
+      .find((record) => record?.variant === "loaded ballista bolt");
+    if (!bolt) return { ok: false, message: "The siege ballista has spent its bolts." };
+    const targetId = this.records.has(preferredTargetId) ? preferredTargetId : "humpty";
+    const target = this.bodyPosition(targetId) ?? this.bodyPosition("humpty") ?? { x: 0, y: 3.8, z: 0 };
+    const launch = this.bodyPosition(bolt.id) ?? { x: 5.7, y: 1.2, z: -2.35 };
+    bolt.variant = `fired ballista bolt ${GREEN_BALLISTA_BOLT_IDS.indexOf(bolt.id) + 1}`;
+    bolt.body.setGravityScale(1, true);
+    for (const collider of bolt.colliders) {
+      collider.setSensor(false);
+      collider.setCollisionGroups(interactionGroups(QUEEN_PROJECTILE_COLLISION_GROUP, ALL_COLLISION_GROUPS));
+    }
+    const flightSeconds = .42;
+    const mass = Math.max(1, bolt.body.mass());
+    this.applyImpulse(bolt.id, {
+      x: (target.x - launch.x) / flightSeconds * mass,
+      y: (target.y - launch.y + .5 * 9.81 * flightSeconds ** 2) / flightSeconds * mass,
+      z: (target.z - launch.z) / flightSeconds * mass,
+    });
+    this.battleEvents.push({
+      type: "ballista-shot",
+      machineId: "green-ballista",
+      targetId,
+      value: 1,
+      text: `The siege ballista snaps forward and sends an iron bolt at ${battleTargetName(targetId)}.`,
+    });
+    return { ok: true, targetId, message: "The siege ballista fires." };
   }
 
   strikeBattleMachine(
@@ -1395,6 +1435,26 @@ export class CorePhysicsWorld {
   }
 
   private createBattleMachines(): void {
+    const engineerWagon = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(-5.65, .48, -2.55),
+    );
+    const engineerWagonCollider = this.world.createCollider(
+      RAPIER.ColliderDesc.roundCuboid(.92, .42, .62, .07).setFriction(.88),
+      engineerWagon,
+    );
+    this.addRecord({
+      id: "red-engineers",
+      kind: "battle-machine",
+      shape: "round-box",
+      body: engineerWagon,
+      colliders: [engineerWagonCollider],
+      size: { x: 1.95, y: .95, z: 1.35 },
+      dynamic: false,
+      team: "king",
+      variant: "field engineer wagon",
+      integrity: 100,
+    });
+
     const rescueWinch = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed().setTranslation(-4.75, .72, 2.55),
     );
@@ -1531,6 +1591,57 @@ export class CorePhysicsWorld {
         dynamic: true,
         team: "queen",
         variant: "loaded siege stone",
+      });
+    }
+
+    const ballista = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(5.65, .62, -2.55),
+    );
+    const ballistaCollider = this.world.createCollider(
+      RAPIER.ColliderDesc.roundCuboid(1.12, .56, .7, .08).setFriction(.9),
+      ballista,
+    );
+    this.addRecord({
+      id: "green-ballista",
+      kind: "battle-machine",
+      shape: "round-box",
+      body: ballista,
+      colliders: [ballistaCollider],
+      size: { x: 2.4, y: 1.25, z: 1.55 },
+      dynamic: false,
+      team: "queen",
+      variant: "siege ballista",
+      integrity: 100,
+    });
+
+    for (const [index, boltId] of GREEN_BALLISTA_BOLT_IDS.entries()) {
+      const body = this.world.createRigidBody(
+        RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(5.25 + index * .22, 1.42, -2.18)
+          .setGravityScale(0)
+          .setLinearDamping(.05)
+          .setAngularDamping(.3)
+          .setCcdEnabled(true),
+      );
+      const collider = this.world.createCollider(
+        RAPIER.ColliderDesc.ball(.085)
+          .setMass(3.8)
+          .setFriction(.28)
+          .setRestitution(.04)
+          .setSensor(true),
+        body,
+      );
+      collider.setCollisionGroups(interactionGroups(QUEEN_ENGINE_COLLISION_GROUP, QUEEN_ENGINE_COLLISION_GROUP));
+      this.addRecord({
+        id: boltId,
+        kind: "battle-projectile",
+        shape: "cylinder",
+        body,
+        colliders: [collider],
+        size: { x: .48, y: .1, z: .1 },
+        dynamic: true,
+        team: "queen",
+        variant: "loaded ballista bolt",
       });
     }
   }
@@ -2139,6 +2250,13 @@ function battleMachineDefinition(id: string): {
   purpose: string;
   simpleMachines: readonly string[];
 } | undefined {
+  if (id === "red-engineers") return {
+    team: "king",
+    role: "rescue",
+    name: "Field Engineers",
+    purpose: "Brace damaged positions and raid exposed siege equipment.",
+    simpleMachines: [],
+  };
   if (id === "red-rescue-winch") return {
     team: "king",
     role: "rescue",
@@ -2166,6 +2284,13 @@ function battleMachineDefinition(id: string): {
     name: "Stone Thrower",
     purpose: "Drop a counterweight and sling stones into the upper tower.",
     simpleMachines: ["lever", "pulley", "counterweight"],
+  };
+  if (id === "green-ballista") return {
+    team: "queen",
+    role: "war",
+    name: "Siege Ballista",
+    purpose: "Fire precise iron bolts at Humpty or Red equipment.",
+    simpleMachines: ["lever", "wheel-and-axle"],
   };
   return undefined;
 }

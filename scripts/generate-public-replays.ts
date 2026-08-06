@@ -22,32 +22,32 @@ interface PublicReplaySummary extends ReplaySummary {
 }
 
 const OUTPUT_DIR = resolve(process.cwd(), "public", "replays");
-const BUILD_ID = "battle-reset-0805";
-const CREATED_AT = "2026-08-05T20:00:00.000Z";
-const MAX_SECONDS = 600;
+const BUILD_ID = "siege-orders-0806";
+const CREATED_AT = "2026-08-06T18:00:00.000Z";
+const MAX_SECONDS = 200;
 const EVENT_LIMIT = 36;
 
 const demos: DemoSpec[] = [
   {
     id: "the-sledgebreaker",
-    seed: 7331,
-    title: "The Sledgebreaker",
-    description: "Red catches the king; Green turns its ram on the rescue bed and forces a second crisis.",
-    frameInterval: .5,
+    seed: 10,
+    title: "The Counterbattery Duel",
+    description: "Red raids the siege train while Green's bombardment doctrine searches for a path through the defenses.",
+    frameInterval: 1,
   },
   {
     id: "the-ten-minute-hold",
     seed: 4198,
-    title: "The Ten-Minute Hold",
-    description: "A mixed bombardment cracks Humpty twice, but Red's catch and winch survive to the bell.",
-    frameInterval: 4,
+    title: "The Broken Foundation",
+    description: "Green brings down the tower base, but Red's rescue doctrine carries a battered Humpty through the final bell.",
+    frameInterval: 1,
   },
   {
     id: "the-king-shot",
     seed: 1881,
-    title: "The King Shot",
-    description: "Green chooses the royal target immediately and ends the siege before the catch bed arrives.",
-    frameInterval: .25,
+    title: "The Last Bolt",
+    description: "A decapitation duel spends the catch net early and comes down to Green's final precision shot.",
+    frameInterval: 1,
   },
 ];
 

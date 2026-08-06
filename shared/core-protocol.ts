@@ -2,7 +2,7 @@ import type { ConnectionClass } from "./machines.js";
 export { CONNECTION_CLASSES } from "./machines.js";
 export type { ConnectionClass } from "./machines.js";
 
-export const CORE_MODE = "legibility-lab" as const;
+export const CORE_MODE = "siege" as const;
 export const CORE_FIXED_DT = 1 / 60;
 export const CORE_SNAPSHOT_HZ = 20;
 export const CORE_MATCH_DURATION_SECONDS = 10 * 60;
@@ -266,13 +266,92 @@ export interface BattleMachineState {
   state: "ready" | "moving" | "working" | "returning" | "spent" | "disabled";
 }
 
+export type BattleUnitId =
+  | "red-engineers"
+  | "red-rescue-winch"
+  | "red-catch-sledge"
+  | "green-battering-ram"
+  | "green-stone-thrower"
+  | "green-ballista";
+
+export type BattleTargetId = "foundation" | "tower-face" | "humpty" | "enemy-machine";
+
+export type BattleOrderAction =
+  | "hold"
+  | "breach"
+  | "bombard"
+  | "snipe"
+  | "fortify"
+  | "reposition"
+  | "deploy"
+  | "raid";
+
+export interface BattleUnitState {
+  id: BattleUnitId;
+  team: Team;
+  name: string;
+  role: string;
+  purpose: string;
+  integrity: number;
+  maxIntegrity: number;
+  ammunition: number;
+  maxAmmunition: number;
+  cooldown: number;
+  state: "ready" | "committed" | "recovering" | "spent" | "disabled";
+  availableActions: BattleOrderAction[];
+  availableTargets: BattleTargetId[];
+}
+
+export interface BattleTargetState {
+  id: Exclude<BattleTargetId, "enemy-machine">;
+  name: string;
+  integrity: number;
+  maxIntegrity: number;
+  protection: number;
+  status: "secure" | "damaged" | "critical" | "destroyed";
+}
+
+export interface BattleOrderState {
+  team: Team;
+  unitId: BattleUnitId;
+  unitName: string;
+  action: BattleOrderAction;
+  targetId: BattleTargetId;
+  targetName: string;
+  status: "sealed" | "revealed" | "resolved";
+  result: string;
+  hit?: boolean;
+  damage?: number;
+  resolvedTargetId?: string;
+}
+
+export interface BattleRoundRecord {
+  round: number;
+  clock: string;
+  kingOrder: BattleOrderState;
+  queenOrder: BattleOrderState;
+  summary: string;
+}
+
 export interface BattleState {
   round: number;
+  maxRounds: number;
+  phase: "planning" | "reveal" | "resolving" | "aftermath" | "complete";
+  phaseProgress: number;
+  timeRemaining: number;
   towerStress: number;
   humptyRisk: number;
   tempo: "opening" | "pressing" | "critical" | "last-stand" | "complete";
   chains: Record<Team, BattleChainState>;
   machines: BattleMachineState[];
+  units: BattleUnitState[];
+  targets: BattleTargetState[];
+  sealedTeams: Team[];
+  orders: Partial<Record<Team, BattleOrderState>>;
+  history: BattleRoundRecord[];
+  doctrine: Record<Team, string>;
+  catchReady: boolean;
+  humptyPosition: "crown" | "sheltered" | "exposed";
 }
 
 export interface QueenAdvantageState {
@@ -337,6 +416,13 @@ export type CoreClientCommand =
   | { type: "time-scale"; value: number }
   | { type: "debug-poke"; bodyId?: string; impulse?: Vec3 }
   | { type: "legal-action"; request: LegalActionRequest }
+  | {
+      type: "battle-order";
+      team: Team;
+      unitId: BattleUnitId;
+      action: BattleOrderAction;
+      targetId: BattleTargetId;
+    }
   | { type: "run-fixture"; fixture: "lever" | "ramp" | "ram" | "hoist" | "transport" | "failure" };
 
 export const LEGAL_ACTIONS: readonly LegalActionName[] = [

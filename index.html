@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#11191d" />
+    <meta name="theme-color" content="#101717" />
     <title>All the King's Men</title>
     <link rel="stylesheet" href="/client/style.css?build=__BUILD_ID__" />
   </head>
   <body>
     <main id="app">
-      <section id="stage-shell" aria-label="The physical theatre">
+      <section id="stage-shell" aria-label="The siege theatre">
         <div id="stage"></div>
 
         <header id="title-card">
@@ -17,186 +17,125 @@
           <h1>All the King's Men</h1>
         </header>
 
-        <nav id="controls" aria-label="Stage controls">
-          <button type="button" data-command="pause" aria-label="Pause match" title="Pause match"><i data-lucide="pause"></i></button>
-          <button type="button" data-command="fit" aria-label="Fit the stage" title="Fit the stage"><i data-lucide="maximize-2"></i></button>
-          <button type="button" data-command="poke" aria-label="Test the tower" title="Test the tower"><i data-lucide="hand"></i></button>
-          <button type="button" data-command="sound" aria-label="Enable sound" title="Enable sound"><i data-lucide="volume-x"></i></button>
-          <button type="button" data-command="engineering" aria-label="Show engineering diagnostics" title="Engineering diagnostics"><i data-lucide="wrench"></i></button>
-          <button type="button" data-command="restart" aria-label="Reset the laboratory" title="Reset the laboratory"><i data-lucide="rotate-ccw"></i></button>
-        </nav>
-
-        <div id="mode-mark" aria-live="polite">
-          <span>Legibility lab</span>
-          <strong id="stage-time">10:00</strong>
+        <div id="stage-score" aria-live="polite">
+          <div class="stage-team red"><span>Red holds</span><strong id="red-doctrine">Rescue doctrine</strong></div>
+          <div class="stage-clock"><span id="stage-phase">Planning</span><strong id="stage-time">10:00</strong><small id="stage-turn">Turn 1 of 10</small></div>
+          <div class="stage-team green"><span>Green assaults</span><strong id="green-doctrine">Breach doctrine</strong></div>
         </div>
 
-        <section id="engineering-overlay" hidden aria-label="Engineering diagnostics">
-          <header>
-            <strong>Physical evidence</strong>
-            <output id="engineering-tick">tick 0</output>
-          </header>
+        <nav id="stage-controls" aria-label="Stage controls">
+          <button type="button" data-stage-command="pause" aria-label="Pause match" title="Pause match"><i data-lucide="pause"></i></button>
+          <button type="button" data-stage-command="fit" aria-label="Fit the battlefield" title="Fit the battlefield"><i data-lucide="maximize-2"></i></button>
+          <button type="button" data-stage-command="diagnostics" aria-label="Show physical diagnostics" title="Physical diagnostics"><i data-lucide="gauge"></i></button>
+          <button type="button" data-stage-command="restart" aria-label="Restart match" title="Restart match"><i data-lucide="rotate-ccw"></i></button>
+        </nav>
+
+        <section id="engineering-overlay" hidden aria-label="Physical diagnostics">
+          <header><strong>Physical authority</strong><button type="button" data-stage-command="diagnostics" aria-label="Close diagnostics"><i data-lucide="x"></i></button></header>
           <dl id="engineering-values"></dl>
         </section>
 
+        <div id="connection-state"><span></span><strong id="connection-label">connecting</strong></div>
       </section>
 
-      <aside id="broadside" aria-label="Performance ledger">
-        <nav id="sidebar-nav" aria-label="Game workspaces" role="tablist">
-          <button id="watch-tab" type="button" class="sidebar-tab active" data-sidebar-view="watch" role="tab" aria-controls="watch-panel" aria-selected="true" title="Watch the current match"><i data-lucide="eye"></i><span>Watch</span></button>
-          <button id="archive-tab" type="button" class="sidebar-tab" data-sidebar-view="archive" role="tab" aria-controls="archive-panel" aria-selected="false" title="Browse match archive"><i data-lucide="history"></i><span>Archive</span></button>
-          <button id="organize-tab" type="button" class="sidebar-tab" data-sidebar-view="organize" role="tab" aria-controls="organize-panel" aria-selected="false" title="Organize a match"><i data-lucide="clipboard-list"></i><span>Organize</span></button>
-          <button id="sidebar-toggle" type="button" aria-label="Collapse ledger" aria-expanded="true" title="Collapse ledger"><i data-lucide="panel-right-close"></i></button>
-          <div id="sidebar-context" aria-live="polite">
-            <div class="collapsed-context-copy"><span id="collapsed-context">Model-led match</span><strong id="collapsed-status-value">00:00</strong></div>
-            <div id="collapsed-controls">
-              <div data-collapsed-view="watch" aria-label="Compact watch controls">
-                <button type="button" data-compact-command="watch-rewind" aria-label="Back 10 seconds" title="Back 10 seconds"><i data-lucide="rewind"></i></button>
-                <button type="button" class="compact-primary" data-compact-command="watch-toggle" aria-label="Pause replay" title="Pause replay"><i data-lucide="pause"></i></button>
-                <button type="button" data-compact-command="watch-forward" aria-label="Forward 10 seconds" title="Forward 10 seconds"><i data-lucide="fast-forward"></i></button>
+      <aside id="battle-ledger" aria-label="Battle ledger">
+        <header id="ledger-nav">
+          <nav aria-label="Battle views" role="tablist">
+            <button type="button" class="ledger-tab active" data-ledger-view="watch" role="tab" aria-selected="true" title="Watch battle"><i data-lucide="eye"></i><span>Watch</span></button>
+            <button type="button" class="ledger-tab" data-ledger-view="archive" role="tab" aria-selected="false" title="Replay archive"><i data-lucide="history"></i><span>Archive</span></button>
+            <button type="button" class="ledger-tab" data-ledger-view="command" role="tab" aria-selected="false" title="Command battle"><i data-lucide="swords"></i><span>Command</span></button>
+          </nav>
+          <button id="ledger-toggle" type="button" aria-label="Collapse battle ledger" aria-expanded="true" title="Collapse battle ledger"><i data-lucide="panel-right-close"></i></button>
+          <div id="compact-status" aria-live="polite">
+            <span id="compact-phase">Planning</span>
+            <strong id="compact-clock">10:00</strong>
+            <div id="compact-controls">
+              <div data-compact-view="watch">
+                <button type="button" data-replay-command="rewind" aria-label="Back ten seconds" title="Back ten seconds"><i data-lucide="rewind"></i></button>
+                <button type="button" class="primary" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
+                <button type="button" data-replay-command="fast-forward" aria-label="Forward ten seconds" title="Forward ten seconds"><i data-lucide="fast-forward"></i></button>
               </div>
-              <div data-collapsed-view="archive" hidden aria-label="Compact archive controls">
-                <button type="button" data-compact-command="archive-previous" aria-label="Previous game" title="Previous game"><i data-lucide="skip-back"></i></button>
-                <button type="button" class="compact-primary" data-compact-command="archive-watch" aria-label="Watch selected game" title="Watch selected game"><i data-lucide="eye"></i></button>
-                <button type="button" data-compact-command="archive-next" aria-label="Next game" title="Next game"><i data-lucide="skip-forward"></i></button>
+              <div data-compact-view="archive" hidden>
+                <button type="button" data-archive-command="previous" aria-label="Previous replay" title="Previous replay"><i data-lucide="skip-back"></i></button>
+                <button type="button" class="primary" data-archive-command="watch" aria-label="Watch selected replay" title="Watch selected replay"><i data-lucide="play"></i></button>
+                <button type="button" data-archive-command="next" aria-label="Next replay" title="Next replay"><i data-lucide="skip-forward"></i></button>
               </div>
-              <div data-collapsed-view="organize" hidden aria-label="Compact organizer controls">
-                <button type="button" class="compact-launch" data-compact-command="organize-launch" aria-label="Launch configured match" title="Launch configured match"><i data-lucide="rocket"></i><span>Launch</span></button>
+              <div data-compact-view="command" hidden>
+                <button type="button" data-compact-team="king" aria-label="Command Red" title="Command Red"><b>R</b></button>
+                <button type="button" data-compact-team="queen" aria-label="Command Green" title="Command Green"><b>G</b></button>
+                <button type="button" class="primary" data-compact-command="seal" aria-label="Seal current order" title="Seal current order"><i data-lucide="shield-check"></i></button>
               </div>
             </div>
-          </div>
-        </nav>
-
-        <div id="watch-panel" class="sidebar-panel" data-sidebar-panel="watch" role="tabpanel" aria-labelledby="watch-tab">
-        <header class="workspace-heading watch-workspace-heading">
-          <div><span id="watch-workspace-kicker" class="workspace-kicker">Live theatre</span><h2 id="watch-workspace-title">Watch current match</h2></div>
-          <output id="watch-workspace-status">waiting</output>
-        </header>
-        <section id="replay-console" hidden aria-label="Replay controls">
-          <div class="replay-titleline"><strong id="replay-name">Replay transport</strong><span id="replay-time">00:00 / 00:00</span></div>
-          <input id="replay-scrubber" type="range" min="0" max="0" step="1" value="0" aria-label="Replay position" />
-          <div class="replay-controls">
-            <button type="button" data-replay-command="rewind" aria-label="Back 10 seconds" title="Back 10 seconds"><i data-lucide="rewind"></i><span>10</span></button>
-            <button type="button" class="replay-primary" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
-            <button type="button" data-replay-command="fast-forward" aria-label="Forward 10 seconds" title="Forward 10 seconds"><i data-lucide="fast-forward"></i><span>10</span></button>
-            <label>Speed<select id="replay-speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option><option value="8">8x</option></select></label>
-            <button type="button" data-replay-command="live" aria-label="Return to live match" title="Return to live match"><i data-lucide="radio"></i></button>
-          </div>
-        </section>
-        <header id="scoreboard">
-          <div class="score-topline">
-            <span>Siege clock</span>
-            <strong id="elapsed-value">10:00</strong>
-          </div>
-          <dl class="metrics">
-            <div>
-              <dt>Humpty's height</dt>
-              <dd><span id="height-value">--</span><small> m</small></dd>
-            </div>
-            <div>
-              <dt>Integrity</dt>
-              <dd id="integrity-value">100</dd>
-            </div>
-          </dl>
-          <div id="integrity-track" aria-label="Humpty integrity"><span id="integrity-fill"></span></div>
-          <div class="battle-meters" aria-label="Battle danger">
-            <div><span>Tower stress</span><strong id="tower-stress-value">0</strong><i><b id="tower-stress-fill"></b></i></div>
-            <div><span>Humpty risk</span><strong id="humpty-risk-value">0</strong><i><b id="humpty-risk-fill"></b></i></div>
           </div>
         </header>
 
-        <section id="match-panel" aria-label="Autonomous match">
-          <div class="section-heading">
-            <h2>Battle plans</h2>
+        <section id="watch-view" class="ledger-view" data-ledger-panel="watch">
+          <div id="transport" class="view-controls" aria-label="Playback controls">
+            <div class="transport-line"><strong id="replay-name">Live siege</strong><span id="replay-time">00:00 / 00:00</span></div>
+            <input id="replay-scrubber" type="range" min="0" max="0" step="1" value="0" aria-label="Replay position" />
+            <div class="transport-buttons">
+              <button type="button" data-replay-command="rewind" aria-label="Back ten seconds" title="Back ten seconds"><i data-lucide="rewind"></i><span>10</span></button>
+              <button type="button" class="primary" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
+              <button type="button" data-replay-command="fast-forward" aria-label="Forward ten seconds" title="Forward ten seconds"><i data-lucide="fast-forward"></i><span>10</span></button>
+              <select id="replay-speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option><option value="8">8x</option></select>
+              <button type="button" data-replay-command="live" aria-label="Return to live battle" title="Return to live battle"><i data-lucide="radio"></i></button>
+            </div>
+          </div>
+
+          <header class="view-heading">
+            <div><span id="watch-kicker">Live theatre</span><h2 id="watch-title">Siege command</h2></div>
             <output id="match-status">waiting</output>
-          </div>
-          <div class="match-turnline"><strong id="match-turn">Round 0</strong><span id="match-phase">Muster</span><span id="rule-count">0 moves</span></div>
-          <div class="battle-chains">
-            <article class="battle-chain red">
-              <header><span>Red rescue</span><b id="king-chain-stage">Reading threat</b></header>
-              <h3 id="king-machine">Awaiting the bell</h3>
-              <p id="king-objective">Keep Humpty uncracked until the ten-minute bell.</p>
-              <div class="chain-progress" aria-hidden="true"><span id="king-chain-progress"></span></div>
-              <p id="king-chain-result" class="chain-result">Red is reading the first threat.</p>
-              <small id="king-simple-machines">rescue machine standing by</small>
-            </article>
-            <article class="battle-chain green">
-              <header><span>Green assault</span><b id="queen-chain-stage">Choosing breach</b></header>
-              <h3 id="queen-machine">Awaiting the bell</h3>
-              <p id="queen-objective">Crack Humpty before the siege clock expires.</p>
-              <div class="chain-progress" aria-hidden="true"><span id="queen-chain-progress"></span></div>
-              <p id="queen-chain-result" class="chain-result">Green is selecting the first breach.</p>
-              <small id="queen-simple-machines">war machine standing by</small>
-            </article>
-          </div>
-          <div class="machine-roster-heading"><strong>Machines on the field</strong><span>state · integrity · ammunition</span></div>
-          <div id="battle-machine-list" class="battle-machine-list"></div>
-        </section>
-
-        <section id="gate-panel" aria-label="Reset gates">
-          <div class="section-heading">
-            <h2>Physical gates</h2>
-            <span class="gate-meta"><output id="gate-summary">0/9 cleared</output><span id="connection-label">connecting</span></span>
-          </div>
-          <ol id="gate-list"></ol>
-        </section>
-
-        <details id="command-desk" open>
-          <summary><span>Command desk</span><i data-lucide="chevron-down"></i></summary>
-          <div class="command-fields">
-            <label>Worker<select id="worker-select"><option value="">Workers locked</option></select></label>
-            <label>Order<select id="action-select"></select></label>
-            <label>Object<select id="target-select"><option value="">Select an object</option></select></label>
-            <label id="secondary-field" class="connection-only" hidden>Second object<select id="secondary-select"><option value="">Select an object</option></select></label>
-            <label id="connection-class-field" class="connection-only" hidden>Connection<select id="connection-class-select"></select></label>
-            <button id="issue-order" type="button" disabled><i data-lucide="send"></i><span>Issue order</span></button>
-          </div>
-          <div id="fixture-strip" aria-label="Physical demonstrations">
-            <button type="button" data-fixture="lever">Lever</button>
-            <button type="button" data-fixture="ramp">Ramp</button>
-            <button type="button" data-fixture="ram">Ram</button>
-            <button type="button" data-fixture="hoist">Hoist</button>
-            <button type="button" data-fixture="transport">Carry</button>
-          </div>
-          <p id="command-feedback" role="status">Worker actions unlock after grounding is proven.</p>
-        </details>
-
-        <section id="transcript-panel">
-          <div class="section-heading">
-            <h2>The public record</h2>
-            <span id="run-meta"><b id="build-label">3D live</b><b id="seed-label">seed 1881</b></span>
-          </div>
-          <ol id="transcript" aria-live="polite"></ol>
-        </section>
-        </div>
-
-        <section id="archive-panel" class="sidebar-panel" data-sidebar-panel="archive" hidden aria-label="Match archive" role="tabpanel" aria-labelledby="archive-tab">
-          <header class="workspace-heading">
-            <div><span class="workspace-kicker">Recorded matches</span><h2>Replay archive</h2></div>
-            <output id="archive-status">live session</output>
           </header>
-          <p class="workspace-intro">Autonomous contests preserved as public physical snapshots.</p>
-          <div class="archive-summary"><span id="archive-count">0 records</span><span>public snapshots</span></div>
-          <ol id="archive-list" aria-label="Past games"></ol>
-          <p id="archive-feedback" class="workspace-feedback">The server keeps a session archive of public snapshots.</p>
+
+          <section id="objective-strip" aria-label="Battle objectives">
+            <div class="red"><b>Red</b><span>Hold Humpty through the tenth bell.</span></div>
+            <div class="green"><b>Green</b><span>Crack Humpty before the final order resolves.</span></div>
+          </section>
+
+          <section id="target-board" aria-labelledby="target-heading">
+            <header class="section-heading"><h2 id="target-heading">The hill</h2><span id="position-label">Humpty at crown</span></header>
+            <div id="target-list"></div>
+          </section>
+
+          <section id="order-board" aria-labelledby="orders-heading">
+            <header class="section-heading"><h2 id="orders-heading">Simultaneous orders</h2><span id="order-countdown">revealing</span></header>
+            <div id="order-list"></div>
+          </section>
+
+          <section id="unit-board" aria-labelledby="units-heading">
+            <header class="section-heading"><h2 id="units-heading">Equipment</h2><span>integrity · ammunition</span></header>
+            <div id="unit-list"></div>
+          </section>
+
+          <section id="record-board" aria-labelledby="record-heading">
+            <header class="section-heading"><h2 id="record-heading">Battle record</h2><span id="record-count">0 turns</span></header>
+            <ol id="battle-record" aria-live="polite"></ol>
+          </section>
         </section>
 
-        <section id="organize-panel" class="sidebar-panel" data-sidebar-panel="organize" hidden aria-label="Game organizer" role="tabpanel" aria-labelledby="organize-tab">
-          <header class="workspace-heading">
-            <div><span class="workspace-kicker">Match preparation</span><h2>Organize a game</h2></div>
-            <output id="organize-status">ready</output>
-          </header>
-          <p class="workspace-intro">Set a seed and pace for the next theatre. The two royal objectives and public machine rules remain in force.</p>
-          <form id="organize-form">
-            <label>Match seed<input id="organize-seed" type="number" min="0" max="999999" value="1881" /></label>
-            <label>Opening pace<select id="organize-speed"><option value="0.5">Measured</option><option value="1" selected>Standard</option><option value="2">Urgent</option></select></label>
-            <div class="organize-objective red"><strong>Red</strong><span>Keep Humpty uncracked until the ten-minute bell.</span></div>
-            <div class="organize-objective green"><strong>Green</strong><span>Crack Humpty before the siege clock expires.</span></div>
-            <button id="launch-match" type="submit"><i data-lucide="rocket"></i><span>Launch new match</span></button>
+        <section id="archive-view" class="ledger-view" data-ledger-panel="archive" hidden>
+          <div class="view-controls archive-controls"><button type="button" data-archive-command="previous" aria-label="Previous replay" title="Previous replay"><i data-lucide="skip-back"></i></button><button type="button" class="primary" data-archive-command="watch"><i data-lucide="play"></i><span>Watch selected</span></button><button type="button" data-archive-command="next" aria-label="Next replay" title="Next replay"><i data-lucide="skip-forward"></i></button></div>
+          <header class="view-heading"><div><span>Recorded battles</span><h2>Replay archive</h2></div><output id="archive-status">loading</output></header>
+          <p class="view-intro">Three seeded doctrines, ten simultaneous turns, and every revealed order preserved.</p>
+          <ol id="archive-list"></ol>
+          <p id="archive-feedback" role="status">Loading public battle records.</p>
+        </section>
+
+        <section id="command-view" class="ledger-view" data-ledger-panel="command" hidden>
+          <form id="command-form" class="view-controls">
+            <div class="team-switch" role="group" aria-label="Commanding side">
+              <button type="button" class="active red" data-command-team="king">Red</button>
+              <button type="button" class="green" data-command-team="queen">Green</button>
+            </div>
+            <label>Unit<select id="command-unit"></select></label>
+            <label>Order<select id="command-action"></select></label>
+            <label>Target<select id="command-target"></select></label>
+            <button id="seal-order" type="submit" class="seal"><i data-lucide="shield-check"></i><span>Seal order</span></button>
           </form>
-          <div class="organize-contract"><span>Battle contract</span><strong>4 tactical chains · 4 physical machines · 10 minute bell</strong><a href="/agent-context" target="_blank" rel="noreferrer">Open repo contract</a></div>
-          <div class="organize-recipes"><span>Siege doctrines</span><strong id="organize-recipe-summary">Loading battle simulations...</strong></div>
-          <p id="organize-feedback" class="workspace-feedback">Launching a match preserves the current one in the archive.</p>
+          <header class="view-heading"><div><span>Ten-second planning window</span><h2>Battle command</h2></div><output id="command-status">waiting</output></header>
+          <p id="command-feedback" class="view-intro" role="status">Choose one formed unit, one legal order, and one visible target.</p>
+          <section class="command-rules"><h3>Turn contract</h3><p>Both orders stay hidden until the reveal. Damage, ammunition, cooldowns, cover, and rescue effects resolve together.</p></section>
+          <div id="command-roster"></div>
         </section>
       </aside>
     </main>

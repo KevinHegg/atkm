@@ -1,60 +1,40 @@
 import {
-  ChevronDown,
-  ClipboardList,
   Eye,
   FastForward,
-  Hand,
+  Gauge,
   History as HistoryIcon,
   Maximize2,
   PanelRightClose,
   PanelRightOpen,
   Pause,
   Play,
-  RotateCcw,
   Radio,
   Rewind,
-  Rocket,
-  Send,
+  RotateCcw,
+  ShieldCheck,
   SkipBack,
   SkipForward,
-  Volume2,
-  VolumeX,
-  Wrench,
+  Swords,
+  X,
   createElement as createLucideElement,
 } from "lucide";
 import {
   CORE_MODE,
-  CORE_MATCH_DURATION_SECONDS,
-  CONNECTION_CLASSES,
-  LEGAL_ACTIONS,
+  type BattleOrderAction,
+  type BattleOrderState,
+  type BattleTargetId,
+  type BattleUnitState,
   type CoreClientCommand,
-  type CoreMatchState,
   type CoreSnapshot,
-  type LegalActionRequest,
   type ReplayArchiveEntry,
   type ReplaySummary,
+  type Team,
 } from "../shared/core-protocol.js";
 import { LabWorld } from "./lab-world.js";
-import { WorksiteAudio, type RoyalSpeaker } from "./worksite-audio.js";
-
-const errors: string[] = [];
-const SIDEBAR_COLLAPSED_KEY = "humpty-sidebar-collapsed";
-window.addEventListener("error", (event) => errors.push(event.message));
-window.addEventListener("unhandledrejection", (event) => errors.push(String(event.reason)));
-
-navigator.serviceWorker?.getRegistrations()
-  .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-  .catch(() => undefined);
-
-const url = new URL(location.href);
-if (!url.searchParams.has("mode")) url.searchParams.set("mode", CORE_MODE);
-if (!url.searchParams.has("seed")) url.searchParams.set("seed", "1881");
-if (url.href !== location.href) history.replaceState({}, "", url);
-const staticPreview = location.hostname.endsWith(".github.io") || url.searchParams.get("preview") === "static";
 
 interface PublicReplaySummary extends ReplaySummary {
-  title?: string;
-  description?: string;
+  title: string;
+  description: string;
   path: string;
 }
 
@@ -64,130 +44,169 @@ interface PublicReplayManifest {
   replays: PublicReplaySummary[];
 }
 
-const stage = required<HTMLElement>("stage");
-const world = new LabWorld(stage);
-const audio = new WorksiteAudio();
-const transcript = required<HTMLOListElement>("transcript");
-const elapsedValue = required<HTMLElement>("elapsed-value");
-const stageTime = required<HTMLElement>("stage-time");
-const heightValue = required<HTMLElement>("height-value");
-const integrityValue = required<HTMLElement>("integrity-value");
-const integrityFill = required<HTMLElement>("integrity-fill");
-const towerStressValue = required<HTMLElement>("tower-stress-value");
-const towerStressFill = required<HTMLElement>("tower-stress-fill");
-const humptyRiskValue = required<HTMLElement>("humpty-risk-value");
-const humptyRiskFill = required<HTMLElement>("humpty-risk-fill");
-const modeLabel = required<HTMLElement>("mode-mark").querySelector("span");
-const matchStatus = required<HTMLOutputElement>("match-status");
-const watchWorkspaceStatus = required<HTMLOutputElement>("watch-workspace-status");
-const watchWorkspaceKicker = required<HTMLElement>("watch-workspace-kicker");
-const watchWorkspaceTitle = required<HTMLElement>("watch-workspace-title");
-const matchTurn = required<HTMLElement>("match-turn");
-const matchPhase = required<HTMLElement>("match-phase");
-const ruleCount = required<HTMLElement>("rule-count");
-const kingObjective = required<HTMLElement>("king-objective");
-const queenObjective = required<HTMLElement>("queen-objective");
-const kingMachine = required<HTMLElement>("king-machine");
-const queenMachine = required<HTMLElement>("queen-machine");
-const kingChainStage = required<HTMLElement>("king-chain-stage");
-const queenChainStage = required<HTMLElement>("queen-chain-stage");
-const kingChainResult = required<HTMLElement>("king-chain-result");
-const queenChainResult = required<HTMLElement>("queen-chain-result");
-const kingChainProgress = required<HTMLElement>("king-chain-progress");
-const queenChainProgress = required<HTMLElement>("queen-chain-progress");
-const kingSimpleMachines = required<HTMLElement>("king-simple-machines");
-const queenSimpleMachines = required<HTMLElement>("queen-simple-machines");
-const battleMachineList = required<HTMLElement>("battle-machine-list");
-const gateList = required<HTMLOListElement>("gate-list");
-const gateSummary = required<HTMLOutputElement>("gate-summary");
-const connectionLabel = required<HTMLElement>("connection-label");
-const seedLabel = required<HTMLElement>("seed-label");
-const buildLabel = required<HTMLElement>("build-label");
-const sidebarToggle = required<HTMLButtonElement>("sidebar-toggle");
-const collapsedContext = required<HTMLElement>("collapsed-context");
-const collapsedStatusValue = required<HTMLElement>("collapsed-status-value");
-const engineeringOverlay = required<HTMLElement>("engineering-overlay");
-const engineeringTick = required<HTMLOutputElement>("engineering-tick");
-const engineeringValues = required<HTMLDListElement>("engineering-values");
-const actionSelect = required<HTMLSelectElement>("action-select");
-const targetSelect = required<HTMLSelectElement>("target-select");
-const secondarySelect = required<HTMLSelectElement>("secondary-select");
-const connectionClassSelect = required<HTMLSelectElement>("connection-class-select");
-const secondaryField = required<HTMLElement>("secondary-field");
-const connectionClassField = required<HTMLElement>("connection-class-field");
-const workerSelect = required<HTMLSelectElement>("worker-select");
-const issueOrder = required<HTMLButtonElement>("issue-order");
-const commandFeedback = required<HTMLElement>("command-feedback");
-const sidebarTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-sidebar-view]")];
-const sidebarPanels = [...document.querySelectorAll<HTMLElement>("[data-sidebar-panel]")];
-const collapsedViews = [...document.querySelectorAll<HTMLElement>("[data-collapsed-view]")];
-const archiveStatus = required<HTMLOutputElement>("archive-status");
-const archiveList = required<HTMLOListElement>("archive-list");
-const archiveCount = required<HTMLElement>("archive-count");
-const archiveFeedback = required<HTMLElement>("archive-feedback");
-const replayConsole = required<HTMLElement>("replay-console");
-const replayName = required<HTMLElement>("replay-name");
-const replayTime = required<HTMLElement>("replay-time");
+const errors: string[] = [];
+window.addEventListener("error", (event) => errors.push(event.message));
+window.addEventListener("unhandledrejection", (event) => errors.push(String(event.reason)));
+navigator.serviceWorker?.getRegistrations()
+  .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+  .catch(() => undefined);
+
+const url = new URL(location.href);
+if (url.searchParams.get("mode") !== CORE_MODE) url.searchParams.set("mode", CORE_MODE);
+if (!url.searchParams.has("seed")) url.searchParams.set("seed", "1881");
+if (url.href !== location.href) history.replaceState({}, "", url);
+const staticPreview = location.hostname.endsWith(".github.io") || url.searchParams.get("preview") === "static";
+
+const world = new LabWorld(required("stage"));
+const ledger = required("battle-ledger");
+const ledgerToggle = required<HTMLButtonElement>("ledger-toggle");
+const replayName = required("replay-name");
+const replayTime = required("replay-time");
 const replayScrubber = required<HTMLInputElement>("replay-scrubber");
 const replaySpeed = required<HTMLSelectElement>("replay-speed");
-const organizeForm = required<HTMLFormElement>("organize-form");
-const organizeSeed = required<HTMLInputElement>("organize-seed");
-const organizeSpeed = required<HTMLSelectElement>("organize-speed");
-const organizeStatus = required<HTMLOutputElement>("organize-status");
-const organizeFeedback = required<HTMLElement>("organize-feedback");
-const organizeRecipeSummary = required<HTMLElement>("organize-recipe-summary");
+const stageTime = required("stage-time");
+const stagePhase = required("stage-phase");
+const stageTurn = required("stage-turn");
+const redDoctrine = required("red-doctrine");
+const greenDoctrine = required("green-doctrine");
+const compactClock = required("compact-clock");
+const compactPhase = required("compact-phase");
+const connectionLabel = required("connection-label");
+const matchStatus = required<HTMLOutputElement>("match-status");
+const watchKicker = required("watch-kicker");
+const watchTitle = required("watch-title");
+const positionLabel = required("position-label");
+const targetList = required("target-list");
+const orderList = required("order-list");
+const orderCountdown = required("order-countdown");
+const unitList = required("unit-list");
+const recordList = required<HTMLOListElement>("battle-record");
+const recordCount = required("record-count");
+const archiveStatus = required<HTMLOutputElement>("archive-status");
+const archiveList = required<HTMLOListElement>("archive-list");
+const archiveFeedback = required("archive-feedback");
+const commandForm = required<HTMLFormElement>("command-form");
+const commandUnit = required<HTMLSelectElement>("command-unit");
+const commandAction = required<HTMLSelectElement>("command-action");
+const commandTarget = required<HTMLSelectElement>("command-target");
+const commandStatus = required<HTMLOutputElement>("command-status");
+const commandFeedback = required("command-feedback");
+const commandRoster = required("command-roster");
+const sealOrderButton = required<HTMLButtonElement>("seal-order");
+const engineeringOverlay = required("engineering-overlay");
+const engineeringValues = required<HTMLDListElement>("engineering-values");
 
 let socket: WebSocket | undefined;
-let polling = false;
 let pollTimer = 0;
 let reconnectTimer = 0;
-let latest: CoreSnapshot | undefined;
-let sidebarCollapsed = readSidebarState();
-let engineering = false;
-let receivedFirstSnapshot = false;
-const seenAudioEvents = new Set<string>();
-let sidebarView: "watch" | "archive" | "organize" = "watch";
+let latestLive: CoreSnapshot | undefined;
+let displayed: CoreSnapshot | undefined;
+let activeView: "watch" | "archive" | "command" = "watch";
+let ledgerCollapsed = localStorage.getItem("atkm-ledger-collapsed") === "true";
 let replayEntry: ReplayArchiveEntry | undefined;
 let replayFrameIndex = 0;
 let replayPlaying = false;
 let replayClock = 0;
 let replayTimer = 0;
-let archiveTimer = 0;
-let archiveDurable = false;
-let archiveSummaries: ReplaySummary[] = [];
-let publicReplayBaseUrl: URL | undefined;
-let publicReplaySummaries: PublicReplaySummary[] = [];
+let replayBaseUrl: URL | undefined;
+let archiveSummaries: Array<ReplaySummary | PublicReplaySummary> = [];
+let selectedReplayId = "";
+let commandTeam: Team = "king";
 
-for (const action of LEGAL_ACTIONS) {
-  const option = document.createElement("option");
-  option.value = action;
-  option.textContent = actionLabel(action);
-  actionSelect.append(option);
-}
-for (const connectionClass of CONNECTION_CLASSES) {
-  const option = document.createElement("option");
-  option.value = connectionClass;
-  option.textContent = connectionClass.replaceAll("_", " ");
-  connectionClassSelect.append(option);
-}
-
-installControls();
 renderIcons();
-applySidebarState(sidebarCollapsed, false);
-setSidebarView("watch");
-if (staticPreview) {
-  void loadStaticPreview();
-} else {
+installControls();
+setLedgerCollapsed(ledgerCollapsed);
+setView("watch");
+if (staticPreview) void loadStaticSite();
+else {
   connect();
-  void refreshArchiveList();
-  void refreshContraptionSummary();
-  archiveTimer = window.setInterval(() => void refreshArchiveList(), 2500);
+  void refreshLiveArchive();
+  window.setInterval(() => void refreshLiveArchive(), 4000);
 }
+replayTimer = window.setInterval(advanceReplay, 50);
 
-function required<T extends HTMLElement>(id: string): T {
+function required<T extends HTMLElement = HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing #${id}`);
   return element as T;
+}
+
+function installControls(): void {
+  ledgerToggle.addEventListener("click", () => setLedgerCollapsed(!ledgerCollapsed));
+  document.querySelectorAll<HTMLButtonElement>("[data-ledger-view]").forEach((button) => {
+    button.addEventListener("click", () => setView(button.dataset.ledgerView as typeof activeView));
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-stage-command]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const command = button.dataset.stageCommand;
+      if (command === "fit") world.fit();
+      else if (command === "diagnostics") engineeringOverlay.hidden = !engineeringOverlay.hidden;
+      else if (command === "pause") togglePlayback();
+      else if (command === "restart") void send({ type: "reset", seed: Number(url.searchParams.get("seed") ?? 1881) });
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-replay-command]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const command = button.dataset.replayCommand;
+      if (command === "play") togglePlayback();
+      else if (command === "rewind") jumpReplay(-10);
+      else if (command === "fast-forward") jumpReplay(10);
+      else if (command === "live") returnToLive();
+    });
+  });
+  replayScrubber.addEventListener("input", () => {
+    if (!replayEntry) return;
+    replayFrameIndex = Number(replayScrubber.value);
+    replayClock = replayEntry.frames[replayFrameIndex]?.elapsed ?? 0;
+    presentReplayFrame();
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-archive-command]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const command = button.dataset.archiveCommand;
+      if (command === "watch") void openReplay(selectedReplayId, true);
+      else selectAdjacentReplay(command === "previous" ? -1 : 1);
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-command-team]").forEach((button) => {
+    button.addEventListener("click", () => {
+      commandTeam = button.dataset.commandTeam as Team;
+      document.querySelectorAll<HTMLButtonElement>("[data-command-team]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+      renderCommandControls();
+      updateCompactStatus();
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-compact-team]").forEach((button) => {
+    button.addEventListener("click", () => {
+      commandTeam = button.dataset.compactTeam as Team;
+      renderCommandControls();
+      updateCompactStatus();
+    });
+  });
+  document.querySelector<HTMLButtonElement>('[data-compact-command="seal"]')?.addEventListener("click", () => commandForm.requestSubmit());
+  commandUnit.addEventListener("change", renderCommandActions);
+  commandAction.addEventListener("change", renderCommandTargets);
+  commandForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (staticPreview) return;
+    void send({
+      type: "battle-order",
+      team: commandTeam,
+      unitId: commandUnit.value as BattleUnitState["id"],
+      action: commandAction.value as BattleOrderAction,
+      targetId: commandTarget.value as BattleTargetId,
+    }).then((result) => {
+      commandFeedback.textContent = result.message ?? (result.ok ? "Order sealed." : "Order rejected.");
+    });
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    if (event.code === "Space") {
+      event.preventDefault();
+      togglePlayback();
+    }
+    if (event.key === "ArrowLeft") jumpReplay(-10);
+    if (event.key === "ArrowRight") jumpReplay(10);
+  });
 }
 
 function connect(): void {
@@ -200,924 +219,556 @@ function connect(): void {
     return;
   }
   socket.addEventListener("open", () => {
-    stopPolling();
-    document.body.classList.remove("disconnected");
     connectionLabel.textContent = "live";
-    connectionLabel.classList.add("open");
+    document.body.classList.remove("disconnected");
+    stopPolling();
   });
   socket.addEventListener("message", (event) => {
     try {
       const payload = JSON.parse(String(event.data)) as CoreSnapshot | { type: string; message?: string };
-      if (payload.type === "core-snapshot") acceptSnapshot(payload as CoreSnapshot);
-      else if (payload.type === "command-error" && payload.message) commandFeedback.textContent = payload.message;
+      if (payload.type === "core-snapshot") acceptLiveSnapshot(payload as CoreSnapshot);
+      else if ("message" in payload && payload.message) commandFeedback.textContent = payload.message;
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }
   });
-  socket.addEventListener("error", startPolling);
   socket.addEventListener("close", () => {
-    document.body.classList.add("disconnected");
     connectionLabel.textContent = "reconnecting";
-    connectionLabel.classList.remove("open");
+    document.body.classList.add("disconnected");
     startPolling();
-    reconnectTimer = window.setTimeout(connect, 1000);
+    reconnectTimer = window.setTimeout(connect, 1200);
   });
-}
-
-async function loadStaticPreview(): Promise<void> {
-  document.body.classList.add("static-preview");
-  connectionLabel.textContent = "preview";
-  connectionLabel.classList.add("open");
-  organizeStatus.textContent = "preview";
-  commandFeedback.textContent = "Static preview only. Live orders are available from the local theatre server.";
-  try {
-    const replays = await refreshStaticArchiveList();
-    if (replays.length > 0) {
-      const requestedReplay = url.searchParams.get("replay");
-      const selected = replays.find((summary) => summary.id === requestedReplay) ?? replays[0];
-      if (!selected) throw new Error("Public replay manifest is empty.");
-      await openReplay(selected.id, { autoplay: true });
-      organizeRecipeSummary.textContent = "3 packaged autonomous games";
-      return;
-    }
-  } catch (error) {
-    archiveFeedback.textContent = error instanceof Error ? error.message : "Public replays unavailable.";
-  }
-
-  try {
-    const assetUrl = new URL("demo-snapshot.json", new URL(".", location.href));
-    const response = await fetch(assetUrl, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Preview ${response.status}`);
-    const snapshot = await response.json() as CoreSnapshot;
-    latest = snapshot;
-    presentSnapshot(snapshot, false);
-    archiveStatus.textContent = "static preview";
-    archiveFeedback.textContent = "Recorded stage state. Run the theatre server for live autonomous play.";
-    archiveCount.textContent = "1 preview";
-  } catch (error) {
-    connectionLabel.textContent = "unavailable";
-    commandFeedback.textContent = error instanceof Error ? error.message : "Preview unavailable.";
-  }
+  socket.addEventListener("error", startPolling);
 }
 
 function startPolling(): void {
-  if (polling) return;
-  polling = true;
+  if (pollTimer) return;
+  pollTimer = window.setInterval(() => void pollSnapshot(), 800);
   void pollSnapshot();
 }
 
 function stopPolling(): void {
-  polling = false;
-  window.clearTimeout(pollTimer);
+  if (!pollTimer) return;
+  window.clearInterval(pollTimer);
+  pollTimer = 0;
 }
 
 async function pollSnapshot(): Promise<void> {
-  if (!polling) return;
   try {
     const response = await fetch(`/snapshot?at=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Snapshot ${response.status}`);
-    acceptSnapshot(await response.json() as CoreSnapshot);
+    if (!response.ok) return;
     connectionLabel.textContent = "live";
-    connectionLabel.classList.add("open");
+    acceptLiveSnapshot(await response.json() as CoreSnapshot);
   } catch {
-    document.body.classList.add("disconnected");
-  }
-  pollTimer = window.setTimeout(pollSnapshot, 250);
-}
-
-function acceptSnapshot(snapshot: CoreSnapshot): void {
-  latest = snapshot;
-  if (!replayEntry) presentSnapshot(snapshot, true);
-}
-
-function presentSnapshot(snapshot: CoreSnapshot, live: boolean): void {
-  world.sync(snapshot);
-  if (live) processAudioEvents(snapshot);
-  if (window.__HUMPTY_LAB__) window.__HUMPTY_LAB__.consoleErrors = errors;
-  const timeRemaining = matchTimeRemaining(snapshot);
-  const siegeClock = formatElapsed(timeRemaining);
-  elapsedValue.textContent = siegeClock;
-  stageTime.textContent = siegeClock;
-  seedLabel.textContent = `seed ${snapshot.seed}`;
-  buildLabel.textContent = `build ${snapshot.build}`;
-  const humpty = snapshot.bodies.find((body) => body.id === "humpty");
-  if (humpty) {
-    heightValue.textContent = humpty.position.y.toFixed(2);
-    const integrity = humpty.integrity ?? 100;
-    integrityValue.textContent = String(Math.round(integrity));
-    integrityFill.style.width = `${Math.max(0, integrity)}%`;
-  }
-  renderEvents(snapshot);
-  renderMatch(snapshot);
-  renderGates(snapshot);
-  renderDiagnostics(snapshot);
-  updateSidebarContext();
-  populateTargets(snapshot);
-  if (live) {
-    archiveStatus.textContent = archiveDurable ? "durable archive" : "session archive";
-    organizeStatus.textContent = "ready";
-  } else {
-    archiveStatus.textContent = staticPreview ? "public demo reel" : "replay view";
+    connectionLabel.textContent = "offline";
   }
 }
 
-function renderEvents(snapshot: CoreSnapshot): void {
-  transcript.replaceChildren(...snapshot.events.map((event) => {
-    const item = document.createElement("li");
-    const time = document.createElement("time");
-    time.textContent = formatElapsed(event.elapsed);
-    const text = document.createElement("span");
-    text.textContent = event.text;
-    if (event.team) item.dataset.team = event.team;
-    item.append(time, text);
-    return item;
-  }));
-  transcript.scrollTop = 0;
+function acceptLiveSnapshot(snapshot: CoreSnapshot): void {
+  latestLive = snapshot;
+  if (!replayEntry) presentSnapshot(snapshot);
 }
 
-function renderMatch(snapshot: CoreSnapshot): void {
-  const match = snapshot.match;
-  const battle = match.battle;
-  const statusLabel = match.outcome ? outcomeLabel(match.outcome) : match.status;
-  matchStatus.textContent = statusLabel;
-  watchWorkspaceStatus.textContent = statusLabel;
-  matchStatus.dataset.status = match.status;
-  matchStatus.dataset.outcome = match.outcome ?? "";
-  matchTurn.textContent = `Round ${battle?.round ?? 0}`;
-  const urgency = match.urgency ?? siegeUrgencyLabel(snapshot.elapsed);
-  matchPhase.textContent = (battle?.tempo ?? urgency).replace("-", " ");
-  matchPhase.dataset.urgency = urgency;
-  ruleCount.textContent = `${match.moves} decisions`;
-  kingObjective.textContent = match.kingObjective;
-  queenObjective.textContent = match.queenObjective;
-  const stress = battle?.towerStress ?? 0;
-  const risk = battle?.humptyRisk ?? 0;
-  towerStressValue.textContent = String(Math.round(stress));
-  towerStressFill.style.width = `${Math.max(0, Math.min(100, stress))}%`;
-  humptyRiskValue.textContent = String(Math.round(risk));
-  humptyRiskFill.style.width = `${Math.max(0, Math.min(100, risk))}%`;
-
-  const kingChain = battle?.chains.king;
-  const queenChain = battle?.chains.queen;
-  kingMachine.textContent = kingChain?.title || match.machinePlans.king;
-  queenMachine.textContent = queenChain?.title || match.machinePlans.queen;
-  kingChainStage.textContent = kingChain?.stageLabel ?? "Reading threat";
-  queenChainStage.textContent = queenChain?.stageLabel ?? "Choosing breach";
-  kingChainResult.textContent = kingChain?.lastResult ?? "Red is reading the first threat.";
-  queenChainResult.textContent = queenChain?.lastResult ?? "Green is selecting the first breach.";
-  kingChainProgress.style.width = `${Math.round((kingChain?.progress ?? 0) * 100)}%`;
-  queenChainProgress.style.width = `${Math.round((queenChain?.progress ?? 0) * 100)}%`;
-  kingSimpleMachines.textContent = kingChain?.simpleMachines.length
-    ? kingChain.simpleMachines.join(" + ")
-    : "rescue machine standing by";
-  queenSimpleMachines.textContent = queenChain?.simpleMachines.length
-    ? queenChain.simpleMachines.join(" + ")
-    : "war machine standing by";
-  battleMachineList.replaceChildren(...(battle?.machines ?? []).map((machine) => {
-    const row = document.createElement("div");
-    row.className = `battle-machine ${machine.team === "king" ? "red" : "green"}`;
-    row.dataset.state = machine.state;
-    const title = document.createElement("strong");
-    title.textContent = machine.name;
-    const state = document.createElement("span");
-    state.textContent = machine.state;
-    const meter = document.createElement("i");
-    const fill = document.createElement("b");
-    fill.style.width = `${Math.max(0, Math.min(100, machine.integrity))}%`;
-    meter.append(fill);
-    const meta = document.createElement("small");
-    meta.textContent = machine.maxCharges > 1
-      ? `${Math.round(machine.integrity)} integrity · ${machine.charges}/${machine.maxCharges} shots`
-      : `${Math.round(machine.integrity)} integrity · ${machine.purpose}`;
-    row.append(title, state, meter, meta);
-    return row;
-  }));
-  if (modeLabel) {
-    modeLabel.textContent = match.driver === "manual"
-      ? "Legibility lab"
-      : match.driver === "llm" ? "Model-led match" : "Autonomous match";
+async function loadStaticSite(): Promise<void> {
+  document.body.classList.add("static-preview");
+  connectionLabel.textContent = "public replay";
+  sealOrderButton.disabled = true;
+  commandStatus.textContent = "replay only";
+  commandFeedback.textContent = "The public page plays complete battles. Live command requires the local theatre server.";
+  try {
+    const manifestUrl = new URL("replays/manifest.json", new URL(".", location.href));
+    const response = await fetch(manifestUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Replay manifest ${response.status}`);
+    const manifest = await response.json() as PublicReplayManifest;
+    replayBaseUrl = new URL(".", manifestUrl);
+    archiveSummaries = manifest.replays;
+    selectedReplayId = url.searchParams.get("replay") ?? manifest.replays[0]?.id ?? "";
+    archiveStatus.textContent = `${manifest.replays.length} battles`;
+    archiveFeedback.textContent = `Deterministic siege reel generated for ${manifest.build}.`;
+    renderArchive();
+    await openReplay(selectedReplayId, false);
+  } catch (error) {
+    archiveStatus.textContent = "unavailable";
+    archiveFeedback.textContent = error instanceof Error ? error.message : "Public replays unavailable.";
   }
 }
 
-function renderGates(snapshot: CoreSnapshot): void {
-  const diagnostics = snapshot.diagnostics;
-  const completed = new Set(snapshot.completedFixtures);
-  const clientDivergence = window.__HUMPTY_LAB__?.maxPoseDivergence ?? 0;
-  const gateA =
-    diagnostics.physicsAdapter === "rapier3d" &&
-    diagnostics.physicsWorlds === 1 &&
-    diagnostics.illegalTransformWrites === 0 &&
-    diagnostics.lateCreatedInventory === 0 &&
-    clientDivergence < .01;
-  const tower = snapshot.bodies.filter((body) => body.kind === "tower-block");
-  const courses = new Map<number, CoreSnapshot["bodies"]>();
-  for (const block of tower) {
-    const course = block.course ?? -1;
-    const entries = courses.get(course) ?? [];
-    entries.push(block);
-    courses.set(course, entries);
-  }
-  const topology = tower.length === 36 && courses.size === 12 && [...courses.values()].every((entries) => entries.length === 3);
-  const gateB = topology && diagnostics.humptyCradleContacts > 0 && diagnostics.cradleTowerContacts > 0 && diagnostics.humptyVisibleSupportGap < .02;
-  const gateC =
-    snapshot.completedFixtures.includes("transport") &&
-    snapshot.workers.length === 6 &&
-    diagnostics.workerPenetrations === 0 &&
-    diagnostics.carriedPartPenetrations === 0 &&
-    diagnostics.deepBodyPenetrations === 0;
-  const approvedFamilies = new Set(["beam", "hub", "axle", "wheel", "sheave", "drum", "plank", "rope", "wedge"]);
-  const parts = snapshot.bodies.filter((body) => body.kind === "part");
-  const gateD =
-    diagnostics.inventoryByTeam.king === 24 &&
-    diagnostics.inventoryByTeam.queen === 24 &&
-    parts.every((part) => part.family && approvedFamilies.has(part.family)) &&
-    parts.every((part) => Math.abs(part.position.x) > 5.9 || part.stored === false);
-  const rows = [
-    ["A", "One world", gateA],
-    ["B", "Grounded king", gateB],
-    ["C", "Workers carry", gateC],
-    ["D", "Opening kit", gateD],
-    ["E", "Lever + ramp", snapshot.completedFixtures.includes("lever") && snapshot.completedFixtures.includes("ramp")],
-    ["F", "Wheeled ram", snapshot.completedFixtures.includes("ram")],
-    ["G", "Routed hoist", snapshot.completedFixtures.includes("hoist")],
-    ["H", "Autonomous", completed.has("autonomous") || (snapshot.match.driver !== "manual" && snapshot.match.moves > 0)],
-    ["I", "LLM match", completed.has("llm") || (snapshot.match.driver === "llm" && diagnostics.llmEnabled)],
-  ] as const;
-  let passCount = 0;
-  let currentCount = 0;
-  gateList.replaceChildren(...rows.map(([letter, label, pass], index) => {
-    if (pass) passCount += 1;
-    const current = !pass && rows.slice(0, index).every((row) => row[2]);
-    if (current) currentCount += 1;
-    const state = pass ? "pass" : current ? "current" : "locked";
-    const stateLabel = pass ? "Cleared" : current ? "Next" : "Inactive";
-    const item = document.createElement("li");
-    item.className = state;
-    item.dataset.state = state;
-    item.title = `Gate ${letter}: ${stateLabel}. ${label}`;
-    item.setAttribute("aria-label", `Gate ${letter}, ${label}, ${stateLabel}`);
-    const heading = document.createElement("b");
-    heading.textContent = `Gate ${letter}`;
-    const detail = document.createElement("span");
-    detail.textContent = label;
-    const status = document.createElement("em");
-    status.textContent = stateLabel;
-    item.append(heading, detail, status);
-    return item;
-  }));
-  gateSummary.textContent = `${passCount}/9 cleared · ${currentCount > 0 ? `${currentCount} next` : "all staged"}`;
-}
-
-function renderDiagnostics(snapshot: CoreSnapshot): void {
-  const d = snapshot.diagnostics;
-  engineeringTick.textContent = `tick ${snapshot.tick}`;
-  const values: Array<[string, string | number]> = [
-    ["Authority", `${d.physicsAdapter} / ${d.physicsWorlds} world`],
-    ["Units", d.units],
-    ["Dynamic bodies", d.dynamicBodies],
-    ["Tenon / bearing joints", `${d.jointsByClass.TENON_LOCK} / ${d.jointsByClass.AXLE_BEARING}`],
-    ["Keyed / rope joints", `${d.jointsByClass.KEYED_COAXIAL} / ${d.jointsByClass.ROPE_ATTACH}`],
-    ["Tower bodies", d.towerBodies],
-    ["King / Queen parts", `${d.inventoryByTeam.king} / ${d.inventoryByTeam.queen}`],
-    ["Humpty / cradle contacts", d.humptyCradleContacts],
-    ["Cradle / tower contacts", d.cradleTowerContacts],
-    ["Visible support gap", `${d.humptyVisibleSupportGap.toFixed(4)} m`],
-    ["Illegal pose writes", d.illegalTransformWrites],
-    ["Deep penetrations", d.deepBodyPenetrations],
-    ["Late inventory", d.lateCreatedInventory],
-    ["Client Ammo bodies", window.__HUMPTY_LAB__?.ammoBodies ?? 0],
-    ["Render lag", `${(window.__HUMPTY_LAB__?.maxPoseDivergence ?? 0).toFixed(4)} m`],
-    ["Agent driver", snapshot.match.driver.toUpperCase()],
-  ];
-  engineeringValues.replaceChildren(...values.map(([label, value]) => {
-    const row = document.createElement("div");
-    const term = document.createElement("dt");
-    const detail = document.createElement("dd");
-    term.textContent = label;
-    detail.textContent = String(value);
-    row.append(term, detail);
-    return row;
-  }));
-}
-
-function populateTargets(snapshot: CoreSnapshot): void {
-  if (targetSelect.options.length > 1) return;
-  const options = snapshot.bodies
-    .filter((body) => body.kind === "part" || body.kind === "tower-block" || body.kind === "cradle" || body.kind === "queen-device" || body.kind === "queen-bolt")
-    .sort((left, right) => left.id.localeCompare(right.id));
-  for (const body of options) {
-    const option = document.createElement("option");
-    option.value = body.id;
-    option.textContent = body.kind === "part" ? `${body.team}: ${body.family} ${body.variant ?? ""}` : body.kind === "queen-device" ? "queen: command post" : body.kind === "queen-bolt" ? `queen: ${body.variant ?? "crown bolt"}` : body.id;
-    targetSelect.append(option);
-    secondarySelect.append(option.cloneNode(true));
-  }
-  workerSelect.replaceChildren(...snapshot.workers.map((worker) => {
-    const option = document.createElement("option");
-    option.value = worker.id;
-    option.textContent = `${worker.name} (${worker.team})`;
-    return option;
-  }));
-  if (snapshot.workers.length === 0) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "Workers locked";
-    workerSelect.append(option);
-  }
-  issueOrder.disabled = snapshot.workers.length === 0;
-}
-
-function setSidebarView(view: "watch" | "archive" | "organize"): void {
-  sidebarView = view;
-  for (const tab of sidebarTabs) {
-    const active = tab.dataset.sidebarView === view;
-    tab.classList.toggle("active", active);
-    tab.setAttribute("aria-selected", String(active));
-  }
-  for (const panel of sidebarPanels) panel.hidden = panel.dataset.sidebarPanel !== view;
-  for (const controls of collapsedViews) controls.hidden = controls.dataset.collapsedView !== view;
-  updateSidebarContext();
-}
-
-function updateSidebarContext(): void {
-  if (sidebarView === "watch") {
-    const battle = (replayEntry?.frames[replayFrameIndex] ?? latest)?.match.battle;
-    collapsedContext.textContent = battle
-      ? `Green: ${battle.chains.queen.stageLabel} · Red: ${battle.chains.king.stageLabel}`
-      : replayEntry ? replayTitle(replayEntry.summary) : modeLabel?.textContent ?? "Live match";
-    collapsedStatusValue.textContent = replayEntry
-      ? replayTime.textContent ?? "00:00"
-      : latest ? formatElapsed(matchTimeRemaining(latest)) : "10:00";
-    return;
-  }
-  if (sidebarView === "archive") {
-    collapsedContext.textContent = replayEntry ? replayTitle(replayEntry.summary) : "Replay archive";
-    collapsedStatusValue.textContent = archiveCount.textContent ?? archiveStatus.textContent ?? "ready";
-    return;
-  }
-  const pace = organizeSpeed.selectedOptions[0]?.textContent ?? "Standard";
-  collapsedContext.textContent = `Seed ${organizeSeed.value} · ${pace}`;
-  collapsedStatusValue.textContent = organizeStatus.textContent ?? "ready";
-}
-
-async function refreshArchiveList(): Promise<void> {
+async function refreshLiveArchive(): Promise<void> {
   try {
     const response = await fetch(`/archive?at=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Archive ${response.status}`);
+    if (!response.ok) return;
     const payload = await response.json() as { durable: boolean; replays: ReplaySummary[] };
-    archiveDurable = payload.durable;
     archiveSummaries = payload.replays;
-    archiveStatus.textContent = payload.durable ? "durable archive" : "session archive";
-    archiveCount.textContent = `${payload.replays.length} ${payload.replays.length === 1 ? "record" : "records"}`;
-    updateSidebarContext();
-    renderArchiveList(payload.replays);
-    if (payload.replays.length === 0) archiveFeedback.textContent = "No match has been recorded yet.";
-  } catch (error) {
-    archiveFeedback.textContent = error instanceof Error ? error.message : "Archive unavailable.";
+    selectedReplayId ||= payload.replays[0]?.id ?? "";
+    archiveStatus.textContent = payload.durable ? "saved locally" : "session archive";
+    archiveFeedback.textContent = `${payload.replays.length} battle records available.`;
+    renderArchive();
+  } catch {
+    archiveStatus.textContent = "offline";
   }
 }
 
-async function refreshStaticArchiveList(): Promise<PublicReplaySummary[]> {
-  const manifestUrl = new URL("replays/manifest.json", new URL(".", location.href));
-  const response = await fetch(manifestUrl, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Public replays ${response.status}`);
-  const manifest = await response.json() as PublicReplayManifest;
-  publicReplayBaseUrl = new URL(".", manifestUrl);
-  publicReplaySummaries = manifest.replays;
-  archiveSummaries = manifest.replays;
-  archiveDurable = false;
-  archiveStatus.textContent = "public demo reel";
-  archiveCount.textContent = `${manifest.replays.length} ${manifest.replays.length === 1 ? "game" : "games"}`;
-  archiveFeedback.textContent = `Packaged autonomous games generated for ${manifest.build}.`;
-  renderArchiveList(manifest.replays);
-  updateSidebarContext();
-  return manifest.replays;
-}
-
-function renderArchiveList(summaries: ReplaySummary[]): void {
-  archiveList.replaceChildren(...summaries.map((summary) => {
-    const publicSummary = asPublicReplaySummary(summary);
+function renderArchive(): void {
+  archiveList.replaceChildren(...archiveSummaries.map((summary) => {
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
-    button.dataset.replayId = summary.id;
-    button.classList.toggle("active", replayEntry?.summary.id === summary.id);
-    const title = document.createElement("span");
-    title.className = "archive-row-title";
-    const name = document.createElement("strong");
-    name.textContent = publicSummary?.title ?? (summary.live ? "Live match" : `Match ${summary.id}`);
-    const status = document.createElement("span");
-    status.textContent = summary.outcome ? outcomeLabel(summary.outcome) : summary.status;
-    title.append(name, status);
+    button.classList.toggle("active", summary.id === selectedReplayId);
+    const title = document.createElement("strong");
+    title.textContent = replayTitle(summary);
+    const result = document.createElement("b");
+    result.textContent = summary.outcome ? outcomeLabel(summary.outcome) : summary.status;
     const meta = document.createElement("span");
-    meta.className = "archive-row-meta";
-    meta.textContent = `seed ${summary.seed} · ${summary.driver === "mock" ? "synthetic" : summary.driver} · ${formatElapsed(summary.duration)} · ${summary.frameCount} frames`;
-    button.append(title, meta);
-    if (publicSummary?.description) {
-      const description = document.createElement("span");
-      description.className = "archive-row-description";
-      description.textContent = publicSummary.description;
+    meta.textContent = `seed ${summary.seed} · ${summary.frameCount} frames · ${formatElapsed(summary.duration)}`;
+    button.append(title, result, meta);
+    if ("description" in summary) {
+      const description = document.createElement("p");
+      description.textContent = summary.description;
       button.append(description);
     }
-    button.addEventListener("click", () => void openReplay(summary.id, { autoplay: true, showWatch: true }));
+    button.addEventListener("click", () => {
+      selectedReplayId = summary.id;
+      renderArchive();
+      updateCompactStatus();
+    });
     item.append(button);
     return item;
   }));
 }
 
-function asPublicReplaySummary(summary: ReplaySummary): PublicReplaySummary | undefined {
-  return "path" in summary && typeof summary.path === "string"
-    ? summary as PublicReplaySummary
-    : undefined;
+function selectAdjacentReplay(direction: number): void {
+  if (archiveSummaries.length === 0) return;
+  const current = Math.max(0, archiveSummaries.findIndex((summary) => summary.id === selectedReplayId));
+  const index = (current + direction + archiveSummaries.length) % archiveSummaries.length;
+  selectedReplayId = archiveSummaries[index]!.id;
+  renderArchive();
+  updateCompactStatus();
 }
 
-async function refreshContraptionSummary(): Promise<void> {
-  try {
-    const response = await fetch(`/contraptions?at=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Recipes ${response.status}`);
-    const payload = await response.json() as { contraptions: Array<{ id: string; hybrid?: boolean }> };
-    const hybrids = payload.contraptions.filter((recipe) => recipe.hybrid).length;
-    const base = payload.contraptions.filter((recipe) => !recipe.id.includes(":"));
-    const variants = payload.contraptions.length - base.length - hybrids;
-    organizeRecipeSummary.textContent = `${base.length} base · ${variants} crew variations · ${hybrids} hybrid recipes`;
-  } catch {
-    organizeRecipeSummary.textContent = "Recipe pool unavailable";
-  }
-}
-
-async function openReplay(id: string, options: { autoplay?: boolean; showWatch?: boolean } = {}): Promise<void> {
-  archiveFeedback.textContent = "Loading public snapshots...";
+async function openReplay(id: string, switchToWatch: boolean): Promise<void> {
+  if (!id) return;
+  archiveFeedback.textContent = "Loading battle snapshots...";
   try {
     const response = await fetch(replayUrl(id), { cache: "no-store" });
     if (!response.ok) throw new Error(`Replay ${response.status}`);
     replayEntry = await response.json() as ReplayArchiveEntry;
     replayFrameIndex = 0;
-    replayPlaying = false;
-    syncReplayClockToFrame();
-    replayConsole.hidden = false;
-    replayName.textContent = "Replay transport";
-    watchWorkspaceKicker.textContent = "Recorded theatre";
-    watchWorkspaceTitle.textContent = replayTitle(replayEntry.summary);
-    archiveFeedback.textContent = staticPreview
-      ? `${replayEntry.frames.length} public snapshots ready in Watch.`
-      : `${replayEntry.frames.length} snapshots ready in Watch. The live match continues independently.`;
+    replayClock = replayEntry.frames[0]?.elapsed ?? 0;
+    replayPlaying = true;
+    selectedReplayId = id;
+    replayName.textContent = replayTitle(replayEntry.summary);
+    watchKicker.textContent = "Recorded battle";
+    watchTitle.textContent = replayTitle(replayEntry.summary);
     presentReplayFrame();
-    replayPlaying = Boolean(options.autoplay);
-    setSidebarView(options.showWatch === false ? "archive" : "watch");
+    updatePlaybackButtons();
+    renderArchive();
+    archiveFeedback.textContent = `${replayEntry.frames.length} physical snapshots loaded.`;
     if (staticPreview) {
       url.searchParams.set("replay", id);
       history.replaceState({}, "", url);
     }
-    updateReplayControls();
-    if (staticPreview) renderArchiveList(publicReplaySummaries);
-    else void refreshArchiveList();
+    if (switchToWatch) setView("watch");
   } catch (error) {
     archiveFeedback.textContent = error instanceof Error ? error.message : "Replay unavailable.";
   }
 }
 
 function replayUrl(id: string): string {
-  if (!staticPreview) return `/archive/${encodeURIComponent(id)}?at=${Date.now()}`;
-  const summary = publicReplaySummaries.find((candidate) => candidate.id === id);
-  if (!summary || !publicReplayBaseUrl) throw new Error(`Unknown public replay ${id}`);
-  const replayUrl = new URL(summary.path, publicReplayBaseUrl);
-  replayUrl.searchParams.set("at", String(Date.now()));
-  return replayUrl.href;
+  const summary = archiveSummaries.find((candidate) => candidate.id === id);
+  if (staticPreview) {
+    if (!summary || !("path" in summary) || !replayBaseUrl) throw new Error(`Unknown replay ${id}`);
+    return new URL(summary.path, replayBaseUrl).href;
+  }
+  return `/archive/${encodeURIComponent(id)}?at=${Date.now()}`;
 }
 
-function replayTitle(summary: ReplaySummary): string {
-  const publicSummary = publicReplaySummaries.find((candidate) => candidate.id === summary.id);
-  return publicSummary?.title ?? (summary.live ? "Live match snapshot" : `Match ${summary.id}`);
+function advanceReplay(): void {
+  if (!replayEntry || !replayPlaying) return;
+  replayClock += .05 * Number(replaySpeed.value);
+  const frames = replayEntry.frames;
+  while (replayFrameIndex < frames.length - 1 && (frames[replayFrameIndex + 1]?.elapsed ?? Infinity) <= replayClock) replayFrameIndex += 1;
+  presentReplayFrame();
+  if (replayFrameIndex >= frames.length - 1) {
+    replayPlaying = false;
+    updatePlaybackButtons();
+  }
 }
 
 function presentReplayFrame(): void {
   const frame = replayEntry?.frames[replayFrameIndex];
   if (!frame || !replayEntry) return;
-  presentSnapshot(frame, false);
+  presentSnapshot(frame);
   replayScrubber.max = String(Math.max(0, replayEntry.frames.length - 1));
   replayScrubber.value = String(replayFrameIndex);
   replayTime.textContent = `${formatElapsed(frame.elapsed)} / ${formatElapsed(replayEntry.summary.duration)}`;
-  updateReplayControls();
-}
-
-function updateReplayControls(): void {
-  const replayButtons = [
-    document.querySelector<HTMLButtonElement>('[data-replay-command="play"]'),
-    document.querySelector<HTMLButtonElement>('[data-compact-command="watch-toggle"]'),
-  ].filter((button): button is HTMLButtonElement => Boolean(button));
-  const paused = replayEntry ? !replayPlaying : latest?.paused ?? false;
-  const subject = replayEntry ? "replay" : "match";
-  for (const button of replayButtons) {
-    button.setAttribute("aria-label", paused ? `Play ${subject}` : `Pause ${subject}`);
-    button.title = paused ? `Play ${subject}` : `Pause ${subject}`;
-    button.classList.toggle("active", !paused);
-    setIcon(button, paused ? Play : Pause);
-  }
-  const stageButton = document.querySelector<HTMLButtonElement>('[data-command="pause"]');
-  if (stageButton) {
-    stageButton.setAttribute("aria-label", paused ? `Play ${subject}` : `Pause ${subject}`);
-    stageButton.title = paused ? `Play ${subject}` : `Pause ${subject}`;
-    stageButton.classList.toggle("active", paused);
-    setIcon(stageButton, paused ? Play : Pause);
-  }
-  if (replayEntry) {
-    const frameMatch = replayEntry.frames[replayFrameIndex]?.match;
-    watchWorkspaceStatus.textContent = frameMatch?.status === "complete" && frameMatch.outcome
-      ? outcomeLabel(frameMatch.outcome)
-      : replayPlaying ? `${replaySpeed.value}x replay` : "replay paused";
-  }
-  updateSidebarContext();
 }
 
 function jumpReplay(seconds: number): void {
   if (!replayEntry) return;
-  const current = replayEntry.frames[replayFrameIndex];
-  const first = replayEntry.frames[0];
-  const final = replayEntry.frames.at(-1);
-  if (!current || !first || !final) return;
-  const target = Math.max(first.elapsed, Math.min(final.elapsed, current.elapsed + seconds));
-  let next = replayEntry.frames.findIndex((frame) => frame.elapsed >= target);
-  if (next < 0) next = replayEntry.frames.length - 1;
-  replayFrameIndex = next;
-  syncReplayClockToFrame();
+  const target = Math.max(0, Math.min(replayEntry.summary.duration, replayClock + seconds));
+  let index = replayEntry.frames.findIndex((frame) => frame.elapsed >= target);
+  if (index < 0) index = replayEntry.frames.length - 1;
+  replayFrameIndex = index;
+  replayClock = replayEntry.frames[index]?.elapsed ?? target;
   presentReplayFrame();
-  updateReplayControls();
 }
 
-function togglePrimaryPlayback(): void {
+function togglePlayback(): void {
   if (replayEntry) {
     if (!replayPlaying && replayFrameIndex >= replayEntry.frames.length - 1) {
       replayFrameIndex = 0;
-      presentReplayFrame();
+      replayClock = replayEntry.frames[0]?.elapsed ?? 0;
     }
-    if (!replayPlaying) syncReplayClockToFrame();
     replayPlaying = !replayPlaying;
-    updateReplayControls();
+    updatePlaybackButtons();
+    presentReplayFrame();
     return;
   }
   void send({ type: "pause" });
-  const stageButton = document.querySelector<HTMLButtonElement>('[data-command="pause"]');
-  if (!stageButton) return;
-  const paused = latest ? !latest.paused : true;
-  stageButton.classList.toggle("active", paused);
-  stageButton.setAttribute("aria-label", paused ? "Play match" : "Pause match");
-  stageButton.title = paused ? "Play match" : "Pause match";
-  setIcon(stageButton, paused ? Play : Pause);
-}
-
-async function openAdjacentReplay(direction: -1 | 1, showWatch = false): Promise<void> {
-  if (archiveSummaries.length === 0) return;
-  const currentIndex = replayEntry
-    ? archiveSummaries.findIndex((summary) => summary.id === replayEntry?.summary.id)
-    : -1;
-  const nextIndex = currentIndex < 0
-    ? 0
-    : (currentIndex + direction + archiveSummaries.length) % archiveSummaries.length;
-  const next = archiveSummaries[nextIndex];
-  if (next) await openReplay(next.id, { autoplay: showWatch, showWatch });
-}
-
-function watchSelectedReplay(): void {
-  if (replayEntry) {
-    setSidebarView("watch");
-    replayPlaying = true;
-    updateReplayControls();
-    return;
-  }
-  const first = archiveSummaries[0];
-  if (first) void openReplay(first.id, { autoplay: true, showWatch: true });
-}
-
-function syncReplayClockToFrame(): void {
-  if (!replayEntry) {
-    replayClock = 0;
-    return;
-  }
-  const first = replayEntry.frames[0];
-  const current = replayEntry.frames[replayFrameIndex];
-  replayClock = Math.max(0, (current?.elapsed ?? first?.elapsed ?? 0) - (first?.elapsed ?? 0));
-}
-
-function advanceReplay(): void {
-  if (!replayPlaying || !replayEntry) return;
-  const first = replayEntry.frames[0];
-  const final = replayEntry.frames.at(-1);
-  if (!first || !final) return;
-  replayClock += Number(replaySpeed.value) * .1;
-  const targetElapsed = first.elapsed + replayClock;
-  let next = replayFrameIndex;
-  while (next < replayEntry.frames.length - 1 && (replayEntry.frames[next + 1]?.elapsed ?? Infinity) <= targetElapsed) {
-    next += 1;
-  }
-  if (targetElapsed >= final.elapsed) {
-    replayFrameIndex = replayEntry.frames.length - 1;
-    replayPlaying = false;
-    presentReplayFrame();
-    updateReplayControls();
-    return;
-  }
-  if (next !== replayFrameIndex) {
-    replayFrameIndex = next;
-    presentReplayFrame();
-  }
 }
 
 function returnToLive(): void {
-  replayPlaying = false;
+  if (staticPreview || !latestLive) return;
   replayEntry = undefined;
-  replayConsole.hidden = true;
-  watchWorkspaceKicker.textContent = "Live theatre";
-  watchWorkspaceTitle.textContent = "Watch current match";
-  updateReplayControls();
-  if (latest) presentSnapshot(latest, true);
-  archiveStatus.textContent = staticPreview ? "public demo reel" : archiveDurable ? "durable archive" : "session archive";
-  archiveFeedback.textContent = staticPreview
-    ? "Choose a packaged game from the public replay archive."
-    : "The server keeps a session archive of public snapshots.";
-  updateSidebarContext();
+  replayPlaying = false;
+  replayName.textContent = "Live siege";
+  watchKicker.textContent = "Live theatre";
+  watchTitle.textContent = "Siege command";
+  presentSnapshot(latestLive);
+  updatePlaybackButtons();
 }
 
-function installControls(): void {
-  document.querySelectorAll<HTMLButtonElement>("#controls button").forEach((button) => {
-    button.addEventListener("click", () => {
-      const command = button.dataset.command;
-      if (command === "pause") {
-        togglePrimaryPlayback();
-      } else if (command === "fit") world.fit();
-      else if (command === "poke") void send({ type: "debug-poke" });
-      else if (command === "sound") void toggleSound(button);
-      else if (command === "engineering") {
-        engineering = !engineering;
-        engineeringOverlay.hidden = !engineering;
-        button.classList.toggle("active", engineering);
-      } else if (command === "restart") void send({ type: "reset", seed: 1881 });
-    });
-  });
-  sidebarToggle.addEventListener("click", () => {
-    applySidebarState(!sidebarCollapsed);
-  });
-  for (const tab of sidebarTabs) {
-    tab.addEventListener("click", () => {
-      const view = tab.dataset.sidebarView as "watch" | "archive" | "organize";
-      setSidebarView(view);
-    });
-  }
-  document.querySelectorAll<HTMLButtonElement>("[data-replay-command]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const command = button.dataset.replayCommand;
-      if (!replayEntry && command !== "live") return;
-      if (command === "rewind") {
-        jumpReplay(-10);
-      } else if (command === "fast-forward") {
-        jumpReplay(10);
-      } else if (command === "play") {
-        togglePrimaryPlayback();
-      } else if (command === "live") {
-        setSidebarView("watch");
-        returnToLive();
-      }
-      updateReplayControls();
-    });
-  });
-  document.querySelectorAll<HTMLButtonElement>("[data-compact-command]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const command = button.dataset.compactCommand;
-      if (command === "watch-rewind") jumpReplay(-10);
-      else if (command === "watch-toggle") togglePrimaryPlayback();
-      else if (command === "watch-forward") jumpReplay(10);
-      else if (command === "archive-previous") void openAdjacentReplay(-1);
-      else if (command === "archive-watch") watchSelectedReplay();
-      else if (command === "archive-next") void openAdjacentReplay(1);
-      else if (command === "organize-launch") organizeForm.requestSubmit();
-    });
-  });
-  replayScrubber.addEventListener("input", () => {
-    if (!replayEntry) return;
-    replayPlaying = false;
-    replayFrameIndex = Number(replayScrubber.value);
-    syncReplayClockToFrame();
-    presentReplayFrame();
-    updateReplayControls();
-  });
-  replaySpeed.addEventListener("change", () => {
-    syncReplayClockToFrame();
-    updateReplayControls();
-  });
-  replayTimer = window.setInterval(advanceReplay, 100);
-  organizeForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const seed = Math.max(0, Math.min(999999, Number(organizeSeed.value) || 1881));
-    const pace = Number(organizeSpeed.value);
-    organizeSeed.value = String(seed);
-    organizeStatus.textContent = "launching";
-    updateSidebarContext();
-    organizeFeedback.textContent = "The current match is being archived and the new theatre is mustering.";
-    returnToLive();
-    setSidebarView("organize");
-    void send({ type: "reset", seed }).then(() => {
-      void send({ type: "time-scale", value: pace });
-      organizeStatus.textContent = "live";
-      organizeFeedback.textContent = `Match seed ${seed} launched at ${pace}x opening pace.`;
-      updateSidebarContext();
-      void refreshArchiveList();
-    });
-  });
-  actionSelect.addEventListener("change", syncConnectionControls);
-  organizeSeed.addEventListener("input", updateSidebarContext);
-  organizeSpeed.addEventListener("change", updateSidebarContext);
-  syncConnectionControls();
-  issueOrder.addEventListener("click", () => {
-    const actor = workerSelect.value;
-    if (!actor) return;
-    const action = actionSelect.value as (typeof LEGAL_ACTIONS)[number];
-    const connectionAction = isConnectionAction(action);
-    if (connectionAction && (!secondarySelect.value || secondarySelect.value === targetSelect.value)) {
-      commandFeedback.textContent = "Choose a different second object for the connection.";
-      return;
+function presentSnapshot(snapshot: CoreSnapshot): void {
+  displayed = snapshot;
+  world.sync(snapshot);
+  const battle = snapshot.match.battle;
+  if (!battle) return;
+  const clock = formatClock(battle.timeRemaining);
+  const phase = phaseLabel(battle.phase);
+  stageTime.textContent = clock;
+  compactClock.textContent = clock;
+  stagePhase.textContent = phase;
+  stageTurn.textContent = `Turn ${Math.max(1, battle.round)} of ${battle.maxRounds}`;
+  redDoctrine.textContent = battle.doctrine.king;
+  greenDoctrine.textContent = battle.doctrine.queen;
+  positionLabel.textContent = `Humpty ${battle.humptyPosition === "crown" ? "at crown" : battle.humptyPosition}`;
+  matchStatus.textContent = snapshot.match.status === "complete" && snapshot.match.outcome
+    ? outcomeLabel(snapshot.match.outcome)
+    : phase;
+  orderCountdown.textContent = snapshot.match.status === "complete"
+    ? "final"
+    : `${Math.ceil(snapshot.match.nextMoveIn)}s`;
+  renderTargets(snapshot);
+  renderOrders(snapshot);
+  renderUnits(snapshot);
+  renderRecord(snapshot);
+  renderCommandControls();
+  renderDiagnostics(snapshot);
+  updateCompactStatus();
+  updatePlaybackButtons();
+  document.body.dataset.battlePhase = battle.phase;
+  document.body.dataset.outcome = snapshot.match.outcome ?? "";
+  document.body.dataset.rendered = "true";
+}
+
+function renderTargets(snapshot: CoreSnapshot): void {
+  const battle = snapshot.match.battle!;
+  targetList.replaceChildren(...battle.targets.map((target) => {
+    const row = document.createElement("div");
+    row.className = `target-row ${target.status}`;
+    const copy = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = target.name;
+    const state = document.createElement("span");
+    state.textContent = target.protection > 0 ? `${target.status} · ${target.protection}% cover` : target.status;
+    copy.append(name, state);
+    const value = document.createElement("b");
+    value.textContent = String(Math.round(target.integrity));
+    const track = document.createElement("i");
+    const fill = document.createElement("span");
+    fill.style.width = `${target.integrity}%`;
+    track.append(fill);
+    row.append(copy, value, track);
+    return row;
+  }));
+}
+
+function renderOrders(snapshot: CoreSnapshot): void {
+  const battle = snapshot.match.battle!;
+  orderList.replaceChildren(...(["king", "queen"] as const).map((team) => {
+    const order = battle.orders[team];
+    const row = document.createElement("article");
+    row.className = `order-row ${team === "king" ? "red" : "green"}`;
+    const side = document.createElement("b");
+    side.textContent = team === "king" ? "RED" : "GREEN";
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    const detail = document.createElement("p");
+    if (order) {
+      title.textContent = `${order.unitName} · ${actionLabel(order.action)}`;
+      detail.textContent = order.status === "resolved" ? order.result : `Target: ${order.targetName}`;
+    } else if (battle.sealedTeams.includes(team)) {
+      title.textContent = "Order sealed";
+      detail.textContent = "Hidden until both commanders reveal.";
+    } else {
+      title.textContent = "Planning in secret";
+      detail.textContent = "Reading damage, ammunition, and the previous exchange.";
     }
-    const request: LegalActionRequest = {
-      action,
-      actorIds: [actor],
-      ...(targetSelect.value ? { targetId: targetSelect.value } : {}),
-      ...(connectionAction ? {
-        secondaryId: secondarySelect.value,
-        connectionClass: connectionClassSelect.value as (typeof CONNECTION_CLASSES)[number],
-      } : {}),
-    };
-    void send({
-      type: "legal-action",
-      request,
-    });
-  });
-  document.querySelectorAll<HTMLButtonElement>("[data-fixture]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const fixture = button.dataset.fixture as "lever" | "ramp" | "ram" | "hoist" | "transport";
-      void send({ type: "run-fixture", fixture });
-    });
-  });
-  window.addEventListener("keydown", (event) => {
-    if (event.code === "Space" && event.target === document.body) {
-      event.preventDefault();
-      togglePrimaryPlayback();
-    }
-    if (event.target === document.body && event.key === "ArrowLeft" && replayEntry) jumpReplay(-10);
-    if (event.target === document.body && event.key === "ArrowRight" && replayEntry) jumpReplay(10);
-    if (event.key.toLowerCase() === "r") void send({ type: "reset", seed: 1881 });
-    if (event.key.toLowerCase() === "m") {
-      const button = document.querySelector<HTMLButtonElement>('[data-command="sound"]');
-      if (button) void toggleSound(button);
-    }
-    if (event.key === "0") world.fit();
-  });
+    copy.append(title, detail);
+    row.append(side, copy);
+    return row;
+  }));
 }
 
-function readSidebarState(): boolean {
-  try {
-    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
-  } catch {
-    return false;
+function renderUnits(snapshot: CoreSnapshot): void {
+  const units = snapshot.match.battle!.units;
+  const fragments: HTMLElement[] = [];
+  for (const team of ["king", "queen"] as const) {
+    const heading = document.createElement("h3");
+    heading.className = team === "king" ? "red" : "green";
+    heading.textContent = team === "king" ? "Red defense" : "Green assault";
+    fragments.push(heading);
+    for (const unit of units.filter((candidate) => candidate.team === team)) fragments.push(unitRow(unit));
   }
+  unitList.replaceChildren(...fragments);
 }
 
-function applySidebarState(collapsed: boolean, refit = true): void {
-  sidebarCollapsed = collapsed;
-  document.body.classList.toggle("sidebar-collapsed", collapsed);
-  sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
-  sidebarToggle.setAttribute("aria-label", collapsed ? "Expand ledger" : "Collapse ledger");
-  sidebarToggle.title = collapsed ? "Expand ledger" : "Collapse ledger";
-  setIcon(sidebarToggle, collapsed ? PanelRightOpen : PanelRightClose);
-  updateSidebarContext();
-  try {
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
-  } catch {
-    // The control still works when storage is unavailable.
+function unitRow(unit: BattleUnitState): HTMLElement {
+  const row = document.createElement("div");
+  row.className = `unit-row ${unit.state}`;
+  const name = document.createElement("div");
+  const strong = document.createElement("strong");
+  strong.textContent = unit.name;
+  const role = document.createElement("span");
+  role.textContent = unit.state === "recovering" ? "cooling down" : unit.role;
+  name.append(strong, role);
+  const integrity = document.createElement("b");
+  integrity.textContent = String(Math.round(unit.integrity));
+  const ammo = document.createElement("div");
+  ammo.className = "ammo";
+  ammo.setAttribute("aria-label", `${unit.ammunition} of ${unit.maxAmmunition} ammunition`);
+  for (let index = 0; index < unit.maxAmmunition; index += 1) {
+    const pip = document.createElement("i");
+    pip.classList.toggle("spent", index >= unit.ammunition);
+    ammo.append(pip);
   }
-  if (refit) window.setTimeout(() => world.fit(), 190);
+  row.append(name, integrity, ammo);
+  return row;
 }
 
-function syncConnectionControls(): void {
-  const action = actionSelect.value as (typeof LEGAL_ACTIONS)[number];
-  const connectionAction = isConnectionAction(action);
-  secondaryField.hidden = !connectionAction;
-  connectionClassField.hidden = !connectionAction;
-  const ropeAction = action === "hookRope" || action === "reeveRope";
-  connectionClassSelect.disabled = ropeAction;
-  if (ropeAction) connectionClassSelect.value = "ROPE_ATTACH";
-  else if (connectionClassSelect.value === "ROPE_ATTACH") connectionClassSelect.value = "TENON_LOCK";
+function renderRecord(snapshot: CoreSnapshot): void {
+  const history = snapshot.match.battle!.history;
+  recordCount.textContent = `${history.length} ${history.length === 1 ? "turn" : "turns"}`;
+  recordList.replaceChildren(...[...history].reverse().slice(0, 10).map((record) => {
+    const item = document.createElement("li");
+    const turn = document.createElement("b");
+    turn.textContent = `T${record.round}`;
+    const summary = document.createElement("p");
+    summary.textContent = record.summary;
+    item.append(turn, summary);
+    return item;
+  }));
 }
 
-function isConnectionAction(action: LegalActionRequest["action"]): boolean {
-  return action === "connect" || action === "hookRope" || action === "reeveRope";
+function renderCommandControls(): void {
+  const battle = displayed?.match.battle;
+  if (!battle) return;
+  const units = battle.units.filter((unit) => unit.team === commandTeam && unit.state === "ready");
+  const selectedId = commandUnit.value;
+  commandUnit.replaceChildren(...units.map((unit) => option(unit.id, `${unit.name} · ${unit.ammunition} ammo`)));
+  if (units.some((unit) => unit.id === selectedId)) commandUnit.value = selectedId;
+  renderCommandActions();
+  const planning = battle.phase === "planning" && displayed?.match.status !== "complete";
+  sealOrderButton.disabled = staticPreview || !planning || units.length === 0;
+  commandStatus.textContent = staticPreview ? "replay only" : planning ? `${Math.ceil(displayed?.match.nextMoveIn ?? 0)}s` : "orders locked";
+  commandRoster.replaceChildren(...battle.units.filter((unit) => unit.team === commandTeam).map((unit) => unitRow(unit)));
 }
 
-async function send(command: CoreClientCommand): Promise<void> {
-  if (staticPreview) {
-    commandFeedback.textContent = "Static preview only. Run the theatre server for live orders.";
+function renderCommandActions(): void {
+  const unit = displayed?.match.battle?.units.find((candidate) => candidate.id === commandUnit.value);
+  const selected = commandAction.value;
+  commandAction.replaceChildren(...(unit?.availableActions ?? []).map((action) => option(action, actionLabel(action))));
+  if (unit?.availableActions.includes(selected as BattleOrderAction)) commandAction.value = selected;
+  renderCommandTargets();
+}
+
+function renderCommandTargets(): void {
+  const unit = displayed?.match.battle?.units.find((candidate) => candidate.id === commandUnit.value);
+  let targets = unit?.availableTargets ?? [];
+  if (commandAction.value === "fortify") targets = targets.filter((target) => target !== "enemy-machine");
+  if (commandAction.value === "raid") targets = targets.filter((target) => target === "enemy-machine");
+  commandTarget.replaceChildren(...targets.map((target) => option(target, targetLabel(target))));
+}
+
+function renderDiagnostics(snapshot: CoreSnapshot): void {
+  const entries: Array<[string, string]> = [
+    ["World", `${snapshot.diagnostics.physicsWorlds} Rapier 3D`],
+    ["Fixed step", `${snapshot.diagnostics.fixedHz} Hz`],
+    ["Dynamic bodies", String(snapshot.diagnostics.dynamicBodies)],
+    ["Tower bodies", String(snapshot.diagnostics.towerBodies)],
+    ["Illegal transforms", String(snapshot.diagnostics.illegalTransformWrites)],
+    ["Render divergence", snapshot.diagnostics.renderPoseDivergence.toFixed(4)],
+    ["Build", snapshot.build],
+    ["Seed", String(snapshot.seed)],
+  ];
+  engineeringValues.replaceChildren(...entries.flatMap(([term, value]) => {
+    const dt = document.createElement("dt");
+    dt.textContent = term;
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+    return [dt, dd];
+  }));
+}
+
+function setView(view: typeof activeView): void {
+  activeView = view;
+  document.querySelectorAll<HTMLButtonElement>("[data-ledger-view]").forEach((button) => {
+    const active = button.dataset.ledgerView === view;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll<HTMLElement>("[data-ledger-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.ledgerPanel !== view;
+  });
+  document.querySelectorAll<HTMLElement>("[data-compact-view]").forEach((panel) => {
+    panel.hidden = panel.dataset.compactView !== view;
+  });
+  updateCompactStatus();
+}
+
+function setLedgerCollapsed(collapsed: boolean): void {
+  ledgerCollapsed = collapsed;
+  ledger.classList.toggle("collapsed", collapsed);
+  document.body.classList.toggle("ledger-collapsed", collapsed);
+  ledgerToggle.setAttribute("aria-expanded", String(!collapsed));
+  ledgerToggle.setAttribute("aria-label", collapsed ? "Expand battle ledger" : "Collapse battle ledger");
+  ledgerToggle.title = collapsed ? "Expand battle ledger" : "Collapse battle ledger";
+  setIcon(ledgerToggle, collapsed ? PanelRightOpen : PanelRightClose);
+  localStorage.setItem("atkm-ledger-collapsed", String(collapsed));
+  window.setTimeout(() => world.resizeToHost(), 250);
+}
+
+function updateCompactStatus(): void {
+  if (activeView === "archive") {
+    const selected = archiveSummaries.find((summary) => summary.id === selectedReplayId);
+    compactPhase.textContent = selected ? replayTitle(selected) : "Archive";
+    compactClock.textContent = `${archiveSummaries.length} games`;
     return;
   }
-  if (socket?.readyState === WebSocket.OPEN && command.type !== "reset" && command.type !== "run-fixture") {
+  if (activeView === "command") {
+    compactPhase.textContent = `${commandTeam === "king" ? "Red" : "Green"} command`;
+    compactClock.textContent = displayed?.match.battle ? phaseLabel(displayed.match.battle.phase) : "waiting";
+    return;
+  }
+  compactPhase.textContent = displayed?.match.battle ? phaseLabel(displayed.match.battle.phase) : "Battle";
+  compactClock.textContent = displayed?.match.battle ? formatClock(displayed.match.battle.timeRemaining) : "10:00";
+}
+
+function updatePlaybackButtons(): void {
+  const paused = replayEntry ? !replayPlaying : displayed?.paused ?? false;
+  document.querySelectorAll<HTMLButtonElement>('[data-replay-command="play"], [data-stage-command="pause"]').forEach((button) => {
+    setIcon(button, paused ? Play : Pause);
+    button.setAttribute("aria-label", paused ? "Play" : "Pause");
+    button.title = paused ? "Play" : "Pause";
+  });
+}
+
+async function send(command: CoreClientCommand): Promise<{ ok: boolean; message?: string }> {
+  if (staticPreview) return { ok: false, message: "Public replay mode cannot issue live orders." };
+  if (socket?.readyState === WebSocket.OPEN && command.type !== "reset") {
     socket.send(JSON.stringify(command));
-    return;
+    return { ok: true, message: "Order sent to the theatre." };
   }
-  const response = await fetch("/command", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(command),
-  });
-  if (response.status !== 204) {
-    const result = await response.json() as { message?: string };
-    commandFeedback.textContent = result.message ?? (response.ok ? "Order accepted." : "Order rejected.");
+  try {
+    const response = await fetch("/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(command),
+    });
+    return await response.json() as { ok: boolean; message?: string };
+  } catch {
+    return { ok: false, message: "The theatre server is unreachable." };
   }
 }
 
 function renderIcons(): void {
-  const iconMap = {
-    pause: Pause,
-    play: Play,
-    "maximize-2": Maximize2,
-    hand: Hand,
+  const icons = {
     eye: Eye,
     history: HistoryIcon,
-    "clipboard-list": ClipboardList,
-    "skip-back": SkipBack,
-    "skip-forward": SkipForward,
+    swords: Swords,
+    pause: Pause,
+    play: Play,
     rewind: Rewind,
     "fast-forward": FastForward,
     radio: Radio,
-    rocket: Rocket,
-    "volume-x": VolumeX,
-    wrench: Wrench,
+    "skip-back": SkipBack,
+    "skip-forward": SkipForward,
+    "maximize-2": Maximize2,
+    gauge: Gauge,
     "rotate-ccw": RotateCcw,
     "panel-right-close": PanelRightClose,
-    "chevron-down": ChevronDown,
-    send: Send,
+    "shield-check": ShieldCheck,
+    x: X,
   };
   document.querySelectorAll<HTMLElement>("[data-lucide]").forEach((placeholder) => {
-    const name = placeholder.dataset.lucide as keyof typeof iconMap;
-    const icon = iconMap[name];
+    const icon = icons[placeholder.dataset.lucide as keyof typeof icons];
     if (icon) placeholder.replaceWith(createLucideElement(icon));
   });
 }
 
-async function toggleSound(button: HTMLButtonElement): Promise<void> {
-  if (audio.enabled) {
-    audio.disable();
-    button.classList.remove("active");
-    button.setAttribute("aria-label", "Enable sound");
-    button.title = "Enable sound";
-    setIcon(button, VolumeX);
-    return;
-  }
-  await audio.enable();
-  button.classList.add("active");
-  button.setAttribute("aria-label", "Mute sound");
-  button.title = "Mute sound";
-  setIcon(button, Volume2);
-  if (!latest) return;
-  const humpty = latest.events.find((event) => event.technical === "match:speech:humpty");
-  const queen = latest.events.find((event) => event.technical === "match:speech:queen");
-  const humptyDuration = speakRoyal(
-    "humpty",
-    humpty?.text ?? "I should like it noted that I remain the principal load.",
-  );
-  window.setTimeout(
-    () => speakRoyal("queen", queen?.text ?? "Let gravity serve the crown that understands it."),
-    humptyDuration * 1000 + 180,
-  );
-}
-
-function processAudioEvents(snapshot: CoreSnapshot): void {
-  if (!receivedFirstSnapshot) {
-    for (const event of snapshot.events) seenAudioEvents.add(event.id);
-    receivedFirstSnapshot = true;
-    return;
-  }
-  const fresh = snapshot.events.filter((event) => !seenAudioEvents.has(event.id)).reverse();
-  for (const event of fresh) {
-    seenAudioEvents.add(event.id);
-    if (!audio.enabled) continue;
-    if (event.technical === "match:speech:humpty") speakRoyal("humpty", event.text);
-    else if (event.technical === "match:speech:queen") speakRoyal("queen", event.text);
-    else audio.cue(event);
-  }
-  if (seenAudioEvents.size > 300) {
-    const current = new Set(snapshot.events.map((event) => event.id));
-    for (const id of seenAudioEvents) if (!current.has(id)) seenAudioEvents.delete(id);
-  }
-}
-
-function speakRoyal(speaker: RoyalSpeaker, text: string): number {
-  const duration = audio.speak(speaker, text);
-  if (duration > 0) world.speak(speaker, duration);
-  return duration;
-}
-
 function setIcon(button: HTMLButtonElement, icon: Parameters<typeof createLucideElement>[0]): void {
+  const span = button.querySelector("span");
   button.replaceChildren(createLucideElement(icon));
+  if (span) button.append(span);
 }
 
-function actionLabel(action: string): string {
-  return action.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
+function option(value: string, label: string): HTMLOptionElement {
+  const element = document.createElement("option");
+  element.value = value;
+  element.textContent = label;
+  return element;
+}
+
+function replayTitle(summary: ReplaySummary | PublicReplaySummary): string {
+  if ("title" in summary) return summary.title;
+  const publicSummary = archiveSummaries.find((candidate) => candidate.id === summary.id);
+  if (publicSummary && "title" in publicSummary) return publicSummary.title;
+  return summary.live ? "Live siege" : `Battle ${summary.id}`;
+}
+
+function actionLabel(action: BattleOrderAction): string {
+  return ({
+    hold: "Hold position",
+    breach: "Breach",
+    bombard: "Bombard",
+    snipe: "Precision shot",
+    fortify: "Brace and repair",
+    reposition: "Reposition Humpty",
+    deploy: "Deploy catch net",
+    raid: "Raid equipment",
+  })[action];
+}
+
+function targetLabel(target: BattleTargetId): string {
+  return ({
+    foundation: "Tower foundation",
+    "tower-face": "Exposed tower face",
+    humpty: "Humpty",
+    "enemy-machine": "Enemy equipment",
+  })[target];
+}
+
+function phaseLabel(phase: NonNullable<CoreSnapshot["match"]["battle"]>["phase"]): string {
+  return ({ planning: "Planning", reveal: "Orders revealed", resolving: "Resolving fire", aftermath: "Assessing damage", complete: "Battle complete" })[phase];
+}
+
+function outcomeLabel(outcome: "king" | "queen" | "draw"): string {
+  return outcome === "king" ? "Red holds" : outcome === "queen" ? "Green victory" : "Draw";
+}
+
+function formatClock(seconds: number): string {
+  const whole = Math.max(0, Math.ceil(seconds));
+  return `${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`;
 }
 
 function formatElapsed(seconds: number): string {
@@ -1125,33 +776,16 @@ function formatElapsed(seconds: number): string {
   return `${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-function matchTimeRemaining(snapshot: CoreSnapshot): number {
-  return Number.isFinite(snapshot.match.timeRemaining)
-    ? snapshot.match.timeRemaining
-    : Math.max(0, CORE_MATCH_DURATION_SECONDS - snapshot.elapsed);
-}
-
-function outcomeLabel(outcome: NonNullable<CoreMatchState["outcome"]>): string {
-  if (outcome === "king") return "Red wins";
-  if (outcome === "queen") return "Green wins";
-  return "Draw";
-}
-
-function siegeUrgencyLabel(elapsed: number): CoreMatchState["urgency"] {
-  if (elapsed >= 540) return "last-minute";
-  if (elapsed >= 480) return "desperate";
-  if (elapsed >= 60) return "siege";
-  return "opening";
-}
-
 window.addEventListener("beforeunload", () => {
-  window.clearTimeout(reconnectTimer);
-  stopPolling();
   window.clearInterval(replayTimer);
-  window.clearInterval(archiveTimer);
-  audio.disable();
-  socket?.close();
+  window.clearInterval(pollTimer);
+  window.clearTimeout(reconnectTimer);
   world.destroy();
 });
 
-void reconnectTimer;
+declare global {
+  interface Window {
+    __HUMPTY_ERRORS__?: string[];
+  }
+}
+window.__HUMPTY_ERRORS__ = errors;
