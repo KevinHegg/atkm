@@ -2,6 +2,7 @@ import {
   ChevronDown,
   ClipboardList,
   Eye,
+  FastForward,
   Hand,
   History as HistoryIcon,
   Maximize2,
@@ -11,6 +12,7 @@ import {
   Play,
   RotateCcw,
   Radio,
+  Rewind,
   Rocket,
   Send,
   SkipBack,
@@ -72,6 +74,8 @@ const integrityFill = required<HTMLElement>("integrity-fill");
 const modeLabel = required<HTMLElement>("mode-mark").querySelector("span");
 const matchStatus = required<HTMLOutputElement>("match-status");
 const watchWorkspaceStatus = required<HTMLOutputElement>("watch-workspace-status");
+const watchWorkspaceKicker = required<HTMLElement>("watch-workspace-kicker");
+const watchWorkspaceTitle = required<HTMLElement>("watch-workspace-title");
 const matchTurn = required<HTMLElement>("match-turn");
 const matchPhase = required<HTMLElement>("match-phase");
 const ruleCount = required<HTMLElement>("rule-count");
@@ -105,6 +109,7 @@ const issueOrder = required<HTMLButtonElement>("issue-order");
 const commandFeedback = required<HTMLElement>("command-feedback");
 const sidebarTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-sidebar-view]")];
 const sidebarPanels = [...document.querySelectorAll<HTMLElement>("[data-sidebar-panel]")];
+const collapsedViews = [...document.querySelectorAll<HTMLElement>("[data-collapsed-view]")];
 const archiveStatus = required<HTMLOutputElement>("archive-status");
 const archiveList = required<HTMLOListElement>("archive-list");
 const archiveCount = required<HTMLElement>("archive-count");
@@ -138,6 +143,7 @@ let replayClock = 0;
 let replayTimer = 0;
 let archiveTimer = 0;
 let archiveDurable = false;
+let archiveSummaries: ReplaySummary[] = [];
 let publicReplayBaseUrl: URL | undefined;
 let publicReplaySummaries: PublicReplaySummary[] = [];
 
@@ -490,25 +496,25 @@ function setSidebarView(view: "watch" | "archive" | "organize"): void {
     tab.setAttribute("aria-selected", String(active));
   }
   for (const panel of sidebarPanels) panel.hidden = panel.dataset.sidebarPanel !== view;
+  for (const controls of collapsedViews) controls.hidden = controls.dataset.collapsedView !== view;
   updateSidebarContext();
 }
 
 function updateSidebarContext(): void {
   if (sidebarView === "watch") {
-    collapsedContext.textContent = modeLabel?.textContent ?? "Live match";
-    collapsedStatusValue.textContent = latest ? formatElapsed(latest.elapsed) : "00:00";
+    collapsedContext.textContent = replayEntry ? replayTitle(replayEntry.summary) : modeLabel?.textContent ?? "Live match";
+    collapsedStatusValue.textContent = replayEntry
+      ? replayTime.textContent ?? "00:00"
+      : latest ? formatElapsed(latest.elapsed) : "00:00";
     return;
   }
   if (sidebarView === "archive") {
-    collapsedContext.textContent = replayEntry
-      ? replayEntry.summary.live ? "Live replay" : "Past replay"
-      : "Replay archive";
-    collapsedStatusValue.textContent = replayEntry
-      ? replayTime.textContent ?? "00:00"
-      : archiveStatus.textContent ?? "ready";
+    collapsedContext.textContent = replayEntry ? replayTitle(replayEntry.summary) : "Replay archive";
+    collapsedStatusValue.textContent = archiveCount.textContent ?? archiveStatus.textContent ?? "ready";
     return;
   }
-  collapsedContext.textContent = "Organize a game";
+  const pace = organizeSpeed.selectedOptions[0]?.textContent ?? "Standard";
+  collapsedContext.textContent = `Seed ${organizeSeed.value} · ${pace}`;
   collapsedStatusValue.textContent = organizeStatus.textContent ?? "ready";
 }
 
@@ -518,6 +524,7 @@ async function refreshArchiveList(): Promise<void> {
     if (!response.ok) throw new Error(`Archive ${response.status}`);
     const payload = await response.json() as { durable: boolean; replays: ReplaySummary[] };
     archiveDurable = payload.durable;
+    archiveSummaries = payload.replays;
     archiveStatus.textContent = payload.durable ? "durable archive" : "session archive";
     archiveCount.textContent = `${payload.replays.length} ${payload.replays.length === 1 ? "record" : "records"}`;
     updateSidebarContext();
@@ -535,6 +542,7 @@ async function refreshStaticArchiveList(): Promise<PublicReplaySummary[]> {
   const manifest = await response.json() as PublicReplayManifest;
   publicReplayBaseUrl = new URL(".", manifestUrl);
   publicReplaySummaries = manifest.replays;
+  archiveSummaries = manifest.replays;
   archiveDurable = false;
   archiveStatus.textContent = "public demo reel";
   archiveCount.textContent = `${manifest.replays.length} ${manifest.replays.length === 1 ? "game" : "games"}`;
@@ -569,7 +577,7 @@ function renderArchiveList(summaries: ReplaySummary[]): void {
       description.textContent = publicSummary.description;
       button.append(description);
     }
-    button.addEventListener("click", () => void openReplay(summary.id, { autoplay: staticPreview }));
+    button.addEventListener("click", () => void openReplay(summary.id, { autoplay: true, showWatch: true }));
     item.append(button);
     return item;
   }));
@@ -595,7 +603,7 @@ async function refreshContraptionSummary(): Promise<void> {
   }
 }
 
-async function openReplay(id: string, options: { autoplay?: boolean } = {}): Promise<void> {
+async function openReplay(id: string, options: { autoplay?: boolean; showWatch?: boolean } = {}): Promise<void> {
   archiveFeedback.textContent = "Loading public snapshots...";
   try {
     const response = await fetch(replayUrl(id), { cache: "no-store" });
@@ -604,14 +612,20 @@ async function openReplay(id: string, options: { autoplay?: boolean } = {}): Pro
     replayFrameIndex = 0;
     replayPlaying = false;
     syncReplayClockToFrame();
-    setSidebarView("archive");
     replayConsole.hidden = false;
-    replayName.textContent = replayTitle(replayEntry.summary);
+    replayName.textContent = "Replay transport";
+    watchWorkspaceKicker.textContent = "Recorded theatre";
+    watchWorkspaceTitle.textContent = replayTitle(replayEntry.summary);
     archiveFeedback.textContent = staticPreview
-      ? `${replayEntry.frames.length} public snapshots loaded.`
-      : `${replayEntry.frames.length} public snapshots loaded. The live match continues independently.`;
+      ? `${replayEntry.frames.length} public snapshots ready in Watch.`
+      : `${replayEntry.frames.length} snapshots ready in Watch. The live match continues independently.`;
     presentReplayFrame();
     replayPlaying = Boolean(options.autoplay);
+    setSidebarView(options.showWatch === false ? "archive" : "watch");
+    if (staticPreview) {
+      url.searchParams.set("replay", id);
+      history.replaceState({}, "", url);
+    }
     updateReplayControls();
     if (staticPreview) renderArchiveList(publicReplaySummaries);
     else void refreshArchiveList();
@@ -641,16 +655,90 @@ function presentReplayFrame(): void {
   replayScrubber.max = String(Math.max(0, replayEntry.frames.length - 1));
   replayScrubber.value = String(replayFrameIndex);
   replayTime.textContent = `${formatElapsed(frame.elapsed)} / ${formatElapsed(replayEntry.summary.duration)}`;
-  updateSidebarContext();
+  updateReplayControls();
 }
 
 function updateReplayControls(): void {
-  const playButton = document.querySelector<HTMLButtonElement>('[data-replay-command="play"]');
-  if (playButton) {
-    playButton.setAttribute("aria-label", replayPlaying ? "Pause replay" : "Play replay");
-    playButton.title = replayPlaying ? "Pause replay" : "Play replay";
-    setIcon(playButton, replayPlaying ? Pause : Play);
+  const replayButtons = [
+    document.querySelector<HTMLButtonElement>('[data-replay-command="play"]'),
+    document.querySelector<HTMLButtonElement>('[data-compact-command="watch-toggle"]'),
+  ].filter((button): button is HTMLButtonElement => Boolean(button));
+  const paused = replayEntry ? !replayPlaying : latest?.paused ?? false;
+  const subject = replayEntry ? "replay" : "match";
+  for (const button of replayButtons) {
+    button.setAttribute("aria-label", paused ? `Play ${subject}` : `Pause ${subject}`);
+    button.title = paused ? `Play ${subject}` : `Pause ${subject}`;
+    button.classList.toggle("active", !paused);
+    setIcon(button, paused ? Play : Pause);
   }
+  const stageButton = document.querySelector<HTMLButtonElement>('[data-command="pause"]');
+  if (stageButton) {
+    stageButton.setAttribute("aria-label", paused ? `Play ${subject}` : `Pause ${subject}`);
+    stageButton.title = paused ? `Play ${subject}` : `Pause ${subject}`;
+    stageButton.classList.toggle("active", paused);
+    setIcon(stageButton, paused ? Play : Pause);
+  }
+  if (replayEntry) watchWorkspaceStatus.textContent = replayPlaying ? `${replaySpeed.value}x replay` : "replay paused";
+  updateSidebarContext();
+}
+
+function jumpReplay(seconds: number): void {
+  if (!replayEntry) return;
+  const current = replayEntry.frames[replayFrameIndex];
+  const first = replayEntry.frames[0];
+  const final = replayEntry.frames.at(-1);
+  if (!current || !first || !final) return;
+  const target = Math.max(first.elapsed, Math.min(final.elapsed, current.elapsed + seconds));
+  let next = replayEntry.frames.findIndex((frame) => frame.elapsed >= target);
+  if (next < 0) next = replayEntry.frames.length - 1;
+  replayFrameIndex = next;
+  syncReplayClockToFrame();
+  presentReplayFrame();
+  updateReplayControls();
+}
+
+function togglePrimaryPlayback(): void {
+  if (replayEntry) {
+    if (!replayPlaying && replayFrameIndex >= replayEntry.frames.length - 1) {
+      replayFrameIndex = 0;
+      presentReplayFrame();
+    }
+    if (!replayPlaying) syncReplayClockToFrame();
+    replayPlaying = !replayPlaying;
+    updateReplayControls();
+    return;
+  }
+  void send({ type: "pause" });
+  const stageButton = document.querySelector<HTMLButtonElement>('[data-command="pause"]');
+  if (!stageButton) return;
+  const paused = latest ? !latest.paused : true;
+  stageButton.classList.toggle("active", paused);
+  stageButton.setAttribute("aria-label", paused ? "Play match" : "Pause match");
+  stageButton.title = paused ? "Play match" : "Pause match";
+  setIcon(stageButton, paused ? Play : Pause);
+}
+
+async function openAdjacentReplay(direction: -1 | 1, showWatch = false): Promise<void> {
+  if (archiveSummaries.length === 0) return;
+  const currentIndex = replayEntry
+    ? archiveSummaries.findIndex((summary) => summary.id === replayEntry?.summary.id)
+    : -1;
+  const nextIndex = currentIndex < 0
+    ? 0
+    : (currentIndex + direction + archiveSummaries.length) % archiveSummaries.length;
+  const next = archiveSummaries[nextIndex];
+  if (next) await openReplay(next.id, { autoplay: showWatch, showWatch });
+}
+
+function watchSelectedReplay(): void {
+  if (replayEntry) {
+    setSidebarView("watch");
+    replayPlaying = true;
+    updateReplayControls();
+    return;
+  }
+  const first = archiveSummaries[0];
+  if (first) void openReplay(first.id, { autoplay: true, showWatch: true });
 }
 
 function syncReplayClockToFrame(): void {
@@ -691,6 +779,8 @@ function returnToLive(): void {
   replayPlaying = false;
   replayEntry = undefined;
   replayConsole.hidden = true;
+  watchWorkspaceKicker.textContent = "Live theatre";
+  watchWorkspaceTitle.textContent = "Watch current match";
   updateReplayControls();
   if (latest) presentSnapshot(latest, true);
   archiveStatus.textContent = staticPreview ? "public demo reel" : archiveDurable ? "durable archive" : "session archive";
@@ -705,10 +795,7 @@ function installControls(): void {
     button.addEventListener("click", () => {
       const command = button.dataset.command;
       if (command === "pause") {
-        void send({ type: "pause" });
-        const paused = latest ? !latest.paused : true;
-        button.classList.toggle("active", paused);
-        setIcon(button, paused ? Play : Pause);
+        togglePrimaryPlayback();
       } else if (command === "fit") world.fit();
       else if (command === "poke") void send({ type: "debug-poke" });
       else if (command === "sound") void toggleSound(button);
@@ -725,7 +812,6 @@ function installControls(): void {
   for (const tab of sidebarTabs) {
     tab.addEventListener("click", () => {
       const view = tab.dataset.sidebarView as "watch" | "archive" | "organize";
-      if (view === "watch") returnToLive();
       setSidebarView(view);
     });
   }
@@ -733,24 +819,29 @@ function installControls(): void {
     button.addEventListener("click", () => {
       const command = button.dataset.replayCommand;
       if (!replayEntry && command !== "live") return;
-      if (command === "back") {
-        replayPlaying = false;
-        replayFrameIndex = Math.max(0, replayFrameIndex - 1);
-        syncReplayClockToFrame();
-        presentReplayFrame();
-      } else if (command === "forward") {
-        replayPlaying = false;
-        replayFrameIndex = Math.min((replayEntry?.frames.length ?? 1) - 1, replayFrameIndex + 1);
-        syncReplayClockToFrame();
-        presentReplayFrame();
+      if (command === "rewind") {
+        jumpReplay(-10);
+      } else if (command === "fast-forward") {
+        jumpReplay(10);
       } else if (command === "play") {
-        if (!replayPlaying) syncReplayClockToFrame();
-        replayPlaying = !replayPlaying;
+        togglePrimaryPlayback();
       } else if (command === "live") {
         setSidebarView("watch");
         returnToLive();
       }
       updateReplayControls();
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-compact-command]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const command = button.dataset.compactCommand;
+      if (command === "watch-rewind") jumpReplay(-10);
+      else if (command === "watch-toggle") togglePrimaryPlayback();
+      else if (command === "watch-forward") jumpReplay(10);
+      else if (command === "archive-previous") void openAdjacentReplay(-1);
+      else if (command === "archive-watch") watchSelectedReplay();
+      else if (command === "archive-next") void openAdjacentReplay(1);
+      else if (command === "organize-launch") organizeForm.requestSubmit();
     });
   });
   replayScrubber.addEventListener("input", () => {
@@ -761,7 +852,10 @@ function installControls(): void {
     presentReplayFrame();
     updateReplayControls();
   });
-  replaySpeed.addEventListener("change", syncReplayClockToFrame);
+  replaySpeed.addEventListener("change", () => {
+    syncReplayClockToFrame();
+    updateReplayControls();
+  });
   replayTimer = window.setInterval(advanceReplay, 100);
   organizeForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -782,6 +876,8 @@ function installControls(): void {
     });
   });
   actionSelect.addEventListener("change", syncConnectionControls);
+  organizeSeed.addEventListener("input", updateSidebarContext);
+  organizeSpeed.addEventListener("change", updateSidebarContext);
   syncConnectionControls();
   issueOrder.addEventListener("click", () => {
     const actor = workerSelect.value;
@@ -815,8 +911,10 @@ function installControls(): void {
   window.addEventListener("keydown", (event) => {
     if (event.code === "Space" && event.target === document.body) {
       event.preventDefault();
-      void send({ type: "pause" });
+      togglePrimaryPlayback();
     }
+    if (event.target === document.body && event.key === "ArrowLeft" && replayEntry) jumpReplay(-10);
+    if (event.target === document.body && event.key === "ArrowRight" && replayEntry) jumpReplay(10);
     if (event.key.toLowerCase() === "r") void send({ type: "reset", seed: 1881 });
     if (event.key.toLowerCase() === "m") {
       const button = document.querySelector<HTMLButtonElement>('[data-command="sound"]');
@@ -841,6 +939,7 @@ function applySidebarState(collapsed: boolean, refit = true): void {
   sidebarToggle.setAttribute("aria-label", collapsed ? "Expand ledger" : "Collapse ledger");
   sidebarToggle.title = collapsed ? "Expand ledger" : "Collapse ledger";
   setIcon(sidebarToggle, collapsed ? PanelRightOpen : PanelRightClose);
+  updateSidebarContext();
   try {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
   } catch {
@@ -895,6 +994,8 @@ function renderIcons(): void {
     "clipboard-list": ClipboardList,
     "skip-back": SkipBack,
     "skip-forward": SkipForward,
+    rewind: Rewind,
+    "fast-forward": FastForward,
     radio: Radio,
     rocket: Rocket,
     "volume-x": VolumeX,
