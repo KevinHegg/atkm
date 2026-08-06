@@ -17,7 +17,7 @@ Each turn has four explicit phases:
 The fixed field force is:
 
 - Red: Field Engineers, Rescue Winch, Catch-Net Sledge;
-- Green: Battering Ram, Siege Mortar, Siege Ballista.
+- Green: Battering Ram, Counterweight Trebuchet, Siege Ballista.
 
 The four public target classes are the tower foundation, exposed tower face,
 Humpty, and enemy equipment. The catch net may turn one lethal fall into a

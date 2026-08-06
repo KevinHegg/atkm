@@ -1,5 +1,7 @@
 import * as pc from "playcanvas";
 import type {
+  BattleOrderState,
+  BattleState,
   CoreBodyState,
   CoreSnapshot,
   PartFamily,
@@ -38,6 +40,21 @@ interface RopeVisual {
   bodyA: string;
   bodyB: string;
   slack: number;
+}
+
+type BattleMachineVisualKind =
+  | "engineers"
+  | "winch"
+  | "sledge"
+  | "ram"
+  | "trebuchet"
+  | "ballista";
+
+interface BattleMachineVisual {
+  kind: BattleMachineVisualKind;
+  motion: pc.Entity;
+  secondary?: pc.Entity;
+  wheels: pc.Entity[];
 }
 
 declare global {
@@ -79,6 +96,7 @@ export class LabWorld {
   private readonly bodies = new Map<string, RenderBody>();
   private readonly workerVisuals = new Map<string, WorkerVisual>();
   private readonly ropeVisuals = new Map<string, RopeVisual>();
+  private readonly battleMachineVisuals = new Map<string, BattleMachineVisual>();
   private readonly camera: pc.Entity;
   private readonly cameraTarget = new pc.Vec3(0, 2.15, -0.2);
   private readonly resizeObserver: ResizeObserver;
@@ -99,6 +117,9 @@ export class LabWorld {
   private elapsed = 0;
   private humptySpeakingUntil = 0;
   private queenSpeakingUntil = 0;
+  private battleState: BattleState | undefined;
+  private impactBurst?: pc.Entity;
+  private impactShards: pc.Entity[] = [];
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -121,6 +142,7 @@ export class LabWorld {
     this.app.scene.exposure = 1.15;
     this.camera = this.createCamera();
     this.createLights();
+    this.createBattleEffects();
     this.bindInput();
     this.app.on("update", (dt: number) => this.update(Math.min(dt, 0.05)));
     this.app.start();
@@ -133,6 +155,7 @@ export class LabWorld {
   sync(snapshot: CoreSnapshot): void {
     this.latestTick = snapshot.tick;
     this.elapsed = snapshot.elapsed;
+    this.battleState = snapshot.match.battle;
     const seen = new Set<string>();
     for (const state of snapshot.bodies) {
       seen.add(state.id);
@@ -473,88 +496,141 @@ export class LabWorld {
 
   private createBattleMachineVisual(root: pc.Entity, state: CoreBodyState): void {
     const timber = this.material("battle-machine-timber", palette.oak, .2);
+    const lightTimber = this.material("battle-machine-light-timber", palette.oakLight, .16);
     const dark = this.material("battle-machine-dark", palette.oakDark, .16);
     const iron = this.material("battle-machine-iron", palette.iron, .58, .72);
+    const bronze = this.material("battle-machine-bronze", palette.bronze, .66, .58);
     const rope = this.material("battle-machine-rope", palette.rope, .12);
-    const padding = this.material("rescue-padding", new pc.Color(.67, .63, .48), .08);
+    const padding = this.material("rescue-padding", new pc.Color(.84, .74, .48), .08);
+    const red = this.material("battle-red", new pc.Color(.78, .065, .045), .22);
+    const green = this.material("battle-green", new pc.Color(.035, .49, .29), .22);
+    const gold = this.material("battle-gold", palette.gold, .52, .32);
     const team = state.team ?? "king";
     const variant = state.variant ?? "";
+    const wheels: pc.Entity[] = [];
+    const wheel = (name: string, position: pc.Vec3, radius = .38): pc.Entity => {
+      const visual = this.primitive(name, "cylinder", root, position, new pc.Vec3(radius, .18, radius), iron, new pc.Vec3(90, 0, 0));
+      wheels.push(visual);
+      return visual;
+    };
     if (variant.includes("field engineer wagon")) {
-      this.primitive("engineer-chassis", "box", root, new pc.Vec3(0, -.22, 0), new pc.Vec3(1.82, .34, 1.22), dark);
-      this.primitive("engineer-chest", "box", root, new pc.Vec3(-.28, .18, 0), new pc.Vec3(.8, .54, .92), timber);
-      this.primitive("engineer-anvil", "box", root, new pc.Vec3(.46, .28, 0), new pc.Vec3(.5, .16, .3), iron);
-      this.primitive("engineer-anvil-foot", "box", root, new pc.Vec3(.46, .02, 0), new pc.Vec3(.18, .42, .18), iron);
-      for (const x of [-.68, .68]) {
-        for (const z of [-.54, .54]) this.primitive("engineer-wheel", "cylinder", root, new pc.Vec3(x, -.42, z), new pc.Vec3(.34, .16, .34), iron, new pc.Vec3(90, 0, 0));
-      }
-      this.teamWrap(root, team, new pc.Vec3(1.05, .07, .18), new pc.Vec3(0, .49, -.48));
+      this.primitive("engineer-chassis", "box", root, new pc.Vec3(0, -.2, 0), new pc.Vec3(2.05, .32, 1.26), dark);
+      this.primitive("engineer-armored-chest", "box", root, new pc.Vec3(-.32, .22, 0), new pc.Vec3(.92, .68, 1), timber);
+      this.primitive("engineer-shield", "box", root, new pc.Vec3(-.86, .22, 0), new pc.Vec3(.08, .75, .86), red);
+      this.primitive("engineer-anvil", "box", root, new pc.Vec3(.52, .32, 0), new pc.Vec3(.58, .18, .34), iron);
+      this.primitive("engineer-anvil-foot", "box", root, new pc.Vec3(.52, .02, 0), new pc.Vec3(.2, .46, .2), iron);
+      const hammer = new pc.Entity("engineer-hammer-rig");
+      hammer.setLocalPosition(.62, .64, 0);
+      root.addChild(hammer);
+      this.primitive("engineer-hammer-handle", "cylinder", hammer, new pc.Vec3(0, .24, 0), new pc.Vec3(.055, .58, .055), lightTimber, new pc.Vec3(0, 0, 22));
+      this.primitive("engineer-hammer-head", "box", hammer, new pc.Vec3(-.1, .53, 0), new pc.Vec3(.42, .16, .18), iron, new pc.Vec3(0, 0, 22));
+      for (const x of [-.76, .76]) for (const z of [-.56, .56]) wheel("engineer-wheel", new pc.Vec3(x, -.42, z), .35);
+      this.primitive("engineer-standard", "box", root, new pc.Vec3(-.05, .95, -.48), new pc.Vec3(.68, .5, .05), red);
+      this.primitive("engineer-standard-mark", "box", root, new pc.Vec3(-.05, .95, -.515), new pc.Vec3(.36, .08, .02), gold, undefined, false);
+      this.battleMachineVisuals.set(state.id, { kind: "engineers", motion: hammer, wheels });
       return;
     }
     if (variant.includes("rescue winch")) {
-      this.primitive("winch-base", "box", root, new pc.Vec3(0, -.6, 0), new pc.Vec3(1.45, .2, 1.35), dark);
-      for (const x of [-.52, .52]) {
-        this.primitive("winch-upright", "box", root, new pc.Vec3(x, .02, 0), new pc.Vec3(.16, 1.22, .18), timber, new pc.Vec3(0, 0, x * -8));
-      }
-      this.primitive("winch-crossbeam", "box", root, new pc.Vec3(0, .58, 0), new pc.Vec3(1.34, .16, .2), timber);
-      this.primitive("winch-drum", "cylinder", root, new pc.Vec3(0, -.28, 0), new pc.Vec3(.46, .76, .46), timber, new pc.Vec3(90, 0, 0));
-      for (const z of [-.34, .34]) this.primitive("winch-drum-collar", "cylinder", root, new pc.Vec3(0, -.28, z), new pc.Vec3(.55, .08, .55), iron, new pc.Vec3(90, 0, 0));
-      this.primitive("winch-crank", "box", root, new pc.Vec3(.56, -.28, .42), new pc.Vec3(.72, .08, .08), iron, new pc.Vec3(0, 32, 0));
-      this.primitive("winch-sheave", "cylinder", root, new pc.Vec3(0, .61, -.16), new pc.Vec3(.38, .12, .38), iron, new pc.Vec3(90, 0, 0));
-      this.primitive("winch-line", "cylinder", root, new pc.Vec3(0, .02, -.2), new pc.Vec3(.035, 1.18, .035), rope);
-      this.teamWrap(root, team, new pc.Vec3(1.15, .08, .16), new pc.Vec3(0, -.48, .69));
+      this.primitive("winch-sled-base", "box", root, new pc.Vec3(0, -.6, 0), new pc.Vec3(1.7, .22, 1.5), dark);
+      for (const x of [-.58, .58]) this.primitive("winch-upright", "box", root, new pc.Vec3(x, .12, 0), new pc.Vec3(.18, 1.48, .22), timber, new pc.Vec3(0, 0, x * -8));
+      this.primitive("winch-crossbeam", "box", root, new pc.Vec3(0, .8, 0), new pc.Vec3(1.52, .18, .24), lightTimber);
+      const drumRig = new pc.Entity("winch-drum-rig");
+      drumRig.setLocalPosition(0, -.26, 0);
+      root.addChild(drumRig);
+      this.primitive("winch-drum", "cylinder", drumRig, pc.Vec3.ZERO, new pc.Vec3(.5, .82, .5), timber, new pc.Vec3(90, 0, 0));
+      for (const z of [-.38, .38]) this.primitive("winch-drum-collar", "cylinder", drumRig, new pc.Vec3(0, 0, z), new pc.Vec3(.59, .09, .59), bronze, new pc.Vec3(90, 0, 0));
+      const crankRig = new pc.Entity("winch-crank-rig");
+      crankRig.setLocalPosition(.58, -.26, .46);
+      root.addChild(crankRig);
+      this.primitive("winch-crank", "box", crankRig, new pc.Vec3(.16, 0, 0), new pc.Vec3(.72, .09, .09), iron);
+      this.primitive("winch-crank-grip", "cylinder", crankRig, new pc.Vec3(.52, .12, 0), new pc.Vec3(.08, .28, .08), lightTimber);
+      this.primitive("winch-sheave", "cylinder", root, new pc.Vec3(0, .82, -.18), new pc.Vec3(.4, .13, .4), bronze, new pc.Vec3(90, 0, 0));
+      this.primitive("winch-line", "cylinder", root, new pc.Vec3(0, .12, -.23), new pc.Vec3(.045, 1.34, .045), rope);
+      this.primitive("winch-rescue-mark", "box", root, new pc.Vec3(0, .38, .73), new pc.Vec3(.86, .36, .05), red);
+      this.primitive("winch-rescue-cross-a", "box", root, new pc.Vec3(0, .38, .765), new pc.Vec3(.48, .09, .02), padding, undefined, false);
+      this.primitive("winch-rescue-cross-b", "box", root, new pc.Vec3(0, .38, .765), new pc.Vec3(.09, .48, .02), padding, undefined, false);
+      this.battleMachineVisuals.set(state.id, { kind: "winch", motion: drumRig, secondary: crankRig, wheels });
       return;
     }
     if (variant.includes("catch sledge")) {
       this.primitive("sledge-frame", "box", root, new pc.Vec3(0, -.08, 0), new pc.Vec3(state.size.x * .96, .2, state.size.z * .96), dark);
-      this.primitive("sledge-bed", "box", root, new pc.Vec3(0, .15, 0), new pc.Vec3(state.size.x * .9, .16, state.size.z * .9), padding);
+      const net = new pc.Entity("catch-net-rig");
+      net.setLocalPosition(0, .18, 0);
+      root.addChild(net);
+      this.primitive("sledge-bed", "box", net, pc.Vec3.ZERO, new pc.Vec3(state.size.x * .9, .11, state.size.z * .88), padding);
+      for (let x = -1.7; x <= 1.7; x += .56) this.primitive("catch-net-rope", "box", net, new pc.Vec3(x, .075, 0), new pc.Vec3(.028, .018, 1.82), rope, undefined, false);
+      for (let z = -.72; z <= .72; z += .36) this.primitive("catch-net-rope", "box", net, new pc.Vec3(0, .08, z), new pc.Vec3(3.85, .018, .028), rope, undefined, false);
       for (const x of [-state.size.x * .4, state.size.x * .4]) {
         for (const z of [-state.size.z * .47, state.size.z * .47]) {
-          this.primitive("sledge-wheel", "cylinder", root, new pc.Vec3(x, -.2, z), new pc.Vec3(.34, .16, .34), iron, new pc.Vec3(90, 0, 0));
+          wheel("sledge-wheel", new pc.Vec3(x, -.2, z), .34);
         }
       }
       for (const x of [-state.size.x * .45, state.size.x * .45]) {
         this.primitive("sledge-ramp", "box", root, new pc.Vec3(x, .16, 0), new pc.Vec3(.3, .12, state.size.z * .9), timber, new pc.Vec3(0, 0, x * -4));
       }
-      this.teamWrap(root, team, new pc.Vec3(state.size.x * .62, .06, .22), new pc.Vec3(0, .27, -state.size.z * .38));
+      this.primitive("sledge-red-rail", "box", root, new pc.Vec3(0, .34, -state.size.z * .42), new pc.Vec3(state.size.x * .92, .12, .12), red);
+      this.battleMachineVisuals.set(state.id, { kind: "sledge", motion: net, wheels });
       return;
     }
     if (variant.includes("battering ram")) {
-      this.primitive("ram-chassis", "box", root, new pc.Vec3(.2, -.08, 0), new pc.Vec3(2.55, .32, 1.18), dark);
-      this.primitive("ram-log", "cylinder", root, new pc.Vec3(-.18, .2, 0), new pc.Vec3(.42, 2.72, .42), timber, new pc.Vec3(0, 0, 90));
-      this.primitive("ram-tip", "cone", root, new pc.Vec3(-1.58, .2, 0), new pc.Vec3(.48, .55, .48), iron, new pc.Vec3(0, 0, 90));
+      this.primitive("ram-chassis", "box", root, new pc.Vec3(.15, -.12, 0), new pc.Vec3(2.9, .34, 1.42), dark);
+      for (const x of [-.72, .72]) this.primitive("ram-tower", "box", root, new pc.Vec3(x, .62, 0), new pc.Vec3(.18, 1.34, 1.12), lightTimber);
+      this.primitive("ram-canopy", "box", root, new pc.Vec3(0, 1.23, 0), new pc.Vec3(2.15, .18, 1.55), green, new pc.Vec3(0, 0, -3));
+      for (const z of [-.62, .62]) this.primitive("ram-suspension", "cylinder", root, new pc.Vec3(-.08, .72, z), new pc.Vec3(.035, .86, .035), rope, new pc.Vec3(0, 0, 8));
+      const ramRig = new pc.Entity("ram-striker-rig");
+      ramRig.setLocalPosition(-.1, .3, 0);
+      root.addChild(ramRig);
+      this.primitive("ram-log", "cylinder", ramRig, pc.Vec3.ZERO, new pc.Vec3(.48, 3.12, .48), timber, new pc.Vec3(0, 0, 90));
+      this.primitive("ram-iron-bands-a", "cylinder", ramRig, new pc.Vec3(-.9, 0, 0), new pc.Vec3(.52, .14, .52), iron, new pc.Vec3(0, 0, 90));
+      this.primitive("ram-iron-bands-b", "cylinder", ramRig, new pc.Vec3(.72, 0, 0), new pc.Vec3(.52, .14, .52), iron, new pc.Vec3(0, 0, 90));
+      this.primitive("ram-dragon-head", "cone", ramRig, new pc.Vec3(-1.7, 0, 0), new pc.Vec3(.58, .72, .58), bronze, new pc.Vec3(0, 0, 90));
+      this.primitive("ram-dragon-brow", "box", ramRig, new pc.Vec3(-1.56, .24, 0), new pc.Vec3(.42, .12, .62), gold, new pc.Vec3(0, 0, 12));
       for (const x of [-.9, .9]) {
-        for (const z of [-.58, .58]) {
-          this.primitive("ram-wheel", "cylinder", root, new pc.Vec3(x, -.34, z), new pc.Vec3(.42, .18, .42), iron, new pc.Vec3(90, 0, 0));
-        }
+        for (const z of [-.66, .66]) wheel("ram-wheel", new pc.Vec3(x, -.4, z), .46);
       }
-      this.teamWrap(root, team, new pc.Vec3(1.25, .07, .18), new pc.Vec3(.2, .43, -.51));
+      this.battleMachineVisuals.set(state.id, { kind: "ram", motion: ramRig, wheels });
       return;
     }
     if (variant.includes("stone thrower")) {
-      this.primitive("thrower-base", "box", root, new pc.Vec3(0, -.67, 0), new pc.Vec3(1.72, .22, 1.68), dark);
-      for (const x of [-.58, .58]) {
-        this.primitive("thrower-frame", "box", root, new pc.Vec3(x, -.05, 0), new pc.Vec3(.16, 1.25, .18), timber, new pc.Vec3(0, 0, x * -18));
+      this.primitive("trebuchet-base", "box", root, new pc.Vec3(0, -.72, 0), new pc.Vec3(2.25, .26, 2.05), dark);
+      for (const x of [-.72, .72]) {
+        this.primitive("trebuchet-frame-front", "box", root, new pc.Vec3(x, .22, -.58), new pc.Vec3(.2, 2, .2), timber, new pc.Vec3(0, 0, x * -17));
+        this.primitive("trebuchet-frame-back", "box", root, new pc.Vec3(x, .22, .58), new pc.Vec3(.2, 2, .2), timber, new pc.Vec3(0, 0, x * -17));
       }
-      this.primitive("thrower-axle", "cylinder", root, new pc.Vec3(0, .24, 0), new pc.Vec3(.17, 1.5, .17), iron, new pc.Vec3(90, 0, 0));
-      this.primitive("throwing-arm", "box", root, new pc.Vec3(-.18, .36, 0), new pc.Vec3(2.15, .14, .18), timber, new pc.Vec3(0, 0, -38));
-      this.primitive("counterweight", "box", root, new pc.Vec3(.62, -.25, 0), new pc.Vec3(.55, .58, .52), iron);
-      this.primitive("sling-line", "cylinder", root, new pc.Vec3(-.78, .84, 0), new pc.Vec3(.035, .7, .035), rope, new pc.Vec3(0, 0, -38));
-      this.primitive("sling-cup", "sphere", root, new pc.Vec3(-1.02, 1.12, 0), new pc.Vec3(.32, .14, .32), rope);
-      this.teamWrap(root, team, new pc.Vec3(1.2, .07, .18), new pc.Vec3(0, -.48, .76));
+      this.primitive("trebuchet-topbeam", "box", root, new pc.Vec3(0, 1.12, 0), new pc.Vec3(1.9, .2, .32), lightTimber);
+      this.primitive("trebuchet-axle", "cylinder", root, new pc.Vec3(0, .8, 0), new pc.Vec3(.19, 1.72, .19), bronze, new pc.Vec3(90, 0, 0));
+      const armRig = new pc.Entity("trebuchet-arm-rig");
+      armRig.setLocalPosition(0, .8, 0);
+      armRig.setLocalEulerAngles(0, 0, -52);
+      root.addChild(armRig);
+      this.primitive("trebuchet-arm", "box", armRig, new pc.Vec3(-.45, 0, 0), new pc.Vec3(3.25, .18, .24), lightTimber);
+      this.primitive("trebuchet-counterweight", "box", armRig, new pc.Vec3(.98, -.38, 0), new pc.Vec3(.72, .78, .72), iron);
+      this.primitive("trebuchet-counterweight-mark", "box", armRig, new pc.Vec3(.98, -.38, -.37), new pc.Vec3(.4, .4, .04), green, undefined, false);
+      this.primitive("trebuchet-sling", "cylinder", armRig, new pc.Vec3(-1.65, -.42, 0), new pc.Vec3(.04, .9, .04), rope, new pc.Vec3(0, 0, -18));
+      this.primitive("trebuchet-sling-cup", "sphere", armRig, new pc.Vec3(-1.92, -.84, 0), new pc.Vec3(.36, .16, .36), rope);
+      this.primitive("trebuchet-chevron", "box", root, new pc.Vec3(0, -.45, 1.04), new pc.Vec3(1.15, .22, .05), green, undefined, false);
+      this.battleMachineVisuals.set(state.id, { kind: "trebuchet", motion: armRig, wheels });
       return;
     }
     if (variant.includes("siege ballista")) {
-      this.primitive("ballista-base", "box", root, new pc.Vec3(.15, -.38, 0), new pc.Vec3(2.18, .26, 1.3), dark);
-      this.primitive("ballista-stock", "box", root, new pc.Vec3(-.08, .12, 0), new pc.Vec3(2.45, .18, .2), timber);
-      this.primitive("ballista-bow", "box", root, new pc.Vec3(-.76, .16, 0), new pc.Vec3(.16, .18, 1.45), timber);
-      for (const z of [-.72, .72]) this.primitive("ballista-tip", "cylinder", root, new pc.Vec3(-.76, .16, z), new pc.Vec3(.09, .22, .09), iron);
-      this.primitive("ballista-crank", "cylinder", root, new pc.Vec3(.62, .08, 0), new pc.Vec3(.28, .86, .28), iron, new pc.Vec3(90, 0, 0));
-      this.primitive("ballista-bolt", "cylinder", root, new pc.Vec3(-.32, .28, 0), new pc.Vec3(.07, 1.75, .07), iron, new pc.Vec3(0, 0, 90));
-      this.primitive("ballista-tip", "cone", root, new pc.Vec3(-1.23, .28, 0), new pc.Vec3(.14, .28, .14), iron, new pc.Vec3(0, 0, 90));
+      this.primitive("ballista-base", "box", root, new pc.Vec3(.12, -.42, 0), new pc.Vec3(2.65, .3, 1.55), dark);
+      this.primitive("ballista-turntable", "cylinder", root, new pc.Vec3(0, -.2, 0), new pc.Vec3(.72, .18, .72), bronze);
+      this.primitive("ballista-stock", "box", root, new pc.Vec3(-.12, .18, 0), new pc.Vec3(2.85, .22, .25), lightTimber);
+      const bowRig = new pc.Entity("ballista-bow-rig");
+      bowRig.setLocalPosition(-.78, .24, 0);
+      root.addChild(bowRig);
+      this.primitive("ballista-bow-upper", "box", bowRig, new pc.Vec3(0, 0, -.62), new pc.Vec3(.18, .18, 1.25), timber, new pc.Vec3(0, -8, 0));
+      this.primitive("ballista-bow-lower", "box", bowRig, new pc.Vec3(0, 0, .62), new pc.Vec3(.18, .18, 1.25), timber, new pc.Vec3(0, 8, 0));
+      for (const z of [-1.22, 1.22]) this.primitive("ballista-bow-cap", "cylinder", bowRig, new pc.Vec3(0, 0, z), new pc.Vec3(.11, .26, .11), bronze);
+      this.primitive("ballista-string", "box", bowRig, new pc.Vec3(.42, 0, 0), new pc.Vec3(.035, .035, 2.35), rope, undefined, false);
+      this.primitive("ballista-crank", "cylinder", root, new pc.Vec3(.68, .08, 0), new pc.Vec3(.3, .95, .3), iron, new pc.Vec3(90, 0, 0));
+      this.primitive("ballista-loaded-bolt", "cylinder", root, new pc.Vec3(-.38, .34, 0), new pc.Vec3(.08, 2.05, .08), iron, new pc.Vec3(0, 0, 90));
+      this.primitive("ballista-loaded-tip", "cone", root, new pc.Vec3(-1.45, .34, 0), new pc.Vec3(.16, .32, .16), gold, new pc.Vec3(0, 0, 90));
       for (const x of [-.7, .7]) {
-        for (const z of [-.57, .57]) this.primitive("ballista-wheel", "cylinder", root, new pc.Vec3(x, -.55, z), new pc.Vec3(.34, .15, .34), iron, new pc.Vec3(90, 0, 0));
+        for (const z of [-.66, .66]) wheel("ballista-wheel", new pc.Vec3(x, -.58, z), .38);
       }
-      this.teamWrap(root, team, new pc.Vec3(1.15, .07, .18), new pc.Vec3(.2, .44, -.62));
+      this.primitive("ballista-green-mark", "box", root, new pc.Vec3(.34, .55, -.7), new pc.Vec3(1.05, .38, .05), green, undefined, false);
+      this.battleMachineVisuals.set(state.id, { kind: "ballista", motion: bowRig, wheels });
       return;
     }
     this.primitive("battle-machine", "box", root, pc.Vec3.ZERO, state.size, timber);
@@ -564,14 +640,43 @@ export class LabWorld {
     if (state.variant?.includes("ballista bolt")) {
       const iron = this.material("ballista-bolt-iron", palette.iron, .5, .68);
       const wood = this.material("ballista-bolt-shaft", palette.oakDark, .15);
-      this.primitive("bolt-shaft", "cylinder", root, pc.Vec3.ZERO, new pc.Vec3(.055, .54, .055), wood, new pc.Vec3(0, 0, 90));
-      this.primitive("bolt-head", "cone", root, new pc.Vec3(-.32, 0, 0), new pc.Vec3(.11, .18, .11), iron, new pc.Vec3(0, 0, 90));
+      const gold = this.material("ballista-bolt-gold", palette.gold, .55, .42);
+      this.primitive("bolt-shaft", "cylinder", root, pc.Vec3.ZERO, new pc.Vec3(.065, .86, .065), wood, new pc.Vec3(0, 0, 90));
+      this.primitive("bolt-head", "cone", root, new pc.Vec3(-.52, 0, 0), new pc.Vec3(.14, .26, .14), iron, new pc.Vec3(0, 0, 90));
+      this.primitive("bolt-fletching-a", "box", root, new pc.Vec3(.42, 0, 0), new pc.Vec3(.24, .03, .28), gold, undefined, false);
+      this.primitive("bolt-fletching-b", "box", root, new pc.Vec3(.42, 0, 0), new pc.Vec3(.24, .28, .03), gold, undefined, false);
       return;
     }
-    const stone = this.material("siege-stone", new pc.Color(.26, .25, .22), .08);
+    const stone = this.material("siege-stone", new pc.Color(.31, .295, .25), .08);
     const iron = this.material("siege-stone-band", palette.iron, .38, .36);
-    this.primitive("siege-stone", "sphere", root, pc.Vec3.ZERO, new pc.Vec3(.38, .38, .38), stone);
-    this.primitive("siege-stone-band", "cylinder", root, pc.Vec3.ZERO, new pc.Vec3(.41, .06, .41), iron);
+    const green = this.material("siege-stone-mark", new pc.Color(.04, .46, .27), .18);
+    this.primitive("siege-stone", "sphere", root, pc.Vec3.ZERO, new pc.Vec3(.46, .46, .46), stone);
+    this.primitive("siege-stone-band", "cylinder", root, pc.Vec3.ZERO, new pc.Vec3(.49, .07, .49), iron);
+    this.primitive("siege-stone-mark", "box", root, new pc.Vec3(0, .34, -.33), new pc.Vec3(.34, .08, .025), green, new pc.Vec3(-38, 0, 0), false);
+  }
+
+  private createBattleEffects(): void {
+    const burst = new pc.Entity("battle-impact-burst");
+    burst.enabled = false;
+    this.app.root.addChild(burst);
+    this.impactBurst = burst;
+    const flash = this.material("impact-flash", new pc.Color(1, .56, .05), .34);
+    const dust = this.material("impact-dust", new pc.Color(.58, .48, .31), .04);
+    this.primitive("impact-core", "sphere", burst, pc.Vec3.ZERO, new pc.Vec3(.34, .34, .34), flash, undefined, false);
+    for (let index = 0; index < 9; index += 1) {
+      const angle = index / 9 * Math.PI * 2;
+      const shard = this.primitive(
+        "impact-shard",
+        index % 2 === 0 ? "cone" : "box",
+        burst,
+        new pc.Vec3(Math.cos(angle) * .62, .08 + (index % 3) * .16, Math.sin(angle) * .62),
+        index % 2 === 0 ? new pc.Vec3(.1, .72, .1) : new pc.Vec3(.12, .46, .16),
+        index % 3 === 0 ? flash : dust,
+        new pc.Vec3(Math.sin(angle) * 52, 0, -Math.cos(angle) * 52),
+        false,
+      );
+      this.impactShards.push(shard);
+    }
   }
 
   private createTowerBlockVisual(root: pc.Entity, state: CoreBodyState): void {
@@ -984,8 +1089,86 @@ export class LabWorld {
         visual.rightArm.setLocalEulerAngles(gait * .72, 0, 12);
       }
     }
+    this.updateBattlePresentation();
     this.updateCamera();
     this.publishDebug(this.maxDivergence());
+  }
+
+  private updateBattlePresentation(): void {
+    const battle = this.battleState;
+    const resolving = battle?.phase === "resolving";
+    const progress = resolving
+      ? pc.math.clamp((battle.phaseProgress - 2 / 3) / (2 / 9), 0, 1)
+      : 0;
+    const redOrder = battle?.orders.king;
+    const greenOrder = battle?.orders.queen;
+    const wheelSpin = this.elapsed * 155;
+
+    for (const [id, visual] of this.battleMachineVisuals) {
+      const order = id.startsWith("red-") ? redOrder : greenOrder;
+      const engaged = resolving && order?.unitId === id;
+      for (const wheel of visual.wheels) wheel.setLocalEulerAngles(90, wheelSpin, 0);
+      if (visual.kind === "engineers") {
+        const strike = engaged ? Math.sin(Math.min(1, progress * 2.4) * Math.PI) : 0;
+        visual.motion.setLocalEulerAngles(0, 0, 18 - strike * 78);
+      } else if (visual.kind === "winch") {
+        const spin = engaged ? progress * 1080 : 0;
+        visual.motion.setLocalEulerAngles(0, 0, spin);
+        visual.secondary?.setLocalEulerAngles(spin * 1.3, 0, 0);
+      } else if (visual.kind === "sledge") {
+        const catchPulse = engaged ? Math.sin(progress * Math.PI * 3) * (1 - progress) : 0;
+        visual.motion.setLocalScale(1, 1 + Math.abs(catchPulse) * .65, 1);
+        visual.motion.setLocalEulerAngles(0, 0, catchPulse * 3.5);
+      } else if (visual.kind === "ram") {
+        const stroke = engaged ? Math.sin(Math.min(1, progress * 1.45) * Math.PI) : 0;
+        visual.motion.setLocalPosition(-.1 - stroke * .72, .3 + Math.abs(stroke) * .06, 0);
+        visual.motion.setLocalEulerAngles(0, 0, stroke * -5);
+      } else if (visual.kind === "trebuchet") {
+        const release = engaged ? smoothStep(.08, .52, progress) : 0;
+        visual.motion.setLocalEulerAngles(0, 0, -52 + release * 112);
+      } else if (visual.kind === "ballista") {
+        const tension = engaged ? 1 - smoothStep(.08, .34, progress) : 0;
+        const recoil = engaged && progress >= .34
+          ? Math.sin((progress - .34) * Math.PI * 8) * Math.exp(-(progress - .34) * 7)
+          : 0;
+        visual.motion.setLocalPosition(-.78 + recoil * .24, .24, 0);
+        visual.motion.setLocalScale(1, 1, 1 + tension * .18);
+      }
+    }
+
+    if (!this.impactBurst) return;
+    const attack = greenOrder && ["breach", "bombard", "snipe"].includes(greenOrder.action)
+      ? greenOrder
+      : undefined;
+    const impactLife = resolving && attack?.hit !== false
+      ? 1 - Math.abs(pc.math.clamp((progress - .48) / .24, -1, 1))
+      : 0;
+    const target = attack ? this.battleTargetPosition(attack) : undefined;
+    this.impactBurst.enabled = Boolean(target && impactLife > .03);
+    if (!target || impactLife <= .03) return;
+    this.impactBurst.setPosition(target.x, target.y + .12, target.z);
+    this.impactBurst.setLocalScale(.55 + impactLife * 1.15, .55 + impactLife * 1.15, .55 + impactLife * 1.15);
+    for (let index = 0; index < this.impactShards.length; index += 1) {
+      const angle = index / this.impactShards.length * Math.PI * 2;
+      const travel = .3 + impactLife * (1 + (index % 3) * .18);
+      this.impactShards[index]?.setLocalPosition(
+        Math.cos(angle) * travel,
+        .08 + impactLife * (.35 + (index % 3) * .22),
+        Math.sin(angle) * travel,
+      );
+    }
+  }
+
+  private battleTargetPosition(order: BattleOrderState): pc.Vec3 | undefined {
+    const bodyId = order.resolvedTargetId
+      ?? (order.targetId === "foundation"
+        ? "tower-02-3"
+        : order.targetId === "tower-face"
+          ? "tower-08-2"
+          : order.targetId === "humpty"
+            ? "humpty"
+            : "red-catch-sledge");
+    return this.bodies.get(bodyId)?.currentPosition;
   }
 
   private syncRopeVisuals(snapshot: CoreSnapshot): void {
@@ -1139,4 +1322,9 @@ function hashUnit(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0) / 0xffffffff;
+}
+
+function smoothStep(edge0: number, edge1: number, value: number): number {
+  const amount = pc.math.clamp((value - edge0) / Math.max(.0001, edge1 - edge0), 0, 1);
+  return amount * amount * (3 - 2 * amount);
 }

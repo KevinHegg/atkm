@@ -118,9 +118,9 @@ const UNIT_BLUEPRINTS: readonly BattleUnitState[] = [
   {
     id: "green-stone-thrower",
     team: "queen",
-    name: "Siege Mortar",
-    role: "High explosive bombardment",
-    purpose: "Arc scarce shells over defenses at structures, Humpty, or Red equipment.",
+    name: "Counterweight Trebuchet",
+    role: "Arcing stone bombardment",
+    purpose: "Drop the counterweight to arc scarce stone shot over defenses at structures, Humpty, or Red equipment.",
     integrity: 100,
     maxIntegrity: 100,
     ammunition: 5,

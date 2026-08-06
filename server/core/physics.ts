@@ -67,7 +67,7 @@ const GREEN_STONE_IDS = Array.from({ length: 5 }, (_, index) => `green-siege-sto
 const GREEN_BALLISTA_BOLT_IDS = Array.from({ length: 5 }, (_, index) => `green-ballista-bolt-${index + 1}`);
 
 export interface BattlePhysicsEvent {
-  type: "ram-impact" | "stone-impact" | "ballista-shot" | "catch" | "deployment" | "machine-disabled" | "winch-pull" | "line-snap";
+  type: "ram-impact" | "stone-impact" | "ballista-shot" | "ballista-impact" | "projectile-miss" | "catch" | "deployment" | "machine-disabled" | "winch-pull" | "line-snap";
   machineId: string;
   targetId: string;
   value: number;
@@ -139,6 +139,7 @@ export class CorePhysicsWorld {
   private carriedPartPenetrations = 0;
   private readonly queenBoltImpactIds = new Set<string>();
   private readonly battleImpactIds = new Set<string>();
+  private readonly battleProjectileLaunchedAt = new Map<string, number>();
   private readonly battleEvents: BattlePhysicsEvent[] = [];
   private readonly initialTowerPositions = new Map<string, Vec3>();
   private winchActiveUntilTick = 0;
@@ -590,7 +591,7 @@ export class CorePhysicsWorld {
     return profiles[this.seed % profiles.length]?.[shotIndex] ?? "tower-08-2";
   }
 
-  operateBattleMachine(machineId: string, preferredTargetId?: string): BattleMachineOperationResult {
+  operateBattleMachine(machineId: string, preferredTargetId?: string, shouldHit = true): BattleMachineOperationResult {
     const machine = this.records.get(machineId);
     if (!machine || machine.kind !== "battle-machine") {
       return { ok: false, message: "That machine is not on the battlefield." };
@@ -623,7 +624,7 @@ export class CorePhysicsWorld {
         return { ok: false, message: "The battering ram is still in motion." };
       }
       this.ramRun += 1;
-      this.ramTargetX = .9;
+      this.ramTargetX = shouldHit ? .9 : 2.15;
       this.ramMode = "moving";
       return {
         ok: true,
@@ -640,6 +641,7 @@ export class CorePhysicsWorld {
         ? preferredTargetId
         : this.battleStoneTargetId();
       stone.variant = `fired siege stone ${GREEN_STONE_IDS.indexOf(stone.id) + 1}`;
+      this.battleProjectileLaunchedAt.set(stone.id, this.tickValue);
       stone.body.setGravityScale(1, true);
       for (const collider of stone.colliders) {
         collider.setSensor(false);
@@ -651,7 +653,9 @@ export class CorePhysicsWorld {
       const target = this.bodyPosition(targetId) ?? this.bodyPosition("tower-08-2") ?? { x: 0, y: 2.1, z: 0 };
       const launch = this.bodyPosition(stone.id) ?? { x: 4.5, y: 1.72, z: 2.22 };
       const shotIndex = GREEN_STONE_IDS.indexOf(stone.id);
-      const aimError = ((this.seed * 17 + shotIndex * 29) % 9 - 4) * .025;
+      const aimError = shouldHit
+        ? ((this.seed * 17 + shotIndex * 29) % 9 - 4) * .025
+        : 1.35 + ((this.seed + shotIndex) % 4) * .18;
       const flightSeconds = .56;
       const mass = Math.max(1, stone.body.mass());
       this.applyImpulse(stone.id, {
@@ -669,7 +673,7 @@ export class CorePhysicsWorld {
     return { ok: false, message: "That machine has no public operation." };
   }
 
-  fireBattleBallista(preferredTargetId: string): BattleMachineOperationResult {
+  fireBattleBallista(preferredTargetId: string, shouldHit = true): BattleMachineOperationResult {
     const machine = this.records.get("green-ballista");
     if (!machine || (machine.integrity ?? 0) <= 0) return { ok: false, message: "The siege ballista is disabled." };
     const bolt = GREEN_BALLISTA_BOLT_IDS
@@ -680,6 +684,7 @@ export class CorePhysicsWorld {
     const target = this.bodyPosition(targetId) ?? this.bodyPosition("humpty") ?? { x: 0, y: 3.8, z: 0 };
     const launch = this.bodyPosition(bolt.id) ?? { x: 5.7, y: 1.2, z: -2.35 };
     bolt.variant = `fired ballista bolt ${GREEN_BALLISTA_BOLT_IDS.indexOf(bolt.id) + 1}`;
+    this.battleProjectileLaunchedAt.set(bolt.id, this.tickValue);
     bolt.body.setGravityScale(1, true);
     for (const collider of bolt.colliders) {
       collider.setSensor(false);
@@ -689,8 +694,8 @@ export class CorePhysicsWorld {
     const mass = Math.max(1, bolt.body.mass());
     this.applyImpulse(bolt.id, {
       x: (target.x - launch.x) / flightSeconds * mass,
-      y: (target.y - launch.y + .5 * 9.81 * flightSeconds ** 2) / flightSeconds * mass,
-      z: (target.z - launch.z) / flightSeconds * mass,
+      y: (target.y + (shouldHit ? 0 : 1.4) - launch.y + .5 * 9.81 * flightSeconds ** 2) / flightSeconds * mass,
+      z: (target.z + (shouldHit ? 0 : 1.2) - launch.z) / flightSeconds * mass,
     });
     this.battleEvents.push({
       type: "ballista-shot",
@@ -1541,7 +1546,7 @@ export class CorePhysicsWorld {
     });
 
     const stoneThrower = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(4.8, .84, 2.55),
+      RAPIER.RigidBodyDesc.fixed().setTranslation(6.15, .84, 3.15),
     );
     const stoneThrowerCollider = this.world.createCollider(
       RAPIER.ColliderDesc.roundCuboid(.86, .8, .86, .08).setFriction(.86),
@@ -1563,7 +1568,7 @@ export class CorePhysicsWorld {
     for (const [index, stoneId] of GREEN_STONE_IDS.entries()) {
       const body = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(4.35 + (index % 3) * .45, 1.72, 2.22 + Math.floor(index / 3) * .38)
+          .setTranslation(5.7 + (index % 3) * .45, 1.72, 2.78 + Math.floor(index / 3) * .38)
           .setGravityScale(0)
           .setLinearDamping(.08)
           .setAngularDamping(.1)
@@ -1595,7 +1600,7 @@ export class CorePhysicsWorld {
     }
 
     const ballista = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed().setTranslation(5.65, .62, -2.55),
+      RAPIER.RigidBodyDesc.fixed().setTranslation(6.2, .62, -3.05),
     );
     const ballistaCollider = this.world.createCollider(
       RAPIER.ColliderDesc.roundCuboid(1.12, .56, .7, .08).setFriction(.9),
@@ -1617,7 +1622,7 @@ export class CorePhysicsWorld {
     for (const [index, boltId] of GREEN_BALLISTA_BOLT_IDS.entries()) {
       const body = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(5.25 + index * .22, 1.42, -2.18)
+          .setTranslation(5.72 + index * .22, 1.42, -2.66)
           .setGravityScale(0)
           .setLinearDamping(.05)
           .setAngularDamping(.3)
@@ -2007,7 +2012,20 @@ export class CorePhysicsWorld {
     }
 
     if ((this.records.get("green-battering-ram")?.integrity ?? 0) > 0) {
-      if (this.ramMode === "moving") this.driveBodyTowardX("green-battering-ram", this.ramTargetX, 7.2, 38);
+      if (this.ramMode === "moving") {
+        const arrived = this.driveBodyTowardX("green-battering-ram", this.ramTargetX, 7.2, 38);
+        if (arrived && this.ramTargetX > 1.5) {
+          this.ramResolvedRun = this.ramRun;
+          this.ramMode = "returning";
+          this.battleEvents.push({
+            type: "ram-impact",
+            machineId: "green-battering-ram",
+            targetId: "tower-02-3",
+            value: 0,
+            text: "The battering ram charges but brakes short of the tower.",
+          });
+        }
+      }
       if (this.ramMode === "returning") {
         const arrived = this.driveBodyTowardX("green-battering-ram", 4.35, 4.8, 28);
         if (arrived) this.ramMode = "ready";
@@ -2129,7 +2147,21 @@ export class CorePhysicsWorld {
       if (!stone?.variant?.startsWith("fired")) continue;
       const targetId = ["humpty", "red-catch-sledge", ...this.towerBlockIds()]
         .find((id) => this.contactCount(stoneId, id) > 0);
-      if (!targetId) continue;
+      if (!targetId) {
+        const launchedAt = this.battleProjectileLaunchedAt.get(stoneId) ?? this.tickValue;
+        if (this.tickValue - launchedAt > 4 * 60) {
+          this.battleImpactIds.add(stoneId);
+          stone.variant = "spent siege stone miss";
+          this.battleEvents.push({
+            type: "projectile-miss",
+            machineId: "green-stone-thrower",
+            targetId: stoneId,
+            value: 0,
+            text: "The trebuchet stone passes the target and spends itself on the field.",
+          });
+        }
+        continue;
+      }
       this.battleImpactIds.add(stoneId);
       stone.variant = "spent siege stone";
       if (targetId === "humpty") this.applyDamage("humpty", 38);
@@ -2150,6 +2182,48 @@ export class CorePhysicsWorld {
           : targetId === "red-catch-sledge"
             ? `The thrown stone smashes the catch sledge down to ${Math.max(0, Math.round(this.records.get(targetId)?.integrity ?? 0))} integrity.`
             : `The thrown stone hits ${targetId}; the timber leaves the impact at ${speed.toFixed(1)} m/s.`,
+      });
+    }
+
+    for (const boltId of GREEN_BALLISTA_BOLT_IDS) {
+      if (this.battleImpactIds.has(boltId)) continue;
+      const bolt = this.records.get(boltId);
+      if (!bolt?.variant?.startsWith("fired")) continue;
+      const targetId = [
+        "humpty",
+        "red-catch-sledge",
+        "red-rescue-winch",
+        "red-engineers",
+        ...this.towerBlockIds(),
+      ].find((id) => this.contactCount(boltId, id) > 0);
+      if (!targetId) {
+        const launchedAt = this.battleProjectileLaunchedAt.get(boltId) ?? this.tickValue;
+        if (this.tickValue - launchedAt > 3 * 60) {
+          this.battleImpactIds.add(boltId);
+          bolt.variant = "spent ballista bolt miss";
+          this.battleEvents.push({
+            type: "projectile-miss",
+            machineId: "green-ballista",
+            targetId: boltId,
+            value: 0,
+            text: "The ballista bolt whistles past and buries itself beyond the target.",
+          });
+        }
+        continue;
+      }
+      this.battleImpactIds.add(boltId);
+      bolt.variant = "spent ballista bolt impact";
+      if (targetId === "humpty") this.applyDamage(targetId, 34);
+      else if (this.records.get(targetId)?.kind === "battle-machine") this.applyDamage(targetId, 22);
+      else this.applyImpulse(targetId, { x: -54, y: 8, z: 4 });
+      this.battleEvents.push({
+        type: "ballista-impact",
+        machineId: "green-ballista",
+        targetId,
+        value: this.records.get(targetId)?.integrity ?? 0,
+        text: targetId === "humpty"
+          ? "The ballista bolt strikes Humpty and cracks the royal shell."
+          : `The ballista bolt punches into ${battleTargetName(targetId)}.`,
       });
     }
 

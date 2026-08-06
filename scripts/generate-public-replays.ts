@@ -22,10 +22,11 @@ interface PublicReplaySummary extends ReplaySummary {
 }
 
 const OUTPUT_DIR = resolve(process.cwd(), "public", "replays");
-const BUILD_ID = "siege-orders-0806";
-const CREATED_AT = "2026-08-06T18:00:00.000Z";
+const BUILD_ID = "siege-machines-0806";
+const CREATED_AT = "2026-08-06T21:00:00.000Z";
 const MAX_SECONDS = 200;
-const EVENT_LIMIT = 36;
+const EVENT_LIMIT = 18;
+const ACTION_FRAME_INTERVAL = .2;
 
 const demos: DemoSpec[] = [
   {
@@ -72,6 +73,7 @@ await writeFile(
     generatedAt: CREATED_AT,
     build: BUILD_ID,
     frameIntervals: Object.fromEntries(demos.map((demo) => [demo.id, demo.frameInterval])),
+    actionFrameInterval: ACTION_FRAME_INTERVAL,
     replays: summaries,
   }, null, 2)}\n`,
   "utf8",
@@ -85,16 +87,21 @@ async function createReplay(demo: DemoSpec): Promise<ReplayArchiveEntry> {
   });
   const frames: CoreSnapshot[] = [];
   let nextCapture = 0;
+  let previousPhase = "";
 
   try {
     simulation.handleCommand({ type: "time-scale", value: 8 });
     while (simulation.snapshot().elapsed <= MAX_SECONDS + 1 && simulation.snapshot().match.status !== "complete") {
       simulation.step();
       const snapshot = simulation.snapshot();
+      const phase = snapshot.match.battle?.phase ?? "";
+      if (phase === "resolving" && previousPhase !== "resolving") nextCapture = snapshot.elapsed;
+      const interval = phase === "resolving" ? ACTION_FRAME_INTERVAL : demo.frameInterval;
       if (snapshot.elapsed + 1e-6 >= nextCapture) {
         frames.push(compactSnapshot(snapshot));
-        nextCapture += demo.frameInterval;
+        nextCapture = snapshot.elapsed + interval;
       }
+      previousPhase = phase;
     }
 
     const finalSnapshot = compactSnapshot(simulation.snapshot());
@@ -122,5 +129,11 @@ async function createReplay(demo: DemoSpec): Promise<ReplayArchiveEntry> {
 function compactSnapshot(snapshot: CoreSnapshot): CoreSnapshot {
   const copy = structuredClone(snapshot);
   copy.events = copy.events.slice(0, EVENT_LIMIT);
+  copy.completedFixtures = [];
+  copy.match.activeRuleIds = {};
+  copy.match.applicableRuleIds = {};
+  copy.match.machineEvidence = [];
+  copy.match.machinePlanOptions = { king: [], queen: [] };
+  copy.match.selectedMachinePlanIds = {};
   return copy;
 }

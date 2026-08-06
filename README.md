@@ -34,7 +34,7 @@ rules so every battle can be replayed exactly.
 ## The Field
 
 Red commands Field Engineers, a Rescue Winch, and a Catch-Net Sledge. Green
-commands a Battering Ram, Siege Mortar, and Siege Ballista. Equipment has visible
+commands a Battering Ram, Counterweight Trebuchet, and Siege Ballista. Equipment has visible
 integrity, ammunition, and cooldown state. Orders may address the foundation,
 tower face, Humpty, or enemy equipment.
 

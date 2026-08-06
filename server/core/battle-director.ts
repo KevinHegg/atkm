@@ -220,9 +220,9 @@ export class BattleDirector {
     const kingOrder = this.visibleOrders.king;
     const queenOrder = this.visibleOrders.queen;
     if (!kingOrder || !queenOrder) return;
-    this.stagePhysicalEffects(kingOrder, queenOrder);
     const resolution = resolveSiegeRound(this.siege, this.round, this.seed, kingOrder, queenOrder);
     this.visibleOrders = { king: { ...resolution.kingOrder }, queen: { ...resolution.queenOrder } };
+    this.stagePhysicalEffects(resolution.kingOrder, resolution.queenOrder);
     this.battlePhase = "resolving";
     this.emit({ text: resolution.summary, technical: `siege:round:${this.round}:resolved` });
     this.evidence.add(`round:${this.round}:resolved`);
@@ -274,9 +274,9 @@ export class BattleDirector {
     if (kingOrder.unitId === "red-rescue-winch") this.physics.operateBattleMachine("red-rescue-winch");
     if (kingOrder.unitId === "red-catch-sledge") this.physics.operateBattleMachine("red-catch-sledge");
     const targetId = physicalTargetId(queenOrder);
-    if (queenOrder.unitId === "green-battering-ram") this.physics.operateBattleMachine("green-battering-ram");
-    if (queenOrder.unitId === "green-stone-thrower") this.physics.operateBattleMachine("green-stone-thrower", targetId);
-    if (queenOrder.unitId === "green-ballista") this.physics.fireBattleBallista(targetId);
+    if (queenOrder.unitId === "green-battering-ram") this.physics.operateBattleMachine("green-battering-ram", targetId, queenOrder.hit !== false);
+    if (queenOrder.unitId === "green-stone-thrower") this.physics.operateBattleMachine("green-stone-thrower", targetId, queenOrder.hit !== false);
+    if (queenOrder.unitId === "green-ballista") this.physics.fireBattleBallista(targetId, queenOrder.hit !== false);
   }
 
   private forwardPhysicsEvents(): void {
@@ -284,7 +284,7 @@ export class BattleDirector {
       this.emit({
         text: event.text,
         team: event.type === "catch" || event.type === "deployment" || event.type === "winch-pull" ? "king" : "queen",
-        technical: `siege:physical:${event.type}:${event.machineId}:${event.targetId}:${event.value.toFixed(2)}`,
+        technical: `siege:physical:${event.type}:${event.machineId}:${event.targetId}:${Math.round(event.value)}`,
       });
       this.evidence.add(`physical:${event.type}:${event.targetId}`);
     }

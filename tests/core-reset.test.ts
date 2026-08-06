@@ -425,6 +425,10 @@ test("the siege director reveals and resolves one simultaneous order per team", 
       new Set(snapshot.match.battle.units.map((unit) => unit.id)),
       new Set(["red-engineers", "red-rescue-winch", "red-catch-sledge", "green-battering-ram", "green-stone-thrower", "green-ballista"]),
     );
+    assert.equal(
+      snapshot.match.battle.units.find((unit) => unit.id === "green-stone-thrower")?.name,
+      "Counterweight Trebuchet",
+    );
     assert.ok(snapshot.events.some((event) => event.technical === "siege:round:1:reveal"));
     assert.ok(snapshot.events.some((event) => event.technical === "siege:round:1:resolved"));
     assert.equal(snapshot.match.battle.history[0]?.kingOrder.status, "resolved");
@@ -433,6 +437,26 @@ test("the siege director reveals and resolves one simultaneous order per team", 
     assert.equal(snapshot.diagnostics.lateCreatedInventory, 0);
   } finally {
     simulation.destroy();
+  }
+});
+
+test("ballista bolts resolve to a physical impact or a finite miss", async () => {
+  const hitWorld = await CorePhysicsWorld.create(1881, true);
+  const missWorld = await CorePhysicsWorld.create(1881, true);
+  try {
+    assert.equal(hitWorld.fireBattleBallista("humpty", true).ok, true);
+    assert.equal(missWorld.fireBattleBallista("humpty", false).ok, true);
+    for (let tick = 0; tick < 300; tick += 1) {
+      hitWorld.step();
+      missWorld.step();
+    }
+    assert.ok(hitWorld.records.get("green-ballista-bolt-1")?.variant?.startsWith("spent"));
+    assert.ok(missWorld.records.get("green-ballista-bolt-1")?.variant?.startsWith("spent"));
+    assert.ok(hitWorld.consumeBattleEvents().some((event) => event.type === "ballista-impact"));
+    assert.ok(missWorld.consumeBattleEvents().some((event) => event.type === "projectile-miss"));
+  } finally {
+    hitWorld.free();
+    missWorld.free();
   }
 });
 
