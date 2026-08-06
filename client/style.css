@@ -369,6 +369,8 @@ button { cursor: pointer; }
   text-transform: uppercase;
 }
 .match-turnline strong { color: var(--gold); }
+#match-phase[data-urgency="desperate"] { color: var(--king); font-weight: 700; }
+#match-phase[data-urgency="last-minute"] { color: var(--paper); background: var(--king); padding: 1px 4px; font-weight: 700; }
 #match-objectives { display: grid; gap: 3px; margin: 6px 0 0; }
 #match-objectives div { display: grid; grid-template-columns: 34px 1fr; gap: 5px; }
 #match-objectives dt { font-size: 8px; font-weight: 700; text-transform: uppercase; }
@@ -415,6 +417,7 @@ button { cursor: pointer; }
   line-height: 1.15;
 }
 #queen-advantage-state[data-state="armed"] { color: var(--queen); }
+#queen-advantage-state[data-state="mustering"] { color: var(--gold); }
 #queen-advantage-state[data-state="broken"] { color: var(--king); }
 #queen-advantage-state[data-state="spent"] { color: var(--gold); }
 #match-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 7px 0 0; }

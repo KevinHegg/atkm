@@ -31,13 +31,13 @@ pulley, inclined plane, and wedge. The six capabilities are climb, launch,
 strike, dislodge timber, lift, and lower. `GET /rules` returns the same catalog
 as JSON.
 
-- Red/King: bring Humpty safely to the stage floor.
-- Green/Queen: crack Humpty before he stands on the stage floor.
+- Red/King: keep Humpty uncracked until the ten-minute bell.
+- Green/Queen: crack Humpty at any point before the siege clock expires.
 
 The match snapshot exposes the current rule and applicable IDs for each figure,
 the two machine-plan states, measured machine evidence, and concurrent
-busy-worker and total-move counts, plus the Queen's command-post integrity and
-remaining crown-bolt charges. A rule can enter a
+busy-worker and total-move counts, the time remaining and urgency band, plus
+the Queen's command-post integrity and remaining crown-bolt charges. A rule can enter a
 figure's choice set only when its observed facts are true; listing a connection
 or operation rule does not grant a recipe, create a joint, move a body, or
 bypass action validation.

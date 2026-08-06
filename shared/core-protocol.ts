@@ -5,6 +5,7 @@ export type { ConnectionClass } from "./machines.js";
 export const CORE_MODE = "legibility-lab" as const;
 export const CORE_FIXED_DT = 1 / 60;
 export const CORE_SNAPSHOT_HZ = 20;
+export const CORE_MATCH_DURATION_SECONDS = 10 * 60;
 export const CORE_STAGE = {
   width: 18.4,
   depth: 10,
@@ -206,6 +207,8 @@ export interface CoreMatchState {
   driver: "llm" | "mock" | "manual";
   status: "waiting" | "active" | "complete" | "manual";
   phase: "muster" | "advance" | "contest" | "complete" | "manual";
+  urgency: "opening" | "siege" | "desperate" | "last-minute" | "complete" | "manual";
+  timeRemaining: number;
   moves: number;
   busyWorkers: number;
   kingObjective: string;

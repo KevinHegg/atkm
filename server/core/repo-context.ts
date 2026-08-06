@@ -1,5 +1,5 @@
 export const REPO_AGENT_CONTEXT = {
-  contractVersion: "contraption-repo-v2",
+  contractVersion: "contraption-repo-v3",
   authority: "Rapier 3D on the server is the only gameplay authority.",
   sourceOfTruth: [
     "AGENTS.md",
@@ -28,6 +28,7 @@ export const REPO_AGENT_CONTEXT_TEXT = [
   `Repository contract ${REPO_AGENT_CONTEXT.contractVersion}.`,
   REPO_AGENT_CONTEXT.authority,
   ...REPO_AGENT_CONTEXT.invariants,
+  "The match is a ten-minute siege: Green wins immediately by cracking Humpty; Red wins only if Humpty still has integrity at the bell.",
   "Compose unexpected machines by permuting visible crew roles and simple-machine order; never bypass the action validator.",
-  "The Queen's visible command post has two physical crown-bolt charges; Green can operate it and Red can strike it before it fires.",
+  "The Queen's visible command post has four physical crown-bolt charges; Green can operate it and Red can strike it before it fires.",
 ].join(" ");

@@ -24,9 +24,11 @@ import {
 } from "lucide";
 import {
   CORE_MODE,
+  CORE_MATCH_DURATION_SECONDS,
   CONNECTION_CLASSES,
   LEGAL_ACTIONS,
   type CoreClientCommand,
+  type CoreMatchState,
   type CoreSnapshot,
   type LegalActionRequest,
   type ReplayArchiveEntry,
@@ -283,9 +285,10 @@ function presentSnapshot(snapshot: CoreSnapshot, live: boolean): void {
   world.sync(snapshot);
   if (live) processAudioEvents(snapshot);
   if (window.__HUMPTY_LAB__) window.__HUMPTY_LAB__.consoleErrors = errors;
-  const elapsed = formatElapsed(snapshot.elapsed);
-  elapsedValue.textContent = elapsed;
-  stageTime.textContent = elapsed;
+  const timeRemaining = matchTimeRemaining(snapshot);
+  const siegeClock = formatElapsed(timeRemaining);
+  elapsedValue.textContent = siegeClock;
+  stageTime.textContent = siegeClock;
   seedLabel.textContent = `seed ${snapshot.seed}`;
   buildLabel.textContent = `build ${snapshot.build}`;
   const humpty = snapshot.bodies.find((body) => body.id === "humpty");
@@ -325,25 +328,33 @@ function renderEvents(snapshot: CoreSnapshot): void {
 
 function renderMatch(snapshot: CoreSnapshot): void {
   const match = snapshot.match;
-  matchStatus.textContent = match.outcome ?? match.status;
-  watchWorkspaceStatus.textContent = match.outcome ?? match.status;
+  const statusLabel = match.outcome ? outcomeLabel(match.outcome) : match.status;
+  matchStatus.textContent = statusLabel;
+  watchWorkspaceStatus.textContent = statusLabel;
   matchStatus.dataset.status = match.status;
   matchStatus.dataset.outcome = match.outcome ?? "";
   matchTurn.textContent = `${match.busyWorkers} active / ${match.moves} moves`;
-  matchPhase.textContent = match.phase.charAt(0).toUpperCase() + match.phase.slice(1);
+  const urgency = match.urgency ?? siegeUrgencyLabel(snapshot.elapsed);
+  matchPhase.textContent = urgency.replace("-", " ");
+  matchPhase.dataset.urgency = urgency;
   ruleCount.textContent = `${match.rulebookSize} rules`;
   kingObjective.textContent = match.kingObjective;
   queenObjective.textContent = match.queenObjective;
   kingMachine.textContent = match.machinePlans.king;
   queenMachine.textContent = match.machinePlans.queen;
   const advantage = match.queenAdvantage;
-  queenAdvantageState.textContent = advantage.disabled
+  const queenDevicePresent = snapshot.bodies.some((body) => body.kind === "queen-device");
+  queenAdvantageState.textContent = !queenDevicePresent
+    ? "command post mustering"
+    : advantage.disabled
     ? "command post broken"
     : advantage.armed
       ? "crown bolt armed"
       : "crown bolts spent";
-  queenAdvantageState.dataset.state = advantage.disabled ? "broken" : advantage.armed ? "armed" : "spent";
-  queenAdvantageMeta.textContent = `${advantage.charges} / ${advantage.maxCharges} crown bolts · ${Math.round(advantage.deviceIntegrity)}% integrity`;
+  queenAdvantageState.dataset.state = !queenDevicePresent ? "mustering" : advantage.disabled ? "broken" : advantage.armed ? "armed" : "spent";
+  queenAdvantageMeta.textContent = queenDevicePresent
+    ? `${advantage.charges} / ${advantage.maxCharges} crown bolts · ${Math.round(advantage.deviceIntegrity)}% integrity`
+    : `${advantage.maxCharges} crown bolts · entering with wave one`;
   kingRule.textContent = teamRuleText(snapshot, "king");
   queenRule.textContent = teamRuleText(snapshot, "queen");
   if (modeLabel) {
@@ -505,7 +516,7 @@ function updateSidebarContext(): void {
     collapsedContext.textContent = replayEntry ? replayTitle(replayEntry.summary) : modeLabel?.textContent ?? "Live match";
     collapsedStatusValue.textContent = replayEntry
       ? replayTime.textContent ?? "00:00"
-      : latest ? formatElapsed(latest.elapsed) : "00:00";
+      : latest ? formatElapsed(matchTimeRemaining(latest)) : "10:00";
     return;
   }
   if (sidebarView === "archive") {
@@ -565,7 +576,7 @@ function renderArchiveList(summaries: ReplaySummary[]): void {
     const name = document.createElement("strong");
     name.textContent = publicSummary?.title ?? (summary.live ? "Live match" : `Match ${summary.id}`);
     const status = document.createElement("span");
-    status.textContent = summary.outcome ? `${summary.outcome} wins` : summary.status;
+    status.textContent = summary.outcome ? outcomeLabel(summary.outcome) : summary.status;
     title.append(name, status);
     const meta = document.createElement("span");
     meta.className = "archive-row-meta";
@@ -678,7 +689,12 @@ function updateReplayControls(): void {
     stageButton.classList.toggle("active", paused);
     setIcon(stageButton, paused ? Play : Pause);
   }
-  if (replayEntry) watchWorkspaceStatus.textContent = replayPlaying ? `${replaySpeed.value}x replay` : "replay paused";
+  if (replayEntry) {
+    const frameMatch = replayEntry.frames[replayFrameIndex]?.match;
+    watchWorkspaceStatus.textContent = frameMatch?.status === "complete" && frameMatch.outcome
+      ? outcomeLabel(frameMatch.outcome)
+      : replayPlaying ? `${replaySpeed.value}x replay` : "replay paused";
+  }
   updateSidebarContext();
 }
 
@@ -1076,6 +1092,25 @@ function actionLabel(action: string): string {
 function formatElapsed(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));
   return `${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+function matchTimeRemaining(snapshot: CoreSnapshot): number {
+  return Number.isFinite(snapshot.match.timeRemaining)
+    ? snapshot.match.timeRemaining
+    : Math.max(0, CORE_MATCH_DURATION_SECONDS - snapshot.elapsed);
+}
+
+function outcomeLabel(outcome: NonNullable<CoreMatchState["outcome"]>): string {
+  if (outcome === "king") return "Red wins";
+  if (outcome === "queen") return "Green wins";
+  return "Draw";
+}
+
+function siegeUrgencyLabel(elapsed: number): CoreMatchState["urgency"] {
+  if (elapsed >= 540) return "last-minute";
+  if (elapsed >= 480) return "desperate";
+  if (elapsed >= 60) return "siege";
+  return "opening";
 }
 
 window.addEventListener("beforeunload", () => {

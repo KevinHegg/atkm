@@ -6,18 +6,19 @@ import { tmpdir } from "node:os";
 import {
   CONNECTION_CLASSES,
   CORE_FIXED_DT,
+  CORE_MATCH_DURATION_SECONDS,
   LEGAL_ACTIONS,
   type PartFamily,
 } from "../shared/core-protocol.js";
 import { AGENT_OBJECTIVES, AGENT_RULES } from "../shared/agent-rules.js";
 import { INVENTORY_COUNT, INVENTORY_DEFINITIONS } from "../server/core/catalog.js";
-import { CorePhysicsWorld, TOWER_SPEC } from "../server/core/physics.js";
+import { CorePhysicsWorld, QUEEN_CROWN_BOLT_COUNT, TOWER_SPEC } from "../server/core/physics.js";
 import {
   connectionClassSupportsFamilies,
   connectionJointKind,
 } from "../server/core/connections.js";
 import { CoreSimulation } from "../server/core/simulation.js";
-import { evaluateMatchObjective } from "../server/core/mock-director.js";
+import { evaluateMatchObjective, evaluateSiegeClock, siegeUrgency } from "../server/core/mock-director.js";
 import { observedCompoundPlans } from "../server/core/compound-plans.js";
 import { queenAdvantagePlans, redCounterplayPlans } from "../server/core/special-plans.js";
 import { expandContraptionPlans } from "../server/core/contraption-grammar.js";
@@ -427,23 +428,25 @@ test("the mock match advances all six figures, operates concurrently, and recove
     const snapshot = simulation.snapshot();
     assert.equal(snapshot.match.driver, "mock");
     assert.ok(snapshot.match.status === "active" || snapshot.match.status === "complete");
-    assert.equal(snapshot.match.kingObjective, "Bring Humpty safely to the stage floor.");
-    assert.equal(snapshot.match.queenObjective, "Crack Humpty before he stands on the stage floor.");
+    assert.equal(snapshot.match.kingObjective, "Keep Humpty uncracked until the ten-minute bell.");
+    assert.equal(snapshot.match.queenObjective, "Crack Humpty before the ten-minute bell.");
+    assert.ok(snapshot.match.timeRemaining <= CORE_MATCH_DURATION_SECONDS);
     assert.equal(snapshot.match.rulebookSize, AGENT_RULES.length);
     assert.equal(Object.keys(snapshot.match.activeRuleIds).length, 6);
     assert.ok(snapshot.match.moves >= 8);
     assert.ok(openingMoveObserved);
     assert.ok(concurrentMachineWork, "Red and Green never operated their machines concurrently");
-    assert.equal(snapshot.match.selectedMachinePlanIds.king, "rescue-hoist");
-    assert.ok(snapshot.match.selectedMachinePlanIds.queen);
-    assert.equal(snapshot.match.machinePlans.king, "routed hoist raised receiving load");
-    assert.match(snapshot.match.machinePlans.queen, /(wheel shot|counterweight sling|ram|striker)/);
+    assert.ok(snapshot.events.some((event) =>
+      event.technical?.startsWith("match:machine:king:begin")));
+    assert.ok(snapshot.events.some((event) =>
+      event.technical?.startsWith("match:machine:queen:begin")));
     assert.ok(snapshot.match.machineEvidence.includes("red:hoist-keyed"));
     assert.ok(snapshot.match.machineEvidence.includes("red:line-reeved"));
     assert.ok(snapshot.match.machineEvidence.includes("red:line-tensioned"));
     assert.ok(snapshot.match.machineEvidence.includes("red:load-hooked"));
     assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("red:hoist-travel:")));
     assert.ok(snapshot.events.some((event) => event.technical?.startsWith("match:machine:king:pass")));
+    assert.ok(snapshot.events.some((event) => event.technical === "match:siege:wave:2"));
     assert.ok(snapshot.events.some((event) =>
       event.technical?.startsWith("match:machine:queen:recover:")));
     assert.ok(snapshot.connections.some((connection) => connection.class === "KEYED_COAXIAL"));
@@ -549,8 +552,8 @@ test("the Queen's advantage is a finite physical body with public counterplay", 
     assert.deepEqual(isolated.queenAdvantageState(), {
       deviceId: "queen-command-post",
       deviceIntegrity: 100,
-      charges: 2,
-      maxCharges: 2,
+      charges: QUEEN_CROWN_BOLT_COUNT,
+      maxCharges: QUEEN_CROWN_BOLT_COUNT,
       armed: true,
       disabled: false,
       firedBoltIds: [],
@@ -559,7 +562,7 @@ test("the Queen's advantage is a finite physical body with public counterplay", 
     assert.equal(redCounterplayPlans(isolated)[0]?.requests.at(-1)?.action, "strike");
     const fired = isolated.fireQueenBolt();
     assert.equal(fired.ok, true);
-    assert.equal(isolated.queenAdvantageState().charges, 1);
+    assert.equal(isolated.queenAdvantageState().charges, QUEEN_CROWN_BOLT_COUNT - 1);
     assert.ok((isolated.bodyLinearVelocity(fired.boltId ?? "")?.x ?? 0) < 0);
     assert.equal(isolated.applyDamage("queen-command-post", 100), 0);
     assert.equal(isolated.queenAdvantageState().disabled, true);
@@ -580,7 +583,7 @@ test("the repo contract expands observed machines into legal crew permutations",
     assert.ok(expanded.every((plan) => plan.requests.length > 0));
     assert.ok(expanded.every((plan) => plan.requests.every((request) =>
       request.actorIds.every((actorId) => isolated.workerIds("queen").includes(actorId)))));
-    assert.equal(REPO_AGENT_CONTEXT.contractVersion, "contraption-repo-v2");
+    assert.equal(REPO_AGENT_CONTEXT.contractVersion, "contraption-repo-v3");
     assert.ok(REPO_AGENT_CONTEXT.mcpTools.includes("list_observed_contraptions"));
   } finally {
     isolated.free();
@@ -785,7 +788,7 @@ test("climb is public but rejects a non-climbable machine part", async () => {
   }
 });
 
-test("objective judgment awards a safe stand to Red and a crack to Green", () => {
+test("the siege clock only awards Red at ten minutes while cracks award Green immediately", () => {
   const safe = evaluateMatchObjective({
     integrity: 100,
     floorContact: true,
@@ -794,8 +797,10 @@ test("objective judgment awards a safe stand to Red and a crack to Green", () =>
     safeFloorSeconds: .99,
     dt: CORE_FIXED_DT,
   });
-  assert.equal(safe.outcome, "king");
-  assert.equal(safe.reason, "safe-stand");
+  assert.equal(safe.outcome, undefined);
+  assert.equal(evaluateSiegeClock(CORE_MATCH_DURATION_SECONDS - CORE_FIXED_DT, 100), undefined);
+  assert.equal(evaluateSiegeClock(CORE_MATCH_DURATION_SECONDS, 100), "king");
+  assert.equal(evaluateSiegeClock(30, 0), "queen");
   const impact = evaluateMatchObjective({
     integrity: 100,
     floorContact: true,
@@ -806,6 +811,10 @@ test("objective judgment awards a safe stand to Red and a crack to Green", () =>
   });
   assert.equal(impact.outcome, "queen");
   assert.equal(impact.reason, "hard-impact");
+  assert.equal(siegeUrgency(0), "opening");
+  assert.equal(siegeUrgency(300), "siege");
+  assert.equal(siegeUrgency(480), "desperate");
+  assert.equal(siegeUrgency(540), "last-minute");
 });
 
 test("lever, ramp, ram, and hoist fixtures complete from the frozen opening kit", async () => {

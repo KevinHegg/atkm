@@ -5,6 +5,7 @@ import {
 } from "../../shared/agent-rules.js";
 import {
   CORE_FIXED_DT,
+  CORE_MATCH_DURATION_SECONDS,
   type CoreMatchState,
   type LegalActionRequest,
   type MachinePlanOptionState,
@@ -118,6 +119,7 @@ const POSITION_RULES = [
 ] as const;
 const GREEN_SHOT_TARGET = "tower-02-3";
 const GREEN_TIMBER_SHIFT = .08;
+const SIEGE_WAVE_COOLDOWN_TICKS = 120;
 
 export class MockMatchDirector {
   private readonly reservedParts = new Set<string>();
@@ -149,6 +151,9 @@ export class MockMatchDirector {
     queen: "awaiting parts",
   };
   private combatPlansStarted = false;
+  private siegeWave = 0;
+  private nextSiegeWaveTick: number | undefined;
+  private readonly announcedPressure = new Set<number>();
   private pendingFigureDecision: PendingFigureDecision | undefined;
   private pendingTeamDecision: PendingTeamDecision | undefined;
   private strategySequence = 0;
@@ -185,11 +190,12 @@ export class MockMatchDirector {
   update(): void {
     if (this.status === "manual" || this.status === "complete") return;
     if (this.combatPlansStarted) this.observeCompoundMachines();
+    const elapsed = this.physics.tick * CORE_FIXED_DT;
     this.updateObjectiveState();
     if (this.outcome !== undefined) return;
-    const elapsed = this.physics.tick * CORE_FIXED_DT;
-    if (elapsed >= 600) {
-      this.finish("draw", "The ten-minute bell ends the contest with Humpty still aloft.");
+    this.updateSiegePressure(elapsed);
+    if (evaluateSiegeClock(elapsed, this.physics.records.get("humpty")?.integrity ?? 100) === "king") {
+      this.finish("king", "The ten-minute bell rings with Humpty uncracked. Red survives the siege and wins.");
       return;
     }
     if (this.status === "waiting") {
@@ -281,6 +287,8 @@ export class MockMatchDirector {
       driver: this.status === "manual" ? "manual" : this.strategist?.enabled ? "llm" : "mock",
       status: this.status,
       phase: this.phase,
+      urgency: siegeUrgency(this.physics.tick * CORE_FIXED_DT, this.status),
+      timeRemaining: Math.max(0, CORE_MATCH_DURATION_SECONDS - this.physics.tick * CORE_FIXED_DT),
       moves: this.moves,
       busyWorkers: compoundControl
         ? this.teamLanes.flatMap((lane) => lane.actions.states()).filter((worker) => worker.phase !== "idle").length
@@ -336,27 +344,29 @@ export class MockMatchDirector {
         text: `Humpty strikes the stage floor at ${impactSpeed.toFixed(1)} m/s and cracks.`,
         technical: `match:impact:${impactSpeed.toFixed(2)}`,
       });
-      this.finish("queen", "Green wins: Humpty cracks before he can stand safely on the floor.");
+      this.finish("queen", "Green wins: the siege breaks Humpty before the ten-minute bell.");
       return;
     }
     if (decision.reason === "zero-integrity") {
-      this.finish("queen", "Green cracks Humpty before Red can establish a safe floor stand.");
+      this.finish("queen", "Green cracks Humpty before the ten-minute bell.");
       return;
-    }
-    if (decision.outcome === "king") {
-      this.finish("king", "Red wins: Humpty stands intact on the stage floor after a controlled descent.");
     }
   }
 
   private startCompoundPlans(): void {
     this.physics.ensureQueenAdvantage();
     this.combatPlansStarted = true;
+    this.siegeWave = 1;
     this.phase = "contest";
     for (const lane of this.lanes) lane.actions.cancelAll("", false);
     for (const timberId of this.physics.towerBlockIds()) {
       const timber = this.physics.bodyPosition(timberId);
       if (timber) this.machineStartPositions.set(`green-timber:${timberId}`, timber);
     }
+    this.emit({
+      text: "Siege wave one begins. Red fortifies the hill while Green commits its first war machine.",
+      technical: "match:siege:wave:1",
+    });
     this.beginTeamDecision(this.teamLanes, "scheduled");
   }
 
@@ -366,11 +376,7 @@ export class MockMatchDirector {
   ): void {
     const options = new Map<Team, CompoundPlanOption[]>();
     for (const teamLane of teamLanes) {
-      const observed = observedCompoundPlans(this.physics, teamLane.team);
-      const available = [
-        ...expandContraptionPlans(observed),
-        ...specialPlans(this.physics, teamLane.team),
-      ];
+      const available = this.availableMachinePlans(teamLane.team);
       this.machinePlanOptions[teamLane.team] = available.map((plan) => ({
         id: plan.id,
         ruleId: plan.ruleId,
@@ -552,13 +558,58 @@ export class MockMatchDirector {
         this.scheduleRecovery(lane, "impact");
       }
     }
-    const pending = this.completedMachineTeams.size < this.teamLanes.length;
-    if (!pending) {
-      for (const lane of this.lanes) {
-        this.nextDecisionTicks.set(lane.workerId, this.physics.tick + 120);
-      }
+    if (this.completedMachineTeams.size < this.teamLanes.length) return true;
+
+    const freshLanes = this.teamLanes.filter((lane) =>
+      this.availableMachinePlans(lane.team).some((plan) => plan.eligible && !this.isAttempted(lane.team, plan)));
+    if (freshLanes.length === 0) {
+      for (const lane of this.lanes) this.nextDecisionTicks.set(lane.workerId, this.physics.tick + 120);
+      return false;
     }
-    return pending;
+    if (this.nextSiegeWaveTick === undefined) {
+      this.nextSiegeWaveTick = this.physics.tick + SIEGE_WAVE_COOLDOWN_TICKS;
+      for (const lane of freshLanes) this.machinePlans[lane.team] = "rearming for the next siege wave";
+      return true;
+    }
+    if (this.physics.tick < this.nextSiegeWaveTick) return true;
+
+    this.nextSiegeWaveTick = undefined;
+    this.siegeWave += 1;
+    for (const lane of freshLanes) {
+      this.completedMachineTeams.delete(lane.team);
+      this.selectedMachinePlans.delete(lane.team);
+      this.machinePlanWasBusy.delete(lane.team);
+      this.machineIdleStartTicks.delete(lane.team);
+      this.recoveryCounts[lane.team] = 0;
+      lane.actions.clearReservations();
+    }
+    this.emit({
+      text: `Siege wave ${this.siegeWave} begins. The crews abandon restraint and commit another legal machine packet.`,
+      technical: `match:siege:wave:${this.siegeWave}`,
+    });
+    this.beginTeamDecision(freshLanes, "impact");
+    return true;
+  }
+
+  private availableMachinePlans(team: Team): CompoundPlanOption[] {
+    return [
+      ...expandContraptionPlans(observedCompoundPlans(this.physics, team)),
+      ...specialPlans(this.physics, team),
+    ];
+  }
+
+  private updateSiegePressure(elapsed: number): void {
+    const thresholds = [300, 480, 540] as const;
+    for (const threshold of thresholds) {
+      if (elapsed < threshold || this.announcedPressure.has(threshold)) continue;
+      this.announcedPressure.add(threshold);
+      const text = threshold === 300
+        ? "Five minutes remain. Green widens the bombardment while Red braces the hill."
+        : threshold === 480
+          ? "Two minutes remain. The siege turns desperate; every surviving machine is committed."
+          : "Last minute. Green needs a crack now. Red needs only the bell.";
+      this.emit({ text, technical: `match:siege:pressure:${threshold}` });
+    }
   }
 
   private scheduleRecovery(
@@ -1382,6 +1433,8 @@ export class MockMatchDirector {
     this.status = "complete";
     this.phase = "complete";
     this.outcome = outcome;
+    this.machinePlans.king = outcome === "king" ? "hill held at the bell" : "defense broken";
+    this.machinePlans.queen = outcome === "queen" ? "siege cracked Humpty" : "siege exhausted at the bell";
     this.emit({ text, technical: `match:complete:${outcome}` });
     this.emit({
       text: outcome === "queen" ? QUEEN_LINES[2] : HUMPTY_LINES[2],
@@ -1402,8 +1455,8 @@ export interface MatchObjectiveSample {
 
 export interface MatchObjectiveDecision {
   safeFloorSeconds: number;
-  outcome?: "king" | "queen";
-  reason?: "safe-stand" | "hard-impact" | "zero-integrity";
+  outcome?: "queen";
+  reason?: "hard-impact" | "zero-integrity";
 }
 
 export function evaluateMatchObjective(sample: MatchObjectiveSample): MatchObjectiveDecision {
@@ -1416,10 +1469,27 @@ export function evaluateMatchObjective(sample: MatchObjectiveSample): MatchObjec
   const safeFloorSeconds = sample.floorContact && sample.speed <= .45
     ? sample.safeFloorSeconds + sample.dt
     : 0;
-  if (safeFloorSeconds >= 1) {
-    return { safeFloorSeconds, outcome: "king", reason: "safe-stand" };
-  }
   return { safeFloorSeconds };
+}
+
+export function siegeUrgency(
+  elapsed: number,
+  status: CoreMatchState["status"] = "active",
+): CoreMatchState["urgency"] {
+  if (status === "manual") return "manual";
+  if (status === "complete") return "complete";
+  if (elapsed >= 540) return "last-minute";
+  if (elapsed >= 480) return "desperate";
+  if (elapsed >= 60) return "siege";
+  return "opening";
+}
+
+export function evaluateSiegeClock(
+  elapsed: number,
+  integrity: number,
+): CoreMatchState["outcome"] | undefined {
+  if (integrity <= 0) return "queen";
+  return elapsed >= CORE_MATCH_DURATION_SECONDS ? "king" : undefined;
 }
 
 function clonePlanOptionState(option: MachinePlanOptionState): MachinePlanOptionState {

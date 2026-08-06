@@ -21,30 +21,30 @@ interface PublicReplaySummary extends ReplaySummary {
 }
 
 const OUTPUT_DIR = resolve(process.cwd(), "public", "replays");
-const BUILD_ID = "public-demo-0805";
-const CREATED_AT = "2026-08-05T00:00:00.000Z";
-const MAX_SECONDS = 120;
-const FRAME_INTERVAL = 1.5;
-const EVENT_LIMIT = 30;
+const BUILD_ID = "public-siege-0806";
+const CREATED_AT = "2026-08-06T00:00:00.000Z";
+const MAX_SECONDS = 600;
+const FRAME_INTERVAL = 4;
+const EVENT_LIMIT = 36;
 
 const demos: DemoSpec[] = [
   {
     id: "red-hoist-vs-green-sling",
     seed: 1881,
-    title: "Red Hoist vs Green Sling",
-    description: "Red rigs a routed hoist while Green builds a counterweight sling.",
+    title: "The Ten-Minute Siege",
+    description: "A full survival clock with successive machines, crown bolts, and command-post counterplay.",
   },
   {
     id: "red-hoist-vs-wheel-shot",
     seed: 4199,
-    title: "Red Hoist vs Wheel Shot",
-    description: "Green answers the rescue line with a ramped wheel bombard.",
+    title: "The Wheel Bombardment",
+    description: "Green opens a multi-wave assault while Red races to fortify Humpty's hill.",
   },
   {
     id: "red-hoist-vs-pivot-striker",
     seed: 7331,
-    title: "Red Hoist vs Pivot Striker",
-    description: "A beam and fulcrum striker contests Red's rescue hoist.",
+    title: "The Last-Bell Striker",
+    description: "A beam, fulcrum, ram, and royal artillery contest Red's ten-minute hold.",
   },
 ];
 
@@ -84,7 +84,8 @@ async function createReplay(demo: DemoSpec): Promise<ReplayArchiveEntry> {
   let nextCapture = 0;
 
   try {
-    while (simulation.snapshot().elapsed < MAX_SECONDS && simulation.snapshot().match.status !== "complete") {
+    simulation.handleCommand({ type: "time-scale", value: 8 });
+    while (simulation.snapshot().elapsed <= MAX_SECONDS + 1 && simulation.snapshot().match.status !== "complete") {
       simulation.step();
       const snapshot = simulation.snapshot();
       if (snapshot.elapsed + 1e-6 >= nextCapture) {

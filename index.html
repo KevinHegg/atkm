@@ -28,7 +28,7 @@
 
         <div id="mode-mark" aria-live="polite">
           <span>Legibility lab</span>
-          <strong id="stage-time">00:00</strong>
+          <strong id="stage-time">10:00</strong>
         </div>
 
         <section id="engineering-overlay" hidden aria-label="Engineering diagnostics">
@@ -79,14 +79,14 @@
             <button type="button" data-replay-command="rewind" aria-label="Back 10 seconds" title="Back 10 seconds"><i data-lucide="rewind"></i><span>10</span></button>
             <button type="button" class="replay-primary" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
             <button type="button" data-replay-command="fast-forward" aria-label="Forward 10 seconds" title="Forward 10 seconds"><i data-lucide="fast-forward"></i><span>10</span></button>
-            <label>Speed<select id="replay-speed" aria-label="Replay speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1">1x</option><option value="2">2x</option><option value="4" selected>4x</option></select></label>
+            <label>Speed<select id="replay-speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1">1x</option><option value="2">2x</option><option value="4">4x</option><option value="8" selected>8x</option></select></label>
             <button type="button" data-replay-command="live" aria-label="Return to live match" title="Return to live match"><i data-lucide="radio"></i></button>
           </div>
         </section>
         <header id="scoreboard">
           <div class="score-topline">
-            <span>Elapsed</span>
-            <strong id="elapsed-value">00:00</strong>
+            <span>Siege clock</span>
+            <strong id="elapsed-value">10:00</strong>
           </div>
           <dl class="metrics">
             <div>
@@ -117,7 +117,7 @@
           </dl>
           <dl id="queen-advantage">
             <div><dt>Queen's edge</dt><dd id="queen-advantage-state">command post intact</dd></div>
-            <div><dt>Physical reserve</dt><dd id="queen-advantage-meta">2 / 2 crown bolts · 100% integrity</dd></div>
+            <div><dt>Physical reserve</dt><dd id="queen-advantage-meta">4 / 4 crown bolts · 100% integrity</dd></div>
           </dl>
           <dl id="match-rules">
             <div><dt>Red figures</dt><dd id="king-rule">not moving</dd></div>
@@ -182,8 +182,8 @@
           <form id="organize-form">
             <label>Match seed<input id="organize-seed" type="number" min="0" max="999999" value="1881" /></label>
             <label>Opening pace<select id="organize-speed"><option value="0.5">Measured</option><option value="1" selected>Standard</option><option value="2">Urgent</option></select></label>
-            <div class="organize-objective red"><strong>Red</strong><span>Bring Humpty safely to the stage floor.</span></div>
-            <div class="organize-objective green"><strong>Green</strong><span>Crack Humpty before he stands on the floor.</span></div>
+            <div class="organize-objective red"><strong>Red</strong><span>Keep Humpty uncracked until the ten-minute bell.</span></div>
+            <div class="organize-objective green"><strong>Green</strong><span>Crack Humpty before the siege clock expires.</span></div>
             <button id="launch-match" type="submit"><i data-lucide="rocket"></i><span>Launch new match</span></button>
           </form>
           <div class="organize-contract"><span>Agent contract</span><strong>33 rules · 4 connections · recipe permutations</strong><a href="/agent-context" target="_blank" rel="noreferrer">Open repo contract</a></div>

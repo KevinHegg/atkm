@@ -4,7 +4,7 @@ import type {
   Team,
 } from "./core-protocol.js";
 
-export type AgentObjectiveId = "red-rescue" | "green-crack";
+export type AgentObjectiveId = "red-hold" | "green-crack";
 export type AgentRulePhase = "muster" | "advance" | "contest";
 export type AgentRuleCategory =
   | "logistics"
@@ -52,23 +52,23 @@ export interface AgentRuleDefinition {
 
 export const AGENT_OBJECTIVES: Record<Team, AgentObjectiveDefinition> = {
   king: {
-    id: "red-rescue",
+    id: "red-hold",
     team: "king",
     color: "red",
-    text: "Bring Humpty safely to the stage floor.",
-    winningFact: "Humpty remains intact and stands in floor contact at safe speed for one second.",
+    text: "Keep Humpty uncracked until the ten-minute bell.",
+    winningFact: "Humpty has positive integrity when the ten-minute siege clock expires.",
   },
   queen: {
     id: "green-crack",
     team: "queen",
     color: "green",
-    text: "Crack Humpty before he stands on the stage floor.",
-    winningFact: "Humpty reaches zero integrity before Red establishes a safe floor stand.",
+    text: "Crack Humpty before the ten-minute bell.",
+    winningFact: "Humpty reaches zero integrity at any point before the siege clock expires.",
   },
 };
 
 const BOTH_TEAMS = ["king", "queen"] as const satisfies readonly Team[];
-const BOTH_OBJECTIVES = ["red-rescue", "green-crack"] as const satisfies readonly AgentObjectiveId[];
+const BOTH_OBJECTIVES = ["red-hold", "green-crack"] as const satisfies readonly AgentObjectiveId[];
 const ALL_PHASES = ["muster", "advance", "contest"] as const satisfies readonly AgentRulePhase[];
 
 export const AGENT_RULES = [
@@ -370,7 +370,7 @@ export const AGENT_RULES = [
     label: "Operate a rescue crane",
     category: "compound",
     teams: ["king"],
-    objectiveIds: ["red-rescue"],
+    objectiveIds: ["red-hold"],
     phases: ["contest"],
     weight: 1.45,
     when: ["A tested boom, wheel-and-axle, and reeved line support the cradle.", "A receiving lane is clear below."],
@@ -383,7 +383,7 @@ export const AGENT_RULES = [
     label: "Tension the rescue line",
     category: "operation",
     teams: ["king"],
-    objectiveIds: ["red-rescue"],
+    objectiveIds: ["red-hold"],
     phases: ["contest"],
     weight: 1.3,
     when: ["A tested rope path reaches the rescue load.", "The receiving surface is ready."],
@@ -394,7 +394,7 @@ export const AGENT_RULES = [
     label: "Lower the rescue load",
     category: "operation",
     teams: ["king"],
-    objectiveIds: ["red-rescue"],
+    objectiveIds: ["red-hold"],
     phases: ["contest"],
     weight: 1.5,
     when: ["A tested rescue machine supports Humpty.", "The floor receiving lane is clear."],
@@ -451,7 +451,7 @@ export const AGENT_RULES = [
     label: "Strike the Queen's command post",
     category: "operation",
     teams: ["king"],
-    objectiveIds: ["red-rescue"],
+    objectiveIds: ["red-hold"],
     phases: ["contest"],
     weight: 1.5,
     when: ["The Queen's command post is exposed.", "Red can reach it before the crown bolt is fired."],

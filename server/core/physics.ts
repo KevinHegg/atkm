@@ -47,6 +47,11 @@ const WORKER_COLLISION_GROUP = 0x0004;
 const QUEEN_ENGINE_COLLISION_GROUP = 0x1000;
 const QUEEN_PROJECTILE_COLLISION_GROUP = 0x2000;
 const ALL_COLLISION_GROUPS = 0xffff;
+export const QUEEN_CROWN_BOLT_COUNT = 4;
+const QUEEN_CROWN_BOLT_IDS = Array.from(
+  { length: QUEEN_CROWN_BOLT_COUNT },
+  (_, index) => `queen-crown-bolt-${index + 1}`,
+);
 
 export interface BodyRecord {
   id: string;
@@ -392,15 +397,14 @@ export class CorePhysicsWorld {
 
   queenAdvantageState(): QueenAdvantageState {
     const device = this.records.get("queen-command-post");
-    const boltIds = ["queen-crown-bolt-1", "queen-crown-bolt-2"];
-    const firedBoltIds = boltIds.filter((id) => this.records.get(id)?.variant?.startsWith("spent"));
+    const firedBoltIds = QUEEN_CROWN_BOLT_IDS.filter((id) => this.records.get(id)?.variant?.startsWith("spent"));
     const deviceIntegrity = device?.integrity ?? 0;
-    const charges = Math.max(0, boltIds.length - firedBoltIds.length);
+    const charges = Math.max(0, QUEEN_CROWN_BOLT_IDS.length - firedBoltIds.length);
     return {
       deviceId: "queen-command-post",
       deviceIntegrity,
       charges,
-      maxCharges: boltIds.length,
+      maxCharges: QUEEN_CROWN_BOLT_IDS.length,
       armed: deviceIntegrity > 0 && charges > 0,
       disabled: deviceIntegrity <= 0,
       firedBoltIds,
@@ -417,7 +421,7 @@ export class CorePhysicsWorld {
     if (state.charges <= 0) return { ok: false, message: "The Queen's crown bolts are spent." };
     const target = this.bodyPosition(targetId);
     if (!target) return { ok: false, message: "The crown bolt has no target." };
-    const bolt = ["queen-crown-bolt-1", "queen-crown-bolt-2"]
+    const bolt = QUEEN_CROWN_BOLT_IDS
       .map((id) => this.records.get(id))
       .find((record) => record && !record.variant?.startsWith("spent"));
     if (!bolt) return { ok: false, message: "No unfired crown bolt remains." };
@@ -1120,7 +1124,7 @@ export class CorePhysicsWorld {
       variant: "mad queen command post",
       integrity: 100,
     });
-    for (const [index, x] of [2.98, 3.36].entries()) {
+    for (const [index, x] of [2.82, 3.1, 3.38, 3.66].entries()) {
       const boltBody = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.dynamic()
           .setTranslation(x, .18, -2.42)
@@ -1468,7 +1472,7 @@ export class CorePhysicsWorld {
   }
 
   private resolveQueenBoltImpacts(): void {
-    for (const boltId of ["queen-crown-bolt-1", "queen-crown-bolt-2"]) {
+    for (const boltId of QUEEN_CROWN_BOLT_IDS) {
       if (this.queenBoltImpactIds.has(boltId)) continue;
       const bolt = this.records.get(boltId);
       if (!bolt?.variant?.startsWith("spent")) continue;

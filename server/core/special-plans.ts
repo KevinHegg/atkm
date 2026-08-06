@@ -27,8 +27,6 @@ export function queenAdvantagePlans(physics: CorePhysicsWorld): CompoundPlanOpti
     ["humpty-still-aloft", (physics.bodyPosition(targetId)?.y ?? 0) > .8],
   ]);
   const requests: LegalActionRequest[] = [
-    { action: "fetch", actorIds: [workerId], targetId: deviceId },
-    { action: "hold", actorIds: [workerId], targetId: deviceId, magnitude: .6 },
     { action: "operate", actorIds: [workerId], targetId: deviceId },
   ];
   return [{
@@ -79,7 +77,6 @@ export function redCounterplayPlans(physics: CorePhysicsWorld): CompoundPlanOpti
     eligible: requiredFacts.every((fact) => observedFacts.includes(fact)),
     parts: { device: targetId },
     requests: [
-      { action: "fetch", actorIds: [first, second], targetId },
       { action: "strike", actorIds: [first, second], targetId },
       { action: "strike", actorIds: [first, second], targetId },
     ],

@@ -79,10 +79,10 @@ Date: 2026-08-03
 - The right performance ledger can collapse from its always-reachable stage
   control. The preference persists across reloads, the camera refits after the
   width transition, and mobile keeps the full stage without the redundant dock.
-- Red's objective is an intact, low-speed, one-second stand on the stage floor.
-  Green's objective is zero integrity before that stand; a floor impact at or
-  above 3.0 m/s produces the current terminal crack. Simply reaching floor
-  height no longer awards Green the match.
+- The match is a ten-minute siege. Green wins immediately if Humpty reaches
+  zero integrity; a floor impact at or above 3.0 m/s produces a terminal crack.
+  Safe floor contact does not end the contest. Red wins only when the bell
+  rings with Humpty's integrity still above zero.
 
 ## Verification
 
