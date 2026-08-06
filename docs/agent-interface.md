@@ -1,96 +1,76 @@
 # Agent Interface
 
-## Cadence
+## Match Objective
 
-Physics advances at 60 Hz. Team planning is bounded and asynchronous; local deterministic initiative keeps workers moving between model responses. Busy workers continue their physical task and may speak. The model never receives engine handles or transform-editing authority.
+The live game is a ten-minute king-of-the-hill siege.
 
-With `AGENT_DRIVER=llm`, the server sends bounded asynchronous choice batches
-to the Responses API. Each batch contains only the current objective, trigger,
-observed facts, attempted plan IDs, and advertised rule or plan IDs. The model
-returns one listed ID per figure or team. The server validates every ID before
-the public action packet reaches Rapier. A timeout, service error, omitted
-choice, duplicate choice, or invented ID yields to the seeded director without
-stalling the physics loop. `AGENT_DRIVER=mock` uses that fallback directly;
-`AGENT_DRIVER=off` leaves the command desk in manual control.
+- Red wins when the ten-minute bell rings and Humpty still has positive integrity.
+- Green wins immediately when Humpty reaches zero integrity or strikes the floor at 3.0 m/s or faster.
+- A catch, damaged tower, or safe low landing does not end the match by itself.
 
-After the one-second bell, all six figures independently choose opening jobs.
-Each figure has its own action lane over the same Rapier world. Red and Green
-then receive one team lane apiece, so both teams operate compound machines at
-the same time while sharing and contesting the same physical stage. A manual
-order cancels every individual and team lane first.
+Physics advances at 60 Hz in one server-authoritative Rapier 3D world. The
+PlayCanvas client consumes snapshots and never owns gameplay bodies.
 
-## Enumerable Objectives And Rules
+## Tactical Choice
 
-`shared/agent-rules.ts` is the public strategy contract. It currently contains
-two objectives and 33 rules. Every rule has a stable ID, eligible teams,
-objective IDs, phases, base weight, human-readable preconditions, and a packet
-made only from public legal actions. Connection rules name one of the four
-frozen connection classes. Compound rules also enumerate their simple-machine
-ingredients and capabilities. The five ingredients are lever, wheel-and-axle,
-pulley, inclined plane, and wedge. The six capabilities are climb, launch,
-strike, dislodge timber, lift, and lower. `GET /rules` returns the same catalog
-as JSON.
+Both three-person crews choose concurrently. The live director advertises four
+bounded tactics:
 
-- Red/King: keep Humpty uncracked until the ten-minute bell.
-- Green/Queen: crack Humpty at any point before the siege clock expires.
+| Team | Tactic | Machine | Purpose |
+| --- | --- | --- | --- |
+| Red | `red-stabilize-cradle` | Rescue Winch | Tension the cradle and resist a developing fall. |
+| Red | `red-deploy-catch-sledge` | Catch Sledge | Put a padded receiving bed beneath the fall line. |
+| Green | `green-drive-ram` | Battering Ram | Drive lower timbers or attack a deployed catch bed. |
+| Green | `green-fire-stone` | Stone Thrower | Fire one persistent stone at the advertised target. |
 
-The match snapshot exposes the current rule and applicable IDs for each figure,
-the two machine-plan states, measured machine evidence, and concurrent
-busy-worker and total-move counts, the time remaining and urgency band, plus
-the Queen's command-post integrity and remaining crown-bolt charges. A rule can enter a
-figure's choice set only when its observed facts are true; listing a connection
-or operation rule does not grant a recipe, create a joint, move a body, or
-bypass action validation.
+Each option carries a utility score derived from visible tower stress, Humpty
+risk, machine state, ammunition, and the previous choice. The deterministic
+director selects the highest eligible score. With `AGENT_DRIVER=llm`, the
+Responses API receives the same listed options and public observations. An
+invented or ineligible ID, timeout, or service error falls back to utility
+selection without pausing physics.
 
-## Neutral Observation
+## Observable Chain
 
-The compact team state contains:
+Every team snapshot exposes the same readable chain:
 
-- stage axes, bounds, landmarks, time, and public objective;
-- measured Humpty pose, integrity, and status;
-- crew/opponent pose, activity, and current physical task;
-- persistent stock ID, kind, mass, lifecycle, free port kinds, and intrinsic capabilities;
-- assembly part count, free ports, stability, support margin, failure margin, warnings, and derived capabilities;
-- for each derived capability: confidence, input port, output port, ratio, and failure margin;
-- legal compatible join options with predicted mechanical result and travel cost;
-- reachable use, sabotage, and repair options;
-- public speech.
+1. choosing a tactic;
+2. crewing the named machine;
+3. operating it through the public action system;
+4. watching for physical impact;
+5. assessing measured contact, travel, damage, catch, or failure;
+6. recovering before the next choice.
 
-It contains no blueprint, machine name, recipe, preferred action, strategy text, or hidden winner shortcut. Option order is an implementation detail and must not be treated as advice.
+The snapshot also exposes round, tempo, tower stress, Humpty risk, current and
+last result, simple-machine ingredients, and the state, integrity, and
+ammunition of all four battle machines.
 
-## Action Boundary
+## Physical Boundary
 
-Agents choose high-level legal actions. The game owns navigation,
-collision-aware climbing and carrying, approach, alignment, joint creation,
-load test, operation, interruption, and recovery. `climb` is public but accepts
-only a live plank or beam with a measured rise. `push` is also the projectile
-operation: it applies worker force to a persistent body and succeeds from
-measured travel or load displacement. `operate` is the Green-only command-post
-action that launches an existing crown bolt through Rapier. `strike` is the
-Red-only counterplay action that damages that post from a collision-aware crew
-pose. There is no private attack, damage, or spawn shortcut. `LEGAL_ACTIONS` in
-`shared/core-protocol.ts` is the complete runtime vocabulary.
+Agents choose a listed high-level tactic. The game owns collision-aware crew
+travel, operation timing, impulses, projectiles, contact, damage, and recovery.
+No agent receives transform-editing authority, engine handles, hidden forces,
+spawn authority, or an unadvertised target. A machine operation is rejected if
+the machine is moving, spent, disabled, opposed, or unreachable.
 
-`connect` is a persistent job with visible reserve, fetch, carry, stage, align, and lock phases. `sabotage` requires a real connection, compatible method, reach, contest phase, time, and exposure. `repair` targets the same failed connection record. `recover` walks the same persistent body back to stock.
+The Rescue Winch, Catch Sledge, Battering Ram, Stone Thrower, and five siege
+stones are visible pre-authored stage fixtures. They are not repair-kit
+inventory. Stones become colliding projectiles only at the visible release;
+they never respawn. The sledge catches through collider contact and can be
+damaged and overturned. The ram travels, contacts, and returns through Rapier.
 
-Every choice announces its rule or plan ID and whether the model or seeded
-fallback selected it. The Egg King and Mad Queen have speech events that the
-client voices after the user enables audio. Worker orders remain in the public
-record.
+## Seeded Doctrines
 
-## Reassessment
+The public replay seeds use three deterministic gunnery doctrines. Seed 1881
+opens on Humpty, seed 4198 mixes structural and royal targets, and seed 7331
+commits to structural destruction and the rescue bed. The advertised target and
+physical projectile agree in every case.
 
-Machine completion is evidence-based. An incomplete plan records its measured
-contacts and travel, releases only action reservations, rescans the changed
-world, excludes the attempted plan, and makes one recovery choice. Existing
-joints, displaced timbers, dropped parts, and damage remain physical facts for
-the new plan. Recovery uses the same model validation and seeded fallback as
-the opening decision.
+## Manual Construction Lab
 
-## Objective Judgment
-
-The server judges objective facts from authoritative physics. Red wins only
-after intact Humpty remains in stage-floor contact below the safe-speed limit
-for one second. Green wins when integrity reaches zero first; a stage-floor
-impact at or above 3.0 m/s applies the current terminal crack. The ten-minute
-bell remains a draw when neither objective is established.
+`AGENT_DRIVER=off` retains the Gate 1-5 construction lab. Its frozen
+24-piece-per-team inventory, nine families, four connection classes, public
+legal actions, compound-plan grammar, and deterministic lever, ramp, ram,
+hoist, and carry fixtures remain available. Starting the manual lab uses its
+clear fixture staging layout; starting an autonomous match uses the authored
+battle layout.

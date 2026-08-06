@@ -12,15 +12,13 @@ is failing:
 5. nine-family, 24-piece mirrored kit and four connection classes;
 6. rescue/attack fixtures, diagnostics, and browser acceptance.
 
-Current reset status: Gates 1 through 6 are executable and browser-accepted in
-`server/core` as one server-authoritative Rapier 3D world, with PlayCanvas
-consuming snapshots only. The current browser acceptance records a 36-block,
-12-course tower, a physical Humpty seat, collision-aware worker capsules,
-two-worker carry, the frozen nine-family, 24-piece-per-team manifest, the four
-connection classes (`TENON_LOCK`, `AXLE_BEARING`, `KEYED_COAXIAL`,
-`ROPE_ATTACH`), deterministic rescue/attack fixtures, diagnostics, autonomous
-play, and the LLM driver path. Older docs/archive files still describe previous
-Rapier 2D, Pixi, and Ammo passes.
+Current reset status: Gates 1 through 6 are executable in `server/core` as
+one server-authoritative Rapier 3D world, with PlayCanvas consuming snapshots
+only. Gate 6 is browser-accepted as the current four-machine battle: Red operates the Rescue Winch
+and Catch Sledge; Green operates the Battering Ram and Stone Thrower. The
+ten-minute objective, tactical chains, physical impacts, packaged replays,
+diagnostics, desktop/mobile layout, and replay controls belong to Gate 6. Older docs/archive files
+still describe previous Rapier 2D, Pixi, Ammo, and recipe-led autonomous passes.
 
 ## Commands
 
@@ -45,10 +43,28 @@ Rapier 2D, Pixi, and Ammo passes.
 - Keep inventory persistent. No useful part may spawn, clone, vanish, or be
   replaced after the opening ledger is created.
 
-## Contraption Extension Contract
+## Battle Contract
 
-The frozen opening inventory and four connection classes remain fixed, but the
-strategy layer may now enumerate unexpected contraptions from them. Agents may
+The live match has four advertised tactical chains and no private fallback
+attack. Red may tension the rescue line or deploy the catch sledge. Green may
+drive the ram or loose the stone thrower at its advertised target. Each choice
+expands to a public `operate` packet against visible body IDs. Crew travel,
+machine travel, projectiles, contact, damage, catches, and failure are resolved
+in the authoritative Rapier world. The director may score only these listed
+choices and an LLM must return one of the advertised IDs.
+
+The Rescue Winch, Catch Sledge, Battering Ram, Stone Thrower, and five loaded
+siege stones are non-inventory stage fixtures authorized by the Gate 6 redesign.
+They are pre-authored bodies with visible collision proxies, finite state,
+public operation, and no post-start spawning. Seeded siege doctrines may change
+the stone thrower's advertised target, but never the projectile, force, or
+collision authority. Green wins when Humpty cracks or strikes the floor hard.
+Red wins only when the ten-minute bell rings with Humpty uncracked.
+
+## Construction Lab Contract
+
+The frozen opening inventory and four connection classes remain fixed. The
+manual construction lab may enumerate unexpected contraptions from them. Agents may
 choose a recipe permutation exposed by `/contraptions` or the model request:
 the recipe can reorder crew roles and simple-machine ingredients, and it must
 expand to a public action packet against visible body IDs. The action system
@@ -58,10 +74,10 @@ is evidence for the next choice, not permission to reset the stage.
 
 `/agent-context` is the repository MCP-style contract surface. It returns this
 file, the public rule endpoints, source-of-truth files, and the invariants that
-an external agent must follow. Keep `shared/agent-rules.ts`,
-`server/core/compound-plans.ts`, `server/core/special-plans.ts`, and
-`server/core/contraption-grammar.ts` synchronized when adding a new recipe
-family or public operation.
+an external agent must follow. Keep `shared/agent-rules.ts` and the construction
+grammar synchronized when changing the lab. Keep `server/core/battle-director.ts`,
+`server/core/physics.ts`, and `shared/core-protocol.ts` synchronized when changing
+the live battle.
 
 ## Scope Freeze
 
@@ -69,8 +85,7 @@ The repair kit has nine visual families and four connection classes. Do not add
 new physical families, connection classes, or post-start inventory without a
 separate design decision. Recipe composition is allowed within the visible
 kit; it cannot grant compatibility, spawn parts, create private actions, or
-bypass the four frozen connection classes. A future family such as a screw or
-cam needs its own inventory, ports, physics, and acceptance gate. The Queen's
-command post and loaded crown bolts are non-inventory stage fixtures: visible,
-pre-authored bodies with enumerated `operate` and `strike` actions, finite
-charges, and a destructible integrity state.
+bypass the four frozen connection classes. A future inventory family such as a
+screw or cam needs its own inventory, ports, physics, and acceptance gate. New
+battle fixtures likewise require an explicit design decision, authored bodies,
+public actions, diagnostics, and browser acceptance.

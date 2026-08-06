@@ -13,8 +13,8 @@ import {
 } from "../../shared/core-protocol.js";
 import { CoreActionSystem, type ActionEvent } from "./actions.js";
 import type { AgentStrategist } from "./agent-strategist.js";
+import { BattleDirector } from "./battle-director.js";
 import {
-  MockMatchDirector,
   type AutonomousActionLane,
   type AutonomousTeamLane,
 } from "./mock-director.js";
@@ -91,7 +91,7 @@ export class CoreSimulation {
   readonly actions: CoreActionSystem;
   readonly autonomousLanes: AutonomousActionLane[];
   readonly autonomousTeams: AutonomousTeamLane[];
-  readonly match: MockMatchDirector;
+  readonly match: BattleDirector;
 
   private paused = false;
   private timeScale = 1;
@@ -125,9 +125,8 @@ export class CoreSimulation {
         physics.workerIds(team),
       ),
     }));
-    this.match = new MockMatchDirector(
+    this.match = new BattleDirector(
       physics,
-      this.autonomousLanes,
       this.autonomousTeams,
       (event) => this.addActionEvent(event),
       options.seed,
@@ -139,7 +138,7 @@ export class CoreSimulation {
   }
 
   static async create(options: CoreSimulationOptions): Promise<CoreSimulation> {
-    const physics = await CorePhysicsWorld.create(options.seed);
+    const physics = await CorePhysicsWorld.create(options.seed, options.autoMatch ?? false);
     return new CoreSimulation(options, physics);
   }
 

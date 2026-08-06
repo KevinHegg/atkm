@@ -12,6 +12,7 @@ interface DemoSpec {
   seed: number;
   title: string;
   description: string;
+  frameInterval: number;
 }
 
 interface PublicReplaySummary extends ReplaySummary {
@@ -21,30 +22,32 @@ interface PublicReplaySummary extends ReplaySummary {
 }
 
 const OUTPUT_DIR = resolve(process.cwd(), "public", "replays");
-const BUILD_ID = "public-siege-0806";
-const CREATED_AT = "2026-08-06T00:00:00.000Z";
+const BUILD_ID = "battle-reset-0805";
+const CREATED_AT = "2026-08-05T20:00:00.000Z";
 const MAX_SECONDS = 600;
-const FRAME_INTERVAL = 4;
 const EVENT_LIMIT = 36;
 
 const demos: DemoSpec[] = [
   {
-    id: "red-hoist-vs-green-sling",
-    seed: 1881,
-    title: "The Ten-Minute Siege",
-    description: "A full survival clock with successive machines, crown bolts, and command-post counterplay.",
-  },
-  {
-    id: "red-hoist-vs-wheel-shot",
-    seed: 4199,
-    title: "The Wheel Bombardment",
-    description: "Green opens a multi-wave assault while Red races to fortify Humpty's hill.",
-  },
-  {
-    id: "red-hoist-vs-pivot-striker",
+    id: "the-sledgebreaker",
     seed: 7331,
-    title: "The Last-Bell Striker",
-    description: "A beam, fulcrum, ram, and royal artillery contest Red's ten-minute hold.",
+    title: "The Sledgebreaker",
+    description: "Red catches the king; Green turns its ram on the rescue bed and forces a second crisis.",
+    frameInterval: .5,
+  },
+  {
+    id: "the-ten-minute-hold",
+    seed: 4198,
+    title: "The Ten-Minute Hold",
+    description: "A mixed bombardment cracks Humpty twice, but Red's catch and winch survive to the bell.",
+    frameInterval: 4,
+  },
+  {
+    id: "the-king-shot",
+    seed: 1881,
+    title: "The King Shot",
+    description: "Green chooses the royal target immediately and ends the siege before the catch bed arrives.",
+    frameInterval: .25,
   },
 ];
 
@@ -68,7 +71,7 @@ await writeFile(
   `${JSON.stringify({
     generatedAt: CREATED_AT,
     build: BUILD_ID,
-    frameInterval: FRAME_INTERVAL,
+    frameIntervals: Object.fromEntries(demos.map((demo) => [demo.id, demo.frameInterval])),
     replays: summaries,
   }, null, 2)}\n`,
   "utf8",
@@ -90,7 +93,7 @@ async function createReplay(demo: DemoSpec): Promise<ReplayArchiveEntry> {
       const snapshot = simulation.snapshot();
       if (snapshot.elapsed + 1e-6 >= nextCapture) {
         frames.push(compactSnapshot(snapshot));
-        nextCapture += FRAME_INTERVAL;
+        nextCapture += demo.frameInterval;
       }
     }
 

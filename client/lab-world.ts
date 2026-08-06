@@ -209,6 +209,8 @@ export class LabWorld {
     else if (state.kind === "cradle") this.createCradleVisual(root);
     else if (state.kind === "humpty") this.createHumptyVisual(root, state);
     else if (state.kind === "part") this.createPartVisual(root, state);
+    else if (state.kind === "battle-machine") this.createBattleMachineVisual(root, state);
+    else if (state.kind === "battle-projectile") this.createBattleProjectileVisual(root);
     else if (state.kind === "queen-device") this.createQueenDeviceVisual(root, state);
     else if (state.kind === "queen-bolt") this.createQueenBoltVisual(root, state);
     else if (state.kind === "worker") this.createWorkerVisual(root, state.id, state.team ?? "king");
@@ -463,6 +465,77 @@ export class LabWorld {
     this.primitive("crown-bolt-cap", "cylinder", root, new pc.Vec3(0, .04, 0), new pc.Vec3(.2, .06, .2), gold);
     this.primitive("crown-bolt-tip", "cone", root, new pc.Vec3(0, .17, 0), new pc.Vec3(.11, .25, .11), gold);
     void state;
+  }
+
+  private createBattleMachineVisual(root: pc.Entity, state: CoreBodyState): void {
+    const timber = this.material("battle-machine-timber", palette.oak, .2);
+    const dark = this.material("battle-machine-dark", palette.oakDark, .16);
+    const iron = this.material("battle-machine-iron", palette.iron, .58, .72);
+    const rope = this.material("battle-machine-rope", palette.rope, .12);
+    const padding = this.material("rescue-padding", new pc.Color(.67, .63, .48), .08);
+    const team = state.team ?? "king";
+    const variant = state.variant ?? "";
+    if (variant.includes("rescue winch")) {
+      this.primitive("winch-base", "box", root, new pc.Vec3(0, -.6, 0), new pc.Vec3(1.45, .2, 1.35), dark);
+      for (const x of [-.52, .52]) {
+        this.primitive("winch-upright", "box", root, new pc.Vec3(x, .02, 0), new pc.Vec3(.16, 1.22, .18), timber, new pc.Vec3(0, 0, x * -8));
+      }
+      this.primitive("winch-crossbeam", "box", root, new pc.Vec3(0, .58, 0), new pc.Vec3(1.34, .16, .2), timber);
+      this.primitive("winch-drum", "cylinder", root, new pc.Vec3(0, -.28, 0), new pc.Vec3(.46, .76, .46), timber, new pc.Vec3(90, 0, 0));
+      for (const z of [-.34, .34]) this.primitive("winch-drum-collar", "cylinder", root, new pc.Vec3(0, -.28, z), new pc.Vec3(.55, .08, .55), iron, new pc.Vec3(90, 0, 0));
+      this.primitive("winch-crank", "box", root, new pc.Vec3(.56, -.28, .42), new pc.Vec3(.72, .08, .08), iron, new pc.Vec3(0, 32, 0));
+      this.primitive("winch-sheave", "cylinder", root, new pc.Vec3(0, .61, -.16), new pc.Vec3(.38, .12, .38), iron, new pc.Vec3(90, 0, 0));
+      this.primitive("winch-line", "cylinder", root, new pc.Vec3(0, .02, -.2), new pc.Vec3(.035, 1.18, .035), rope);
+      this.teamWrap(root, team, new pc.Vec3(1.15, .08, .16), new pc.Vec3(0, -.48, .69));
+      return;
+    }
+    if (variant.includes("catch sledge")) {
+      this.primitive("sledge-frame", "box", root, new pc.Vec3(0, -.08, 0), new pc.Vec3(state.size.x * .96, .2, state.size.z * .96), dark);
+      this.primitive("sledge-bed", "box", root, new pc.Vec3(0, .15, 0), new pc.Vec3(state.size.x * .9, .16, state.size.z * .9), padding);
+      for (const x of [-state.size.x * .4, state.size.x * .4]) {
+        for (const z of [-state.size.z * .47, state.size.z * .47]) {
+          this.primitive("sledge-wheel", "cylinder", root, new pc.Vec3(x, -.2, z), new pc.Vec3(.34, .16, .34), iron, new pc.Vec3(90, 0, 0));
+        }
+      }
+      for (const x of [-state.size.x * .45, state.size.x * .45]) {
+        this.primitive("sledge-ramp", "box", root, new pc.Vec3(x, .16, 0), new pc.Vec3(.3, .12, state.size.z * .9), timber, new pc.Vec3(0, 0, x * -4));
+      }
+      this.teamWrap(root, team, new pc.Vec3(state.size.x * .62, .06, .22), new pc.Vec3(0, .27, -state.size.z * .38));
+      return;
+    }
+    if (variant.includes("battering ram")) {
+      this.primitive("ram-chassis", "box", root, new pc.Vec3(.2, -.08, 0), new pc.Vec3(2.55, .32, 1.18), dark);
+      this.primitive("ram-log", "cylinder", root, new pc.Vec3(-.18, .2, 0), new pc.Vec3(.42, 2.72, .42), timber, new pc.Vec3(0, 0, 90));
+      this.primitive("ram-tip", "cone", root, new pc.Vec3(-1.58, .2, 0), new pc.Vec3(.48, .55, .48), iron, new pc.Vec3(0, 0, 90));
+      for (const x of [-.9, .9]) {
+        for (const z of [-.58, .58]) {
+          this.primitive("ram-wheel", "cylinder", root, new pc.Vec3(x, -.34, z), new pc.Vec3(.42, .18, .42), iron, new pc.Vec3(90, 0, 0));
+        }
+      }
+      this.teamWrap(root, team, new pc.Vec3(1.25, .07, .18), new pc.Vec3(.2, .43, -.51));
+      return;
+    }
+    if (variant.includes("stone thrower")) {
+      this.primitive("thrower-base", "box", root, new pc.Vec3(0, -.67, 0), new pc.Vec3(1.72, .22, 1.68), dark);
+      for (const x of [-.58, .58]) {
+        this.primitive("thrower-frame", "box", root, new pc.Vec3(x, -.05, 0), new pc.Vec3(.16, 1.25, .18), timber, new pc.Vec3(0, 0, x * -18));
+      }
+      this.primitive("thrower-axle", "cylinder", root, new pc.Vec3(0, .24, 0), new pc.Vec3(.17, 1.5, .17), iron, new pc.Vec3(90, 0, 0));
+      this.primitive("throwing-arm", "box", root, new pc.Vec3(-.18, .36, 0), new pc.Vec3(2.15, .14, .18), timber, new pc.Vec3(0, 0, -38));
+      this.primitive("counterweight", "box", root, new pc.Vec3(.62, -.25, 0), new pc.Vec3(.55, .58, .52), iron);
+      this.primitive("sling-line", "cylinder", root, new pc.Vec3(-.78, .84, 0), new pc.Vec3(.035, .7, .035), rope, new pc.Vec3(0, 0, -38));
+      this.primitive("sling-cup", "sphere", root, new pc.Vec3(-1.02, 1.12, 0), new pc.Vec3(.32, .14, .32), rope);
+      this.teamWrap(root, team, new pc.Vec3(1.2, .07, .18), new pc.Vec3(0, -.48, .76));
+      return;
+    }
+    this.primitive("battle-machine", "box", root, pc.Vec3.ZERO, state.size, timber);
+  }
+
+  private createBattleProjectileVisual(root: pc.Entity): void {
+    const stone = this.material("siege-stone", new pc.Color(.26, .25, .22), .08);
+    const iron = this.material("siege-stone-band", palette.iron, .38, .36);
+    this.primitive("siege-stone", "sphere", root, pc.Vec3.ZERO, new pc.Vec3(.38, .38, .38), stone);
+    this.primitive("siege-stone-band", "cylinder", root, pc.Vec3.ZERO, new pc.Vec3(.41, .06, .41), iron);
   }
 
   private createTowerBlockVisual(root: pc.Entity, state: CoreBodyState): void {

@@ -79,7 +79,7 @@
             <button type="button" data-replay-command="rewind" aria-label="Back 10 seconds" title="Back 10 seconds"><i data-lucide="rewind"></i><span>10</span></button>
             <button type="button" class="replay-primary" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
             <button type="button" data-replay-command="fast-forward" aria-label="Forward 10 seconds" title="Forward 10 seconds"><i data-lucide="fast-forward"></i><span>10</span></button>
-            <label>Speed<select id="replay-speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1">1x</option><option value="2">2x</option><option value="4">4x</option><option value="8" selected>8x</option></select></label>
+            <label>Speed<select id="replay-speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option><option value="8">8x</option></select></label>
             <button type="button" data-replay-command="live" aria-label="Return to live match" title="Return to live match"><i data-lucide="radio"></i></button>
           </div>
         </section>
@@ -99,30 +99,38 @@
             </div>
           </dl>
           <div id="integrity-track" aria-label="Humpty integrity"><span id="integrity-fill"></span></div>
+          <div class="battle-meters" aria-label="Battle danger">
+            <div><span>Tower stress</span><strong id="tower-stress-value">0</strong><i><b id="tower-stress-fill"></b></i></div>
+            <div><span>Humpty risk</span><strong id="humpty-risk-value">0</strong><i><b id="humpty-risk-fill"></b></i></div>
+          </div>
         </header>
 
         <section id="match-panel" aria-label="Autonomous match">
           <div class="section-heading">
-            <h2>Autonomous match</h2>
+            <h2>Battle plans</h2>
             <output id="match-status">waiting</output>
           </div>
-          <div class="match-turnline"><strong id="match-turn">0 active</strong><span id="match-phase">Muster</span><span id="rule-count">0 rules</span></div>
-          <dl id="match-objectives">
-            <div><dt>Red</dt><dd id="king-objective">Awaiting the bell.</dd></div>
-            <div><dt>Green</dt><dd id="queen-objective">Awaiting the bell.</dd></div>
-          </dl>
-          <dl id="match-machines">
-            <div><dt>Red machine</dt><dd id="king-machine">awaiting parts</dd></div>
-            <div><dt>Green machine</dt><dd id="queen-machine">awaiting parts</dd></div>
-          </dl>
-          <dl id="queen-advantage">
-            <div><dt>Queen's edge</dt><dd id="queen-advantage-state">command post intact</dd></div>
-            <div><dt>Physical reserve</dt><dd id="queen-advantage-meta">4 / 4 crown bolts · 100% integrity</dd></div>
-          </dl>
-          <dl id="match-rules">
-            <div><dt>Red figures</dt><dd id="king-rule">not moving</dd></div>
-            <div><dt>Green figures</dt><dd id="queen-rule">not moving</dd></div>
-          </dl>
+          <div class="match-turnline"><strong id="match-turn">Round 0</strong><span id="match-phase">Muster</span><span id="rule-count">0 moves</span></div>
+          <div class="battle-chains">
+            <article class="battle-chain red">
+              <header><span>Red rescue</span><b id="king-chain-stage">Reading threat</b></header>
+              <h3 id="king-machine">Awaiting the bell</h3>
+              <p id="king-objective">Keep Humpty uncracked until the ten-minute bell.</p>
+              <div class="chain-progress" aria-hidden="true"><span id="king-chain-progress"></span></div>
+              <p id="king-chain-result" class="chain-result">Red is reading the first threat.</p>
+              <small id="king-simple-machines">rescue machine standing by</small>
+            </article>
+            <article class="battle-chain green">
+              <header><span>Green assault</span><b id="queen-chain-stage">Choosing breach</b></header>
+              <h3 id="queen-machine">Awaiting the bell</h3>
+              <p id="queen-objective">Crack Humpty before the siege clock expires.</p>
+              <div class="chain-progress" aria-hidden="true"><span id="queen-chain-progress"></span></div>
+              <p id="queen-chain-result" class="chain-result">Green is selecting the first breach.</p>
+              <small id="queen-simple-machines">war machine standing by</small>
+            </article>
+          </div>
+          <div class="machine-roster-heading"><strong>Machines on the field</strong><span>state · integrity · ammunition</span></div>
+          <div id="battle-machine-list" class="battle-machine-list"></div>
         </section>
 
         <section id="gate-panel" aria-label="Reset gates">
@@ -186,8 +194,8 @@
             <div class="organize-objective green"><strong>Green</strong><span>Crack Humpty before the siege clock expires.</span></div>
             <button id="launch-match" type="submit"><i data-lucide="rocket"></i><span>Launch new match</span></button>
           </form>
-          <div class="organize-contract"><span>Agent contract</span><strong>33 rules · 4 connections · recipe permutations</strong><a href="/agent-context" target="_blank" rel="noreferrer">Open repo contract</a></div>
-          <div class="organize-recipes"><span>Recipe pool</span><strong id="organize-recipe-summary">Loading machine recipes...</strong></div>
+          <div class="organize-contract"><span>Battle contract</span><strong>4 tactical chains · 4 physical machines · 10 minute bell</strong><a href="/agent-context" target="_blank" rel="noreferrer">Open repo contract</a></div>
+          <div class="organize-recipes"><span>Siege doctrines</span><strong id="organize-recipe-summary">Loading battle simulations...</strong></div>
           <p id="organize-feedback" class="workspace-feedback">Launching a match preserves the current one in the archive.</p>
         </section>
       </aside>

@@ -34,6 +34,8 @@ export type CoreBodyKind =
   | "humpty"
   | "worker"
   | "part"
+  | "battle-machine"
+  | "battle-projectile"
   | "queen-device"
   | "queen-bolt";
 
@@ -221,8 +223,56 @@ export interface CoreMatchState {
   selectedMachinePlanIds: Partial<Record<Team, string>>;
   machineEvidence: string[];
   queenAdvantage: QueenAdvantageState;
+  battle?: BattleState;
   nextMoveIn: number;
   outcome?: "king" | "queen" | "draw";
+}
+
+export type BattleChainStage =
+  | "choosing"
+  | "crewing"
+  | "operating"
+  | "impact"
+  | "assessing"
+  | "recovering"
+  | "idle";
+
+export interface BattleChainState {
+  tacticId: string;
+  title: string;
+  intent: string;
+  machineId: string;
+  machineName: string;
+  targetId: string;
+  targetName: string;
+  stage: BattleChainStage;
+  stageLabel: string;
+  progress: number;
+  utility: number;
+  lastResult: string;
+  simpleMachines: string[];
+}
+
+export interface BattleMachineState {
+  id: string;
+  team: Team;
+  role: "war" | "rescue";
+  name: string;
+  purpose: string;
+  simpleMachines: string[];
+  integrity: number;
+  charges: number;
+  maxCharges: number;
+  state: "ready" | "moving" | "working" | "returning" | "spent" | "disabled";
+}
+
+export interface BattleState {
+  round: number;
+  towerStress: number;
+  humptyRisk: number;
+  tempo: "opening" | "pressing" | "critical" | "last-stand" | "complete";
+  chains: Record<Team, BattleChainState>;
+  machines: BattleMachineState[];
 }
 
 export interface QueenAdvantageState {

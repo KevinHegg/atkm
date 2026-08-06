@@ -73,6 +73,10 @@ const stageTime = required<HTMLElement>("stage-time");
 const heightValue = required<HTMLElement>("height-value");
 const integrityValue = required<HTMLElement>("integrity-value");
 const integrityFill = required<HTMLElement>("integrity-fill");
+const towerStressValue = required<HTMLElement>("tower-stress-value");
+const towerStressFill = required<HTMLElement>("tower-stress-fill");
+const humptyRiskValue = required<HTMLElement>("humpty-risk-value");
+const humptyRiskFill = required<HTMLElement>("humpty-risk-fill");
 const modeLabel = required<HTMLElement>("mode-mark").querySelector("span");
 const matchStatus = required<HTMLOutputElement>("match-status");
 const watchWorkspaceStatus = required<HTMLOutputElement>("watch-workspace-status");
@@ -85,10 +89,15 @@ const kingObjective = required<HTMLElement>("king-objective");
 const queenObjective = required<HTMLElement>("queen-objective");
 const kingMachine = required<HTMLElement>("king-machine");
 const queenMachine = required<HTMLElement>("queen-machine");
-const queenAdvantageState = required<HTMLElement>("queen-advantage-state");
-const queenAdvantageMeta = required<HTMLElement>("queen-advantage-meta");
-const kingRule = required<HTMLElement>("king-rule");
-const queenRule = required<HTMLElement>("queen-rule");
+const kingChainStage = required<HTMLElement>("king-chain-stage");
+const queenChainStage = required<HTMLElement>("queen-chain-stage");
+const kingChainResult = required<HTMLElement>("king-chain-result");
+const queenChainResult = required<HTMLElement>("queen-chain-result");
+const kingChainProgress = required<HTMLElement>("king-chain-progress");
+const queenChainProgress = required<HTMLElement>("queen-chain-progress");
+const kingSimpleMachines = required<HTMLElement>("king-simple-machines");
+const queenSimpleMachines = required<HTMLElement>("queen-simple-machines");
+const battleMachineList = required<HTMLElement>("battle-machine-list");
 const gateList = required<HTMLOListElement>("gate-list");
 const gateSummary = required<HTMLOutputElement>("gate-summary");
 const connectionLabel = required<HTMLElement>("connection-label");
@@ -328,47 +337,66 @@ function renderEvents(snapshot: CoreSnapshot): void {
 
 function renderMatch(snapshot: CoreSnapshot): void {
   const match = snapshot.match;
+  const battle = match.battle;
   const statusLabel = match.outcome ? outcomeLabel(match.outcome) : match.status;
   matchStatus.textContent = statusLabel;
   watchWorkspaceStatus.textContent = statusLabel;
   matchStatus.dataset.status = match.status;
   matchStatus.dataset.outcome = match.outcome ?? "";
-  matchTurn.textContent = `${match.busyWorkers} active / ${match.moves} moves`;
+  matchTurn.textContent = `Round ${battle?.round ?? 0}`;
   const urgency = match.urgency ?? siegeUrgencyLabel(snapshot.elapsed);
-  matchPhase.textContent = urgency.replace("-", " ");
+  matchPhase.textContent = (battle?.tempo ?? urgency).replace("-", " ");
   matchPhase.dataset.urgency = urgency;
-  ruleCount.textContent = `${match.rulebookSize} rules`;
+  ruleCount.textContent = `${match.moves} decisions`;
   kingObjective.textContent = match.kingObjective;
   queenObjective.textContent = match.queenObjective;
-  kingMachine.textContent = match.machinePlans.king;
-  queenMachine.textContent = match.machinePlans.queen;
-  const advantage = match.queenAdvantage;
-  const queenDevicePresent = snapshot.bodies.some((body) => body.kind === "queen-device");
-  queenAdvantageState.textContent = !queenDevicePresent
-    ? "command post mustering"
-    : advantage.disabled
-    ? "command post broken"
-    : advantage.armed
-      ? "crown bolt armed"
-      : "crown bolts spent";
-  queenAdvantageState.dataset.state = !queenDevicePresent ? "mustering" : advantage.disabled ? "broken" : advantage.armed ? "armed" : "spent";
-  queenAdvantageMeta.textContent = queenDevicePresent
-    ? `${advantage.charges} / ${advantage.maxCharges} crown bolts · ${Math.round(advantage.deviceIntegrity)}% integrity`
-    : `${advantage.maxCharges} crown bolts · entering with wave one`;
-  kingRule.textContent = teamRuleText(snapshot, "king");
-  queenRule.textContent = teamRuleText(snapshot, "queen");
+  const stress = battle?.towerStress ?? 0;
+  const risk = battle?.humptyRisk ?? 0;
+  towerStressValue.textContent = String(Math.round(stress));
+  towerStressFill.style.width = `${Math.max(0, Math.min(100, stress))}%`;
+  humptyRiskValue.textContent = String(Math.round(risk));
+  humptyRiskFill.style.width = `${Math.max(0, Math.min(100, risk))}%`;
+
+  const kingChain = battle?.chains.king;
+  const queenChain = battle?.chains.queen;
+  kingMachine.textContent = kingChain?.title || match.machinePlans.king;
+  queenMachine.textContent = queenChain?.title || match.machinePlans.queen;
+  kingChainStage.textContent = kingChain?.stageLabel ?? "Reading threat";
+  queenChainStage.textContent = queenChain?.stageLabel ?? "Choosing breach";
+  kingChainResult.textContent = kingChain?.lastResult ?? "Red is reading the first threat.";
+  queenChainResult.textContent = queenChain?.lastResult ?? "Green is selecting the first breach.";
+  kingChainProgress.style.width = `${Math.round((kingChain?.progress ?? 0) * 100)}%`;
+  queenChainProgress.style.width = `${Math.round((queenChain?.progress ?? 0) * 100)}%`;
+  kingSimpleMachines.textContent = kingChain?.simpleMachines.length
+    ? kingChain.simpleMachines.join(" + ")
+    : "rescue machine standing by";
+  queenSimpleMachines.textContent = queenChain?.simpleMachines.length
+    ? queenChain.simpleMachines.join(" + ")
+    : "war machine standing by";
+  battleMachineList.replaceChildren(...(battle?.machines ?? []).map((machine) => {
+    const row = document.createElement("div");
+    row.className = `battle-machine ${machine.team === "king" ? "red" : "green"}`;
+    row.dataset.state = machine.state;
+    const title = document.createElement("strong");
+    title.textContent = machine.name;
+    const state = document.createElement("span");
+    state.textContent = machine.state;
+    const meter = document.createElement("i");
+    const fill = document.createElement("b");
+    fill.style.width = `${Math.max(0, Math.min(100, machine.integrity))}%`;
+    meter.append(fill);
+    const meta = document.createElement("small");
+    meta.textContent = machine.maxCharges > 1
+      ? `${Math.round(machine.integrity)} integrity · ${machine.charges}/${machine.maxCharges} shots`
+      : `${Math.round(machine.integrity)} integrity · ${machine.purpose}`;
+    row.append(title, state, meter, meta);
+    return row;
+  }));
   if (modeLabel) {
     modeLabel.textContent = match.driver === "manual"
       ? "Legibility lab"
       : match.driver === "llm" ? "Model-led match" : "Autonomous match";
   }
-}
-
-function teamRuleText(snapshot: CoreSnapshot, team: "king" | "queen"): string {
-  return snapshot.workers
-    .filter((worker) => worker.team === team)
-    .map((worker) => `${worker.name}: ${snapshot.match.activeRuleIds[worker.id] ?? "observing"}`)
-    .join("\n");
 }
 
 function renderGates(snapshot: CoreSnapshot): void {
@@ -513,7 +541,10 @@ function setSidebarView(view: "watch" | "archive" | "organize"): void {
 
 function updateSidebarContext(): void {
   if (sidebarView === "watch") {
-    collapsedContext.textContent = replayEntry ? replayTitle(replayEntry.summary) : modeLabel?.textContent ?? "Live match";
+    const battle = (replayEntry?.frames[replayFrameIndex] ?? latest)?.match.battle;
+    collapsedContext.textContent = battle
+      ? `Green: ${battle.chains.queen.stageLabel} · Red: ${battle.chains.king.stageLabel}`
+      : replayEntry ? replayTitle(replayEntry.summary) : modeLabel?.textContent ?? "Live match";
     collapsedStatusValue.textContent = replayEntry
       ? replayTime.textContent ?? "00:00"
       : latest ? formatElapsed(matchTimeRemaining(latest)) : "10:00";

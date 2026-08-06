@@ -18,6 +18,7 @@ export interface TeamStrategyOption {
   id: string;
   ruleId: string;
   label: string;
+  utility?: number;
   observedFacts: readonly string[];
   missingFacts: readonly string[];
   capabilities: readonly string[];
@@ -158,6 +159,7 @@ export class OpenAiAgentStrategist implements AgentStrategist {
           "Choose exactly one listed option for every supplied figure or team.",
           "Use only IDs present in that figure or team's options. Never invent an action, body, transform, force, or part.",
           "Prefer choices that advance the team's stated objective and respond to the trigger and observed facts.",
+          "When options include utility scores, treat them as the team's current tactical estimate and prefer the highest score unless another visible fact clearly dominates.",
           "The repository context is a contract, not a source of hidden powers: stay inside its public action and connection rules.",
           "The say field is optional in spirit but required by the schema: use an empty string or one brief in-character order.",
           "Return only the requested structured decision.",

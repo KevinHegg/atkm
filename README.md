@@ -1,6 +1,8 @@
 # All the King's Men
 
-A PlayCanvas toy-theatre simulation in which autonomous crews build physical machines from mirrored parts to rescue or crack Humpty, the Egg King.
+A PlayCanvas toy-theatre siege in which two autonomous crews operate physical
+war and rescue machines around Humpty, the Egg King. Green has ten minutes to
+crack him; Red wins if the bell rings first.
 
 ## Requirements
 
@@ -35,7 +37,9 @@ OPENAI_MODEL=gpt-5.4
 OPENAI_REASONING_EFFORT=none
 ```
 
-When the model is unavailable, the same enumerable choices use a seeded deterministic fallback. A match ends on an upright intact landing, a crack, or a draw at ten minutes.
+When the model is unavailable, the same four advertised tactics use a
+deterministic utility fallback. Green wins on a crack or hard floor impact. Red
+wins at ten minutes while Humpty still has positive integrity.
 
 ## Controls
 
@@ -50,4 +54,9 @@ lines.
 
 ## Architecture
 
-Rapier on the server is authoritative. PlayCanvas renders and animates snapshots. Machine grammar data lives in `data/`, validation schemas in `schemas/`, shared contracts in `shared/machines.ts`, and the design/physics decisions in `docs/`. The agent-facing contract is available at `/agent-context`; observed recipe permutations are exposed at `/contraptions`.
+Rapier on the server is authoritative. PlayCanvas renders and animates
+snapshots. The live tactical director is in `server/core/battle-director.ts`;
+the battle and replay protocol is in `shared/core-protocol.ts`. The frozen
+construction kit and `/contraptions` endpoint remain available to the manual
+Gate 1-5 lab. The complete agent-facing contract is available at
+`/agent-context`.

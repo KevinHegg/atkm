@@ -396,9 +396,9 @@ test("the long keyed axle remains a one-worker load", async () => {
   }
 });
 
-test("the mock match advances all six figures, operates concurrently, and recovers", async () => {
+test("the battle director advances both three-person crews through plan, operation, impact, and response", async () => {
   const simulation = await CoreSimulation.create({
-    seed: 1881,
+    seed: 7331,
     build: "test",
     autoMatch: true,
   });
@@ -410,12 +410,12 @@ test("the mock match advances all six figures, operates concurrently, and recove
     const maximumWorkerTravel = new Map(simulation.physics.workerIds().map((id) => [id, 0]));
     assert.equal(simulation.handleCommand({ type: "time-scale", value: 8 }).ok, true);
     let concurrentMachineWork = false;
-    let openingMoveObserved = false;
-    while (simulation.snapshot().elapsed < 220 && simulation.snapshot().match.status !== "complete") {
+    let planObserved = false;
+    while (simulation.snapshot().elapsed < 60 && simulation.snapshot().match.status !== "complete") {
       simulation.step();
       concurrentMachineWork ||= simulation.autonomousTeams.every((lane) => lane.actions.isBusy());
-      openingMoveObserved ||= simulation.snapshot().events.some(
-        (event) => event.technical?.startsWith("match:move:"),
+      planObserved ||= simulation.snapshot().events.some(
+        (event) => event.technical?.startsWith("battle:chain:") && event.technical.includes(":plan:"),
       );
       for (const id of simulation.physics.workerIds()) {
         const start = starts.get(id);
@@ -431,26 +431,22 @@ test("the mock match advances all six figures, operates concurrently, and recove
     assert.equal(snapshot.match.kingObjective, "Keep Humpty uncracked until the ten-minute bell.");
     assert.equal(snapshot.match.queenObjective, "Crack Humpty before the ten-minute bell.");
     assert.ok(snapshot.match.timeRemaining <= CORE_MATCH_DURATION_SECONDS);
-    assert.equal(snapshot.match.rulebookSize, AGENT_RULES.length);
+    assert.equal(snapshot.match.rulebookSize, 4);
     assert.equal(Object.keys(snapshot.match.activeRuleIds).length, 6);
-    assert.ok(snapshot.match.moves >= 8);
-    assert.ok(openingMoveObserved);
+    assert.ok(snapshot.match.moves >= 6);
+    assert.ok(planObserved);
     assert.ok(concurrentMachineWork, "Red and Green never operated their machines concurrently");
-    assert.ok(snapshot.events.some((event) =>
-      event.technical?.startsWith("match:machine:king:begin")));
-    assert.ok(snapshot.events.some((event) =>
-      event.technical?.startsWith("match:machine:queen:begin")));
-    assert.ok(snapshot.match.machineEvidence.includes("red:hoist-keyed"));
-    assert.ok(snapshot.match.machineEvidence.includes("red:line-reeved"));
-    assert.ok(snapshot.match.machineEvidence.includes("red:line-tensioned"));
-    assert.ok(snapshot.match.machineEvidence.includes("red:load-hooked"));
-    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("red:hoist-travel:")));
-    assert.ok(snapshot.events.some((event) => event.technical?.startsWith("match:machine:king:pass")));
-    assert.ok(snapshot.events.some((event) => event.technical === "match:siege:wave:2"));
-    assert.ok(snapshot.events.some((event) =>
-      event.technical?.startsWith("match:machine:queen:recover:")));
-    assert.ok(snapshot.connections.some((connection) => connection.class === "KEYED_COAXIAL"));
-    assert.equal(snapshot.connections.filter((connection) => connection.class === "ROPE_ATTACH").length, 2);
+    assert.ok(snapshot.match.battle);
+    assert.equal(snapshot.match.battle.machines.length, 4);
+    assert.deepEqual(
+      new Set(snapshot.match.battle.machines.map((machine) => machine.id)),
+      new Set(["red-rescue-winch", "red-catch-sledge", "green-battering-ram", "green-stone-thrower"]),
+    );
+    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("ram-impact:")));
+    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("stone-impact:")));
+    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("catch:")));
+    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("chain:king:")));
+    assert.ok(snapshot.match.machineEvidence.some((entry) => entry.startsWith("chain:queen:")));
     for (const id of simulation.physics.workerIds()) {
       assert.ok((maximumWorkerTravel.get(id) ?? 0) > .25, `${id} did not leave its opening pose`);
     }
@@ -461,20 +457,21 @@ test("the mock match advances all six figures, operates concurrently, and recove
   }
 });
 
-test("all six figures choose concurrently and manual control cancels every autonomous lane", async () => {
+test("both teams choose concurrently and manual control cancels every autonomous lane", async () => {
   const simulation = await CoreSimulation.create({
     seed: 1881,
     build: "test",
     autoMatch: true,
   });
   try {
-    while (simulation.snapshot().elapsed < 2) simulation.step();
+    while (simulation.snapshot().elapsed < .8) simulation.step();
     const autonomous = simulation.snapshot();
-    const moveEvents = autonomous.events.filter((event) => event.technical?.includes(":rule:"));
-    assert.equal(autonomous.match.moves, 6);
+    const planEvents = autonomous.events.filter((event) =>
+      event.technical?.startsWith("battle:chain:") && event.technical.includes(":plan:"));
+    assert.equal(autonomous.match.moves, 2);
     assert.equal(autonomous.match.busyWorkers, 6);
-    assert.equal(moveEvents.length, 6);
-    assert.equal(new Set(moveEvents.map((event) => event.tick)).size, 1);
+    assert.equal(planEvents.length, 2);
+    assert.equal(new Set(planEvents.map((event) => event.tick)).size, 1);
     assert.ok(autonomous.workers.every((worker) => worker.phase !== "idle"));
     assert.equal(Object.keys(autonomous.match.activeRuleIds).length, 6);
 
@@ -637,7 +634,7 @@ test("the session replay archive retains a public past match", async () => {
   }
 });
 
-test("the fixed-seed autonomous compound match replays exactly", async () => {
+test("the fixed-seed autonomous battle replays exactly", async () => {
   const play = async (seed: number) => {
     const simulation = await CoreSimulation.create({ seed, build: "test", autoMatch: true });
     try {
@@ -646,7 +643,7 @@ test("the fixed-seed autonomous compound match replays exactly", async () => {
       while (simulation.snapshot().elapsed < 15) {
         simulation.step();
         for (const event of simulation.snapshot().events) {
-          if (event.technical?.includes(":rule:")) choices.set(event.id, event.technical);
+          if (event.technical?.startsWith("battle:")) choices.set(event.id, event.technical);
         }
       }
       return {
@@ -657,31 +654,29 @@ test("the fixed-seed autonomous compound match replays exactly", async () => {
       simulation.destroy();
     }
   };
-  const first = await play(1881);
-  const replay = await play(1881);
+  const first = await play(7331);
+  const replay = await play(7331);
   assert.deepEqual(first, replay);
-  assert.equal(first.rules.length, 6);
-  assert.deepEqual(first.plans, { king: "rescue-hoist", queen: "wheel-shot" });
+  assert.ok(first.rules.some((entry) => entry.startsWith("battle:impact:ram-impact")));
+  assert.ok(first.rules.some((entry) => entry.startsWith("battle:impact:stone-impact")));
+  assert.deepEqual(first.plans, { king: "red-deploy-catch-sledge", queen: "green-fire-stone" });
 });
 
-test("seeded plan selection varies across all six eligible machine classes", async () => {
-  const selected = new Set<string>();
-  for (let seed = 1876; seed <= 1888; seed += 1) {
+test("seeded siege doctrines advertise three distinct opening stone targets", async () => {
+  const targets = new Map<number, string>();
+  for (const seed of [1881, 4198, 7331]) {
     const simulation = await CoreSimulation.create({ seed, build: "test", autoMatch: true });
     try {
-      simulation.handleCommand({ type: "time-scale", value: 8 });
-      while (simulation.snapshot().elapsed < 15) simulation.step();
-      const plans = simulation.snapshot().match.selectedMachinePlanIds;
-      if (plans.king) selected.add(plans.king);
-      if (plans.queen) selected.add(plans.queen);
+      targets.set(seed, simulation.physics.battleStoneTargetId());
     } finally {
       simulation.destroy();
     }
   }
-  assert.deepEqual(
-    selected,
-    new Set(["escalade-ramp", "rescue-hoist", "compound-ram", "wheel-shot", "pivoted-striker", "counterweight-sling"]),
-  );
+  assert.deepEqual(targets, new Map([
+    [1881, "humpty"],
+    [4198, "tower-10-2"],
+    [7331, "tower-06-1"],
+  ]));
 });
 
 test("model decisions are rejected unless every ID was advertised", () => {
@@ -738,7 +733,7 @@ test("a scripted model strategist drives the same public action boundary", async
         })),
         teams: (request.teams ?? []).map((team) => ({
           team: team.team,
-          planId: team.options.find((option) => option.id === "counterweight-sling")?.id ?? team.options[0]!.id,
+          planId: team.options.find((option) => option.id === (team.team === "queen" ? "green-fire-stone" : "red-deploy-catch-sledge"))?.id ?? team.options[0]!.id,
         })),
       });
     },
@@ -764,7 +759,8 @@ test("a scripted model strategist drives the same public action boundary", async
     const snapshot = simulation.snapshot();
     assert.equal(snapshot.match.driver, "llm");
     assert.equal(snapshot.diagnostics.llmEnabled, true);
-    assert.equal(snapshot.match.selectedMachinePlanIds.queen, "counterweight-sling");
+    assert.equal(snapshot.match.selectedMachinePlanIds.queen, "green-fire-stone");
+    assert.equal(snapshot.match.selectedMachinePlanIds.king, "red-deploy-catch-sledge");
     assert.ok(snapshot.events.some((event) => event.technical?.endsWith("source:llm")));
   } finally {
     simulation.destroy();

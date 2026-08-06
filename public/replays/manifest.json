@@ -1,52 +1,56 @@
 {
-  "generatedAt": "2026-08-06T00:00:00.000Z",
-  "build": "public-siege-0806",
-  "frameInterval": 4,
+  "generatedAt": "2026-08-05T20:00:00.000Z",
+  "build": "battle-reset-0805",
+  "frameIntervals": {
+    "the-sledgebreaker": 0.5,
+    "the-ten-minute-hold": 4,
+    "the-king-shot": 0.25
+  },
   "replays": [
     {
-      "id": "red-hoist-vs-green-sling",
-      "seed": 1881,
-      "build": "public-siege-0806",
+      "id": "the-sledgebreaker",
+      "seed": 7331,
+      "build": "battle-reset-0805",
       "driver": "mock",
       "status": "complete",
       "outcome": "queen",
-      "duration": 154.26666666666665,
-      "frameCount": 40,
-      "createdAt": "2026-08-06T00:00:00.000Z",
+      "duration": 53.46666666666667,
+      "frameCount": 108,
+      "createdAt": "2026-08-05T20:00:00.000Z",
       "live": false,
-      "title": "The Ten-Minute Siege",
-      "description": "A full survival clock with successive machines, crown bolts, and command-post counterplay.",
-      "path": "red-hoist-vs-green-sling.json"
+      "title": "The Sledgebreaker",
+      "description": "Red catches the king; Green turns its ram on the rescue bed and forces a second crisis.",
+      "path": "the-sledgebreaker.json"
     },
     {
-      "id": "red-hoist-vs-wheel-shot",
-      "seed": 4199,
-      "build": "public-siege-0806",
+      "id": "the-ten-minute-hold",
+      "seed": 4198,
+      "build": "battle-reset-0805",
       "driver": "mock",
       "status": "complete",
       "outcome": "king",
       "duration": 600.1333333333333,
       "frameCount": 152,
-      "createdAt": "2026-08-06T00:00:00.000Z",
+      "createdAt": "2026-08-05T20:00:00.000Z",
       "live": false,
-      "title": "The Wheel Bombardment",
-      "description": "Green opens a multi-wave assault while Red races to fortify Humpty's hill.",
-      "path": "red-hoist-vs-wheel-shot.json"
+      "title": "The Ten-Minute Hold",
+      "description": "A mixed bombardment cracks Humpty twice, but Red's catch and winch survive to the bell.",
+      "path": "the-ten-minute-hold.json"
     },
     {
-      "id": "red-hoist-vs-pivot-striker",
-      "seed": 7331,
-      "build": "public-siege-0806",
+      "id": "the-king-shot",
+      "seed": 1881,
+      "build": "battle-reset-0805",
       "driver": "mock",
       "status": "complete",
-      "outcome": "king",
-      "duration": 600.1333333333333,
-      "frameCount": 152,
-      "createdAt": "2026-08-06T00:00:00.000Z",
+      "outcome": "queen",
+      "duration": 12.666666666666666,
+      "frameCount": 52,
+      "createdAt": "2026-08-05T20:00:00.000Z",
       "live": false,
-      "title": "The Last-Bell Striker",
-      "description": "A beam, fulcrum, ram, and royal artillery contest Red's ten-minute hold.",
-      "path": "red-hoist-vs-pivot-striker.json"
+      "title": "The King Shot",
+      "description": "Green chooses the royal target immediately and ends the siege before the catch bed arrives.",
+      "path": "the-king-shot.json"
     }
   ]
 }
