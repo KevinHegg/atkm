@@ -427,7 +427,7 @@ test("the siege director reveals and resolves one simultaneous order per team", 
     );
     assert.equal(
       snapshot.match.battle.units.find((unit) => unit.id === "green-stone-thrower")?.name,
-      "Counterweight Trebuchet",
+      "Bed Mortar",
     );
     assert.ok(snapshot.events.some((event) => event.technical === "siege:round:1:reveal"));
     assert.ok(snapshot.events.some((event) => event.technical === "siege:round:1:resolved"));
@@ -440,7 +440,7 @@ test("the siege director reveals and resolves one simultaneous order per team", 
   }
 });
 
-test("ballista bolts resolve to a physical impact or a finite miss", async () => {
+test("matchlock volleys resolve to a physical impact or a finite miss", async () => {
   const hitWorld = await CorePhysicsWorld.create(1881, true);
   const missWorld = await CorePhysicsWorld.create(1881, true);
   try {
@@ -452,11 +452,49 @@ test("ballista bolts resolve to a physical impact or a finite miss", async () =>
     }
     assert.ok(hitWorld.records.get("green-ballista-bolt-1")?.variant?.startsWith("spent"));
     assert.ok(missWorld.records.get("green-ballista-bolt-1")?.variant?.startsWith("spent"));
-    assert.ok(hitWorld.consumeBattleEvents().some((event) => event.type === "ballista-impact"));
+    assert.ok(hitWorld.consumeBattleEvents().some((event) => event.type === "volley-impact"));
     assert.ok(missWorld.consumeBattleEvents().some((event) => event.type === "projectile-miss"));
   } finally {
     hitWorld.free();
     missWorld.free();
+  }
+});
+
+test("demi-culverin round shot resolves to a physical impact or a finite miss", async () => {
+  const hitWorld = await CorePhysicsWorld.create(1881, true);
+  const missWorld = await CorePhysicsWorld.create(1881, true);
+  try {
+    assert.equal(hitWorld.operateBattleMachine("green-battering-ram", "tower-02-3", true).ok, true);
+    assert.equal(missWorld.operateBattleMachine("green-battering-ram", "tower-02-3", false).ok, true);
+    for (let tick = 0; tick < 300; tick += 1) {
+      hitWorld.step();
+      missWorld.step();
+    }
+    assert.ok(hitWorld.records.get("green-cannonball-1")?.variant?.startsWith("spent"));
+    assert.ok(missWorld.records.get("green-cannonball-1")?.variant?.startsWith("spent"));
+    assert.ok(hitWorld.consumeBattleEvents().some((event) => event.type === "cannon-impact"));
+    assert.ok(missWorld.consumeBattleEvents().some((event) => event.type === "projectile-miss"));
+  } finally {
+    hitWorld.free();
+    missWorld.free();
+  }
+});
+
+test("a rescue capstan cannot lift a fallen Humpty back onto the tower", async () => {
+  const world = await CorePhysicsWorld.create(1881, true);
+  try {
+    const humpty = world.records.get("humpty")!;
+    humpty.body.setTranslation({ x: 3.1, y: .82, z: -3.2 }, true);
+    humpty.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    assert.equal(world.operateBattleMachine("red-rescue-winch").ok, true);
+    let maximumY = world.bodyPosition("humpty")!.y;
+    for (let tick = 0; tick < 360; tick += 1) {
+      world.step();
+      maximumY = Math.max(maximumY, world.bodyPosition("humpty")!.y);
+    }
+    assert.ok(maximumY < 1.25, `fallen Humpty rose to ${maximumY.toFixed(2)}m`);
+  } finally {
+    world.free();
   }
 });
 

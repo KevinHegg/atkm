@@ -22,7 +22,7 @@ interface PublicReplaySummary extends ReplaySummary {
 }
 
 const OUTPUT_DIR = resolve(process.cwd(), "public", "replays");
-const BUILD_ID = "siege-machines-0806";
+const BUILD_ID = "toy-armory-0806";
 const CREATED_AT = "2026-08-06T21:00:00.000Z";
 const MAX_SECONDS = 200;
 const EVENT_LIMIT = 18;
@@ -32,22 +32,22 @@ const demos: DemoSpec[] = [
   {
     id: "the-sledgebreaker",
     seed: 10,
-    title: "The Counterbattery Duel",
-    description: "Red raids the siege train while Green's bombardment doctrine searches for a path through the defenses.",
+    title: "The Powder Train Raid",
+    description: "Royal sappers raid the powder train while Green's culverin and mortar search for a breach.",
     frameInterval: 1,
   },
   {
     id: "the-ten-minute-hold",
     seed: 4198,
     title: "The Broken Foundation",
-    description: "Green brings down the tower base, but Red's rescue doctrine carries a battered Humpty through the final bell.",
+    description: "Green pounds the tower with round shot and mortar shells while Red races a gabion rescue cart beneath the crown.",
     frameInterval: 1,
   },
   {
     id: "the-king-shot",
     seed: 1881,
-    title: "The Last Bolt",
-    description: "A decapitation duel spends the catch net early and comes down to Green's final precision shot.",
+    title: "The Last Volley",
+    description: "A decapitation duel spends the rescue litter early and comes down to Green's final matchlock volley.",
     frameInterval: 1,
   },
 ];

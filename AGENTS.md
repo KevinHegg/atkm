@@ -16,12 +16,14 @@ Each turn has four explicit phases:
 
 The fixed field force is:
 
-- Red: Field Engineers, Rescue Winch, Catch-Net Sledge;
-- Green: Battering Ram, Counterweight Trebuchet, Siege Ballista.
+- Red: Royal Sappers, Rescue Capstan, Gabion Rescue Cart;
+- Green: Demi-Culverin, Bed Mortar, Matchlock Company.
 
 The four public target classes are the tower foundation, exposed tower face,
-Humpty, and enemy equipment. The catch net may turn one lethal fall into a
-second chance; it cannot be rearmed after that save.
+Humpty, and enemy equipment. The straw-lined rescue litter may turn one lethal
+fall into a second chance; it cannot be rearmed after that save. A rescue
+capstan may steady the crown or haul at ground level, but it must never lift a
+fallen Humpty back onto the tower.
 
 ## Source Of Truth
 
@@ -53,7 +55,7 @@ second chance; it cannot be rearmed after that save.
   cooling, or spent equipment cannot act.
 - Both valid orders resolve simultaneously. Destroying a unit during an
   exchange does not erase the order it already fired.
-- Ammunition, integrity, cooldowns, cover, and the catch-net save are finite and
+- Ammunition, integrity, cooldowns, cover, and the rescue-litter save are finite and
   visible.
 - Seeded commanders must be deterministic. An LLM may later add commander voice
   or select from valid advertised orders, but it may not create rules, private

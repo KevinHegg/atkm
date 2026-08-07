@@ -739,13 +739,13 @@ function replayTitle(summary: ReplaySummary | PublicReplaySummary): string {
 function actionLabel(action: BattleOrderAction): string {
   return ({
     hold: "Hold position",
-    breach: "Breach",
-    bombard: "Bombard",
-    snipe: "Precision shot",
-    fortify: "Brace and repair",
-    reposition: "Reposition Humpty",
-    deploy: "Deploy catch net",
-    raid: "Raid equipment",
+    breach: "Fire round shot",
+    bombard: "Lob mortar shell",
+    snipe: "Fire matchlock volley",
+    fortify: "Set gabions and repair",
+    reposition: "Tension rescue capstan",
+    deploy: "Deploy rescue cart",
+    raid: "Raid the powder train",
   })[action];
 }
 

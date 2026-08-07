@@ -1,8 +1,8 @@
 # All the King's Men
 
 A PlayCanvas toy-theatre siege about one terrible hill. Green spends finite
-ammunition to crack Humpty; Red uses braces, raids, a rescue winch, and one
-last-chance catch net to carry him through the tenth bell.
+round shot, mortar shells, and matchlock volleys to crack Humpty; Red uses
+gabions, raids, a rescue capstan, and one last-chance litter to hold ten bells.
 
 The game uses simultaneous orders. Each commander secretly commits one formed
 unit, both orders reveal together, and the server resolves cover, fire, damage,
@@ -33,10 +33,11 @@ rules so every battle can be replayed exactly.
 
 ## The Field
 
-Red commands Field Engineers, a Rescue Winch, and a Catch-Net Sledge. Green
-commands a Battering Ram, Counterweight Trebuchet, and Siege Ballista. Equipment has visible
-integrity, ammunition, and cooldown state. Orders may address the foundation,
-tower face, Humpty, or enemy equipment.
+Red commands Royal Sappers, a Rescue Capstan, and a Gabion Rescue Cart. Green
+commands a wheeled Demi-Culverin, a Bed Mortar, and a Matchlock Company. The
+17th-century toy-armory silhouettes include powder chests, woven gabions,
+straw litter, slow match, and visible finite shot. Equipment has visible
+integrity, ammunition, and cooldown state.
 
 The right ledger provides:
 

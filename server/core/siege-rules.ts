@@ -58,9 +58,9 @@ const UNIT_BLUEPRINTS: readonly BattleUnitState[] = [
   {
     id: "red-engineers",
     team: "king",
-    name: "Field Engineers",
-    role: "Fortification and raids",
-    purpose: "Brace a threatened position, repair damage, or raid Green equipment.",
+    name: "Royal Sappers",
+    role: "Gabions, repairs, and raids",
+    purpose: "Set woven gabions, shore a threatened position, or raid Green's powder train.",
     integrity: 100,
     maxIntegrity: 100,
     ammunition: 6,
@@ -73,9 +73,9 @@ const UNIT_BLUEPRINTS: readonly BattleUnitState[] = [
   {
     id: "red-rescue-winch",
     team: "king",
-    name: "Rescue Winch",
-    role: "Royal repositioning",
-    purpose: "Move Humpty between the crown and prepared shelter before a strike lands.",
+    name: "Rescue Capstan",
+    role: "Block-and-tackle rescue",
+    purpose: "Tension a tackle line to steady the crown or haul a fallen Humpty toward ground shelter.",
     integrity: 100,
     maxIntegrity: 100,
     ammunition: 4,
@@ -88,9 +88,9 @@ const UNIT_BLUEPRINTS: readonly BattleUnitState[] = [
   {
     id: "red-catch-sledge",
     team: "king",
-    name: "Catch-Net Sledge",
-    role: "Last-chance rescue",
-    purpose: "Deploy a mobile catch bed that can turn one lethal fall into a second chance.",
+    name: "Gabion Rescue Cart",
+    role: "Last-chance ground rescue",
+    purpose: "Roll a straw-lined litter and gabion wall beneath the fall line for one desperate catch.",
     integrity: 100,
     maxIntegrity: 100,
     ammunition: 3,
@@ -103,9 +103,9 @@ const UNIT_BLUEPRINTS: readonly BattleUnitState[] = [
   {
     id: "green-battering-ram",
     team: "queen",
-    name: "Battering Ram",
-    role: "Foundation breaker",
-    purpose: "Deliver reliable heavy damage to masonry or crush exposed equipment.",
+    name: "Demi-Culverin",
+    role: "Direct-fire siege cannon",
+    purpose: "Fire heavy iron round shot into the foundation or smash exposed equipment.",
     integrity: 100,
     maxIntegrity: 100,
     ammunition: 6,
@@ -118,9 +118,9 @@ const UNIT_BLUEPRINTS: readonly BattleUnitState[] = [
   {
     id: "green-stone-thrower",
     team: "queen",
-    name: "Counterweight Trebuchet",
-    role: "Arcing stone bombardment",
-    purpose: "Drop the counterweight to arc scarce stone shot over defenses at structures, Humpty, or Red equipment.",
+    name: "Bed Mortar",
+    role: "Arcing shell bombardment",
+    purpose: "Lob scarce powder shells over gabions at the tower, Humpty, or Red equipment.",
     integrity: 100,
     maxIntegrity: 100,
     ammunition: 5,
@@ -133,9 +133,9 @@ const UNIT_BLUEPRINTS: readonly BattleUnitState[] = [
   {
     id: "green-ballista",
     team: "queen",
-    name: "Siege Ballista",
-    role: "Precision counterbattery",
-    purpose: "Spend a bolt on a precise royal or equipment target.",
+    name: "Matchlock Company",
+    role: "Precision volley fire",
+    purpose: "Fire a coordinated matchlock volley at Humpty or exposed royal equipment.",
     integrity: 100,
     maxIntegrity: 100,
     ammunition: 5,
@@ -299,12 +299,12 @@ function applyRedOrder(
   if (order.action === "reposition") {
     state.humptyPosition = "sheltered";
     state.targets.humpty.protection = 32;
-    return { text: "The rescue winch hauls Humpty behind the merlon and shifts his silhouette." };
+    return { text: "The rescue capstan tensions its tackle, steadying Humpty or hauling him toward the ground shelter." };
   }
   if (order.action === "deploy") {
     state.catchReady = true;
     state.targets.humpty.protection = Math.max(state.targets.humpty.protection, 18);
-    return { text: "The catch-net sledge locks beneath Humpty's fall line." };
+    return { text: "The gabion rescue cart locks its straw-lined litter beneath Humpty's fall line." };
   }
 
   const targetUnit = selectEnemyUnit(state, "queen", seed, round);
@@ -373,7 +373,7 @@ function applyCollapse(state: SiegeState): string | undefined {
   state.humptyPosition = "exposed";
   const caught = applyCatchIfNeeded(state);
   return caught
-    ? "The foundation gives way, but the catch net saves Humpty from the collapse."
+    ? "The foundation gives way, but the straw-lined rescue litter saves Humpty from the collapse."
     : "The foundation gives way and the crown drops through the shattered tower.";
 }
 

@@ -65,9 +65,10 @@ export const BATTLE_MACHINE_IDS = [
 
 const GREEN_STONE_IDS = Array.from({ length: 5 }, (_, index) => `green-siege-stone-${index + 1}`);
 const GREEN_BALLISTA_BOLT_IDS = Array.from({ length: 5 }, (_, index) => `green-ballista-bolt-${index + 1}`);
+const GREEN_CANNONBALL_IDS = Array.from({ length: 6 }, (_, index) => `green-cannonball-${index + 1}`);
 
 export interface BattlePhysicsEvent {
-  type: "ram-impact" | "stone-impact" | "ballista-shot" | "ballista-impact" | "projectile-miss" | "catch" | "deployment" | "machine-disabled" | "winch-pull" | "line-snap";
+  type: "cannon-shot" | "cannon-impact" | "mortar-impact" | "volley-shot" | "volley-impact" | "projectile-miss" | "catch" | "deployment" | "machine-disabled" | "winch-pull" | "line-snap";
   machineId: string;
   targetId: string;
   value: number;
@@ -530,16 +531,31 @@ export class CorePhysicsWorld {
       const definition = battleMachineDefinition(id);
       if (!record || !definition) return [];
       const integrity = record.integrity ?? 0;
-      const loadedStones = GREEN_STONE_IDS.filter((stoneId) =>
-        this.records.get(stoneId)?.variant === "loaded siege stone").length;
-      const charges = id === "green-stone-thrower" ? loadedStones : integrity > 0 ? 1 : 0;
-      const maxCharges = id === "green-stone-thrower" ? GREEN_STONE_IDS.length : 1;
+      const loadedMortarShells = GREEN_STONE_IDS.filter((projectileId) =>
+        this.records.get(projectileId)?.variant === "loaded mortar shell").length;
+      const loadedCannonballs = GREEN_CANNONBALL_IDS.filter((projectileId) =>
+        this.records.get(projectileId)?.variant === "loaded cannonball").length;
+      const loadedMusketBalls = GREEN_BALLISTA_BOLT_IDS.filter((projectileId) =>
+        this.records.get(projectileId)?.variant === "loaded musket ball").length;
+      const charges = id === "green-stone-thrower"
+        ? loadedMortarShells
+        : id === "green-battering-ram"
+          ? loadedCannonballs
+          : id === "green-ballista"
+            ? loadedMusketBalls
+            : integrity > 0 ? 1 : 0;
+      const maxCharges = id === "green-stone-thrower"
+        ? GREEN_STONE_IDS.length
+        : id === "green-battering-ram"
+          ? GREEN_CANNONBALL_IDS.length
+          : id === "green-ballista"
+            ? GREEN_BALLISTA_BOLT_IDS.length
+            : 1;
       let state: BattleMachineState["state"] = "ready";
       if (integrity <= 0) state = "disabled";
       else if (id === "red-rescue-winch" && this.tickValue < this.winchActiveUntilTick) state = "working";
       else if (id === "red-catch-sledge") state = this.sledgeMode;
-      else if (id === "green-battering-ram") state = this.ramMode;
-      else if (id === "green-stone-thrower" && charges === 0) state = "spent";
+      else if (id.startsWith("green-") && charges === 0) state = "spent";
       return [{
         id,
         team: definition.team,
@@ -581,7 +597,7 @@ export class CorePhysicsWorld {
 
   battleStoneTargetId(): string {
     const loadedStones = GREEN_STONE_IDS.filter((stoneId) =>
-      this.records.get(stoneId)?.variant === "loaded siege stone").length;
+      this.records.get(stoneId)?.variant === "loaded mortar shell").length;
     const shotIndex = GREEN_STONE_IDS.length - loadedStones;
     const profiles = [
       ["humpty", "red-catch-sledge", "humpty", "tower-03-2", "humpty"],
@@ -607,7 +623,7 @@ export class CorePhysicsWorld {
       return {
         ok: true,
         targetId: "central-cradle",
-        message: "The rescue winch tensions its pulley line and steadies Humpty's cradle.",
+        message: "The rescue capstan tensions its block-and-tackle line.",
       };
     }
     if (machineId === "red-catch-sledge") {
@@ -616,31 +632,54 @@ export class CorePhysicsWorld {
       return {
         ok: true,
         targetId: "humpty",
-        message: "The catch sledge drives beneath Humpty's fall line.",
+        message: "The gabion rescue cart drives its straw-lined litter beneath Humpty's fall line.",
       };
     }
     if (machineId === "green-battering-ram") {
-      if (this.ramMode === "moving" || this.ramMode === "returning") {
-        return { ok: false, message: "The battering ram is still in motion." };
+      const ball = GREEN_CANNONBALL_IDS
+        .map((id) => this.records.get(id))
+        .find((record) => record?.variant === "loaded cannonball");
+      if (!ball) return { ok: false, message: "The demi-culverin has spent its round shot." };
+      const targetId = preferredTargetId && this.records.has(preferredTargetId) ? preferredTargetId : "tower-02-3";
+      const target = this.bodyPosition(targetId) ?? { x: 0, y: 1.15, z: 0 };
+      const launch = this.bodyPosition(ball.id) ?? { x: 4.2, y: .82, z: .55 };
+      ball.variant = `fired cannonball ${GREEN_CANNONBALL_IDS.indexOf(ball.id) + 1}`;
+      this.battleProjectileLaunchedAt.set(ball.id, this.tickValue);
+      ball.body.setGravityScale(1, true);
+      for (const collider of ball.colliders) {
+        collider.setSensor(false);
+        collider.setCollisionGroups(interactionGroups(QUEEN_PROJECTILE_COLLISION_GROUP, ALL_COLLISION_GROUPS));
       }
-      this.ramRun += 1;
-      this.ramTargetX = shouldHit ? .9 : 2.15;
-      this.ramMode = "moving";
+      const flightSeconds = .38;
+      const mass = Math.max(1, ball.body.mass());
+      const miss = shouldHit ? 0 : 1.45;
+      this.applyImpulse(ball.id, {
+        x: (target.x - launch.x) / flightSeconds * mass,
+        y: (target.y + miss - launch.y + .5 * 9.81 * flightSeconds ** 2) / flightSeconds * mass,
+        z: (target.z + miss * .65 - launch.z) / flightSeconds * mass,
+      });
+      this.battleEvents.push({
+        type: "cannon-shot",
+        machineId,
+        targetId,
+        value: 1,
+        text: `The demi-culverin erupts and sends iron round shot at ${battleTargetName(targetId)}.`,
+      });
       return {
         ok: true,
-        targetId: "tower-02-3",
-        message: "The ram crew releases the wheeled oak striker at the tower's lower course.",
+        targetId,
+        message: "The demi-culverin fires.",
       };
     }
     if (machineId === "green-stone-thrower") {
       const stone = GREEN_STONE_IDS
         .map((id) => this.records.get(id))
-        .find((record) => record?.variant === "loaded siege stone");
-      if (!stone) return { ok: false, message: "The stone thrower has spent its ammunition." };
+        .find((record) => record?.variant === "loaded mortar shell");
+      if (!stone) return { ok: false, message: "The bed mortar has spent its shells." };
       const targetId = preferredTargetId && this.records.has(preferredTargetId)
         ? preferredTargetId
         : this.battleStoneTargetId();
-      stone.variant = `fired siege stone ${GREEN_STONE_IDS.indexOf(stone.id) + 1}`;
+      stone.variant = `fired mortar shell ${GREEN_STONE_IDS.indexOf(stone.id) + 1}`;
       this.battleProjectileLaunchedAt.set(stone.id, this.tickValue);
       stone.body.setGravityScale(1, true);
       for (const collider of stone.colliders) {
@@ -667,7 +706,7 @@ export class CorePhysicsWorld {
       return {
         ok: true,
         targetId,
-        message: `The counterweight drops and the sling hurls a stone at ${battleTargetName(targetId)}.`,
+        message: `The bed mortar lobs a powder shell at ${battleTargetName(targetId)}.`,
       };
     }
     return { ok: false, message: "That machine has no public operation." };
@@ -675,15 +714,15 @@ export class CorePhysicsWorld {
 
   fireBattleBallista(preferredTargetId: string, shouldHit = true): BattleMachineOperationResult {
     const machine = this.records.get("green-ballista");
-    if (!machine || (machine.integrity ?? 0) <= 0) return { ok: false, message: "The siege ballista is disabled." };
+    if (!machine || (machine.integrity ?? 0) <= 0) return { ok: false, message: "The matchlock company is disabled." };
     const bolt = GREEN_BALLISTA_BOLT_IDS
       .map((id) => this.records.get(id))
-      .find((record) => record?.variant === "loaded ballista bolt");
-    if (!bolt) return { ok: false, message: "The siege ballista has spent its bolts." };
+      .find((record) => record?.variant === "loaded musket ball");
+    if (!bolt) return { ok: false, message: "The matchlock company is out of prepared shot." };
     const targetId = this.records.has(preferredTargetId) ? preferredTargetId : "humpty";
     const target = this.bodyPosition(targetId) ?? this.bodyPosition("humpty") ?? { x: 0, y: 3.8, z: 0 };
     const launch = this.bodyPosition(bolt.id) ?? { x: 5.7, y: 1.2, z: -2.35 };
-    bolt.variant = `fired ballista bolt ${GREEN_BALLISTA_BOLT_IDS.indexOf(bolt.id) + 1}`;
+    bolt.variant = `fired musket ball ${GREEN_BALLISTA_BOLT_IDS.indexOf(bolt.id) + 1}`;
     this.battleProjectileLaunchedAt.set(bolt.id, this.tickValue);
     bolt.body.setGravityScale(1, true);
     for (const collider of bolt.colliders) {
@@ -698,13 +737,13 @@ export class CorePhysicsWorld {
       z: (target.z + (shouldHit ? 0 : 1.2) - launch.z) / flightSeconds * mass,
     });
     this.battleEvents.push({
-      type: "ballista-shot",
+      type: "volley-shot",
       machineId: "green-ballista",
       targetId,
       value: 1,
-      text: `The siege ballista snaps forward and sends an iron bolt at ${battleTargetName(targetId)}.`,
+      text: `The matchlock line fires a rolling volley at ${battleTargetName(targetId)}.`,
     });
-    return { ok: true, targetId, message: "The siege ballista fires." };
+    return { ok: true, targetId, message: "The matchlock company fires." };
   }
 
   strikeBattleMachine(
@@ -1456,7 +1495,7 @@ export class CorePhysicsWorld {
       size: { x: 1.95, y: .95, z: 1.35 },
       dynamic: false,
       team: "king",
-      variant: "field engineer wagon",
+      variant: "royal sapper wagon",
       integrity: 100,
     });
 
@@ -1476,7 +1515,7 @@ export class CorePhysicsWorld {
       size: { x: 1.55, y: 1.45, z: 1.55 },
       dynamic: false,
       team: "king",
-      variant: "rescue winch",
+      variant: "rescue capstan",
       integrity: 100,
     });
 
@@ -1488,18 +1527,18 @@ export class CorePhysicsWorld {
         .setCcdEnabled(true),
     );
     const catchSledgeColliders = [
-      RAPIER.ColliderDesc.roundCuboid(2.15, .2, 1.05, .08)
+      RAPIER.ColliderDesc.roundCuboid(1.55, .2, .82, .08)
         .setMass(160)
         .setFriction(.68)
         .setRestitution(.08)
         .setContactSkin(.002),
-      ...[-1, 1].map((side) => RAPIER.ColliderDesc.roundCuboid(.1, .3, .96, .06)
-        .setTranslation(side * 2.05, .38, 0)
+      ...[-1, 1].map((side) => RAPIER.ColliderDesc.roundCuboid(.1, .3, .74, .06)
+        .setTranslation(side * 1.45, .38, 0)
         .setMass(12)
         .setFriction(.76)
         .setRestitution(.04)),
-      ...[-1, 1].map((side) => RAPIER.ColliderDesc.roundCuboid(1.95, .3, .1, .06)
-        .setTranslation(0, .38, side * .95)
+      ...[-1, 1].map((side) => RAPIER.ColliderDesc.roundCuboid(1.4, .3, .1, .06)
+        .setTranslation(0, .38, side * .72)
         .setMass(12)
         .setFriction(.76)
         .setRestitution(.04)),
@@ -1510,26 +1549,18 @@ export class CorePhysicsWorld {
       shape: "round-box",
       body: catchSledge,
       colliders: catchSledgeColliders,
-      size: { x: 4.5, y: .46, z: 2.25 },
+      size: { x: 3.25, y: .46, z: 1.75 },
       dynamic: true,
       team: "king",
-      variant: "wheeled catch sledge",
+      variant: "gabion rescue cart",
       integrity: 100,
     });
 
     const batteringRam = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(4.35, .43, .55)
-        .setLinearDamping(.62)
-        .setAngularDamping(2.8)
-        .setCcdEnabled(true),
+      RAPIER.RigidBodyDesc.fixed().setTranslation(4.35, .62, .55),
     );
     const batteringRamCollider = this.world.createCollider(
-      RAPIER.ColliderDesc.roundCuboid(1.48, .32, .62, .08)
-        .setMass(185)
-        .setFriction(.52)
-        .setRestitution(.04)
-        .setContactSkin(.002),
+      RAPIER.ColliderDesc.roundCuboid(1.22, .58, .68, .08).setFriction(.88),
       batteringRam,
     );
     this.addRecord({
@@ -1538,10 +1569,10 @@ export class CorePhysicsWorld {
       shape: "round-box",
       body: batteringRam,
       colliders: [batteringRamCollider],
-      size: { x: 3, y: .72, z: 1.35 },
-      dynamic: true,
+      size: { x: 2.6, y: 1.25, z: 1.5 },
+      dynamic: false,
       team: "queen",
-      variant: "wheeled battering ram",
+      variant: "wheeled demi-culverin",
       integrity: 100,
     });
 
@@ -1561,7 +1592,7 @@ export class CorePhysicsWorld {
       size: { x: 1.8, y: 1.65, z: 1.8 },
       dynamic: false,
       team: "queen",
-      variant: "counterweight stone thrower",
+      variant: "bronze bed mortar",
       integrity: 100,
     });
 
@@ -1595,7 +1626,7 @@ export class CorePhysicsWorld {
         size: { x: .38, y: .38, z: .38 },
         dynamic: true,
         team: "queen",
-        variant: "loaded siege stone",
+        variant: "loaded mortar shell",
       });
     }
 
@@ -1615,7 +1646,7 @@ export class CorePhysicsWorld {
       size: { x: 2.4, y: 1.25, z: 1.55 },
       dynamic: false,
       team: "queen",
-      variant: "siege ballista",
+      variant: "matchlock firing rest",
       integrity: 100,
     });
 
@@ -1646,7 +1677,34 @@ export class CorePhysicsWorld {
         size: { x: .48, y: .1, z: .1 },
         dynamic: true,
         team: "queen",
-        variant: "loaded ballista bolt",
+        variant: "loaded musket ball",
+      });
+    }
+
+    for (const [index, ballId] of GREEN_CANNONBALL_IDS.entries()) {
+      const body = this.world.createRigidBody(
+        RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(2.72 + (index % 3) * .24, .52 + Math.floor(index / 3) * .25, 1.52)
+          .setGravityScale(0)
+          .setLinearDamping(.04)
+          .setAngularDamping(.08)
+          .setCcdEnabled(true),
+      );
+      const collider = this.world.createCollider(
+        RAPIER.ColliderDesc.ball(.14).setMass(9.5).setFriction(.38).setRestitution(.12).setSensor(true),
+        body,
+      );
+      collider.setCollisionGroups(interactionGroups(QUEEN_ENGINE_COLLISION_GROUP, QUEEN_ENGINE_COLLISION_GROUP));
+      this.addRecord({
+        id: ballId,
+        kind: "battle-projectile",
+        shape: "sphere",
+        body,
+        colliders: [collider],
+        size: { x: .28, y: .28, z: .28 },
+        dynamic: true,
+        team: "queen",
+        variant: "loaded cannonball",
       });
     }
   }
@@ -1981,7 +2039,10 @@ export class CorePhysicsWorld {
   private updateBattleMachines(): void {
     if (this.tickValue < this.winchActiveUntilTick) {
       this.stabilizeBattleBody("central-cradle", { x: 0, y: CRADLE_CENTER_Y, z: 0 });
-      this.stabilizeBattleBody("humpty", { x: 0, y: HUMPTY_CENTER_Y, z: 0 });
+      const humpty = this.bodyPosition("humpty");
+      if (humpty && humpty.y >= HUMPTY_CENTER_Y - .65) {
+        this.stabilizeBattleBody("humpty", { x: 0, y: Math.min(HUMPTY_CENTER_Y, humpty.y), z: 0 });
+      }
     }
     if (this.winchOperationStart && this.tickValue >= this.winchReportAtTick) {
       const finish = this.bodyPosition("central-cradle");
@@ -1992,7 +2053,7 @@ export class CorePhysicsWorld {
         machineId: "red-rescue-winch",
         targetId: "central-cradle",
         value: travel,
-        text: `The rescue line holds the cradle through ${travel.toFixed(2)} metres of movement.`,
+        text: `The rescue tackle holds the cradle through ${travel.toFixed(2)} metres of movement without lifting a fallen king.`,
       });
       this.winchOperationStart = undefined;
     }
@@ -2006,31 +2067,11 @@ export class CorePhysicsWorld {
           machineId: "red-catch-sledge",
           targetId: "humpty",
           value: Math.abs(this.bodyPosition("red-catch-sledge")?.x ?? 0),
-          text: "The catch sledge locks beneath Humpty with its padded bed facing the fall line.",
+          text: "The gabion rescue cart locks beneath Humpty with its straw-lined litter facing the fall line.",
         });
       }
     }
 
-    if ((this.records.get("green-battering-ram")?.integrity ?? 0) > 0) {
-      if (this.ramMode === "moving") {
-        const arrived = this.driveBodyTowardX("green-battering-ram", this.ramTargetX, 7.2, 38);
-        if (arrived && this.ramTargetX > 1.5) {
-          this.ramResolvedRun = this.ramRun;
-          this.ramMode = "returning";
-          this.battleEvents.push({
-            type: "ram-impact",
-            machineId: "green-battering-ram",
-            targetId: "tower-02-3",
-            value: 0,
-            text: "The battering ram charges but brakes short of the tower.",
-          });
-        }
-      }
-      if (this.ramMode === "returning") {
-        const arrived = this.driveBodyTowardX("green-battering-ram", 4.35, 4.8, 28);
-        if (arrived) this.ramMode = "ready";
-      }
-    }
   }
 
   private driveBodyTowardX(
@@ -2093,77 +2134,58 @@ export class CorePhysicsWorld {
   }
 
   private resolveBattleImpacts(): void {
-    if (this.ramMode === "moving" && this.ramResolvedRun < this.ramRun) {
-      const possibleTargets = [
-        ...((this.records.get("red-catch-sledge")?.integrity ?? 0) > 0 ? ["red-catch-sledge"] : []),
-        ...this.towerBlockIds().filter((id) =>
-        (this.records.get(id)?.course ?? 99) <= 3)];
-      const targetId = possibleTargets.find((id) => this.contactCount("green-battering-ram", id) > 0);
-      if (targetId) {
-        this.ramResolvedRun = this.ramRun;
-        this.ramMode = "returning";
-        this.ramTargetX = 4.35;
-        if (targetId === "red-catch-sledge") {
-          this.applyDamage(targetId, 32);
-          const remaining = this.records.get(targetId)?.integrity ?? 0;
-          this.applyImpulse(targetId, remaining > 0
-            ? { x: -190, y: 12, z: 36 }
-            : { x: -1200, y: 180, z: 450 });
-          if (remaining <= 0) this.applyTorqueImpulse(targetId, { x: 1000, y: 80, z: 1400 });
-          if (remaining <= 0 && this.tickValue < this.winchActiveUntilTick) {
-            this.applyDamage("red-rescue-winch", 100);
-            this.winchActiveUntilTick = this.tickValue;
-            this.winchOperationStart = undefined;
-            this.battleEvents.push({
-              type: "line-snap",
-              machineId: "red-rescue-winch",
-              targetId: "humpty",
-              value: 100,
-              text: "The overturned sledge shock-loads the rescue line. The winch cable parts and Humpty is loose.",
-            });
-          }
-          this.sledgeMode = remaining > 0 ? "ready" : "disabled";
-        } else this.applyImpulse(targetId, { x: -210, y: 24, z: 20 });
-        const shift = this.initialTowerPositions.get(targetId);
-        const current = this.bodyPosition(targetId);
-        const travel = shift && current
-          ? Math.hypot(current.x - shift.x, current.y - shift.y, current.z - shift.z)
-          : 0;
-        this.battleEvents.push({
-          type: "ram-impact",
-          machineId: "green-battering-ram",
-          targetId,
-          value: travel,
-          text: targetId === "red-catch-sledge"
-            ? `The battering ram slams into Red's catch sledge, knocking it out of line and down to ${Math.max(0, Math.round(this.records.get(targetId)?.integrity ?? 0))} integrity.`
-            : `The battering ram strikes ${targetId} and drives it ${travel.toFixed(2)} metres.`,
-        });
+    for (const ballId of GREEN_CANNONBALL_IDS) {
+      if (this.battleImpactIds.has(ballId)) continue;
+      const ball = this.records.get(ballId);
+      if (!ball?.variant?.startsWith("fired cannonball")) continue;
+      const targetId = ["humpty", "red-catch-sledge", "red-rescue-winch", ...this.towerBlockIds()]
+        .find((id) => this.contactCount(ballId, id) > 0);
+      if (!targetId) {
+        const launchedAt = this.battleProjectileLaunchedAt.get(ballId) ?? this.tickValue;
+        if (this.tickValue - launchedAt > 3 * 60) {
+          this.battleImpactIds.add(ballId);
+          ball.variant = "spent cannonball miss";
+          this.battleEvents.push({ type: "projectile-miss", machineId: "green-battering-ram", targetId: ballId, value: 0, text: "The round shot ploughs into the field beyond the tower." });
+        }
+        continue;
       }
+      this.battleImpactIds.add(ballId);
+      ball.variant = "spent cannonball impact";
+      if (targetId === "humpty") this.applyDamage(targetId, 46);
+      else if (this.records.get(targetId)?.kind === "battle-machine") this.applyDamage(targetId, 34);
+      else this.applyImpulse(targetId, { x: -185, y: 20, z: 18 });
+      this.battleEvents.push({
+        type: "cannon-impact",
+        machineId: "green-battering-ram",
+        targetId,
+        value: this.records.get(targetId)?.integrity ?? 0,
+        text: `The demi-culverin's round shot smashes into ${battleTargetName(targetId)}.`,
+      });
     }
 
     for (const stoneId of GREEN_STONE_IDS) {
       if (this.battleImpactIds.has(stoneId)) continue;
       const stone = this.records.get(stoneId);
-      if (!stone?.variant?.startsWith("fired")) continue;
+      if (!stone?.variant?.startsWith("fired mortar shell")) continue;
       const targetId = ["humpty", "red-catch-sledge", ...this.towerBlockIds()]
         .find((id) => this.contactCount(stoneId, id) > 0);
       if (!targetId) {
         const launchedAt = this.battleProjectileLaunchedAt.get(stoneId) ?? this.tickValue;
         if (this.tickValue - launchedAt > 4 * 60) {
           this.battleImpactIds.add(stoneId);
-          stone.variant = "spent siege stone miss";
+          stone.variant = "spent mortar shell miss";
           this.battleEvents.push({
             type: "projectile-miss",
             machineId: "green-stone-thrower",
             targetId: stoneId,
             value: 0,
-            text: "The trebuchet stone passes the target and spends itself on the field.",
+            text: "The mortar shell sails long and bursts harmlessly in the field.",
           });
         }
         continue;
       }
       this.battleImpactIds.add(stoneId);
-      stone.variant = "spent siege stone";
+      stone.variant = "spent mortar shell";
       if (targetId === "humpty") this.applyDamage("humpty", 38);
       else if (targetId === "red-catch-sledge") {
         this.applyDamage(targetId, 24);
@@ -2173,22 +2195,22 @@ export class CorePhysicsWorld {
       const targetVelocity = this.bodyLinearVelocity(targetId);
       const speed = targetVelocity ? Math.hypot(targetVelocity.x, targetVelocity.y, targetVelocity.z) : 0;
       this.battleEvents.push({
-        type: "stone-impact",
+        type: "mortar-impact",
         machineId: "green-stone-thrower",
         targetId,
         value: speed,
         text: targetId === "humpty"
-          ? "The thrown stone hits Humpty directly and cracks his shell."
+          ? "The mortar shell bursts against Humpty and cracks his shell."
           : targetId === "red-catch-sledge"
-            ? `The thrown stone smashes the catch sledge down to ${Math.max(0, Math.round(this.records.get(targetId)?.integrity ?? 0))} integrity.`
-            : `The thrown stone hits ${targetId}; the timber leaves the impact at ${speed.toFixed(1)} m/s.`,
+            ? `The mortar shell smashes the rescue cart down to ${Math.max(0, Math.round(this.records.get(targetId)?.integrity ?? 0))} integrity.`
+            : `The mortar shell bursts on ${targetId}; the timber leaves the impact at ${speed.toFixed(1)} m/s.`,
       });
     }
 
     for (const boltId of GREEN_BALLISTA_BOLT_IDS) {
       if (this.battleImpactIds.has(boltId)) continue;
       const bolt = this.records.get(boltId);
-      if (!bolt?.variant?.startsWith("fired")) continue;
+      if (!bolt?.variant?.startsWith("fired musket ball")) continue;
       const targetId = [
         "humpty",
         "red-catch-sledge",
@@ -2200,30 +2222,30 @@ export class CorePhysicsWorld {
         const launchedAt = this.battleProjectileLaunchedAt.get(boltId) ?? this.tickValue;
         if (this.tickValue - launchedAt > 3 * 60) {
           this.battleImpactIds.add(boltId);
-          bolt.variant = "spent ballista bolt miss";
+          bolt.variant = "spent musket ball miss";
           this.battleEvents.push({
             type: "projectile-miss",
             machineId: "green-ballista",
             targetId: boltId,
             value: 0,
-            text: "The ballista bolt whistles past and buries itself beyond the target.",
+            text: "The matchlock volley tears past and spends itself in the earthworks.",
           });
         }
         continue;
       }
       this.battleImpactIds.add(boltId);
-      bolt.variant = "spent ballista bolt impact";
+      bolt.variant = "spent musket ball impact";
       if (targetId === "humpty") this.applyDamage(targetId, 34);
       else if (this.records.get(targetId)?.kind === "battle-machine") this.applyDamage(targetId, 22);
       else this.applyImpulse(targetId, { x: -54, y: 8, z: 4 });
       this.battleEvents.push({
-        type: "ballista-impact",
+        type: "volley-impact",
         machineId: "green-ballista",
         targetId,
         value: this.records.get(targetId)?.integrity ?? 0,
         text: targetId === "humpty"
-          ? "The ballista bolt strikes Humpty and cracks the royal shell."
-          : `The ballista bolt punches into ${battleTargetName(targetId)}.`,
+          ? "The matchlock volley strikes Humpty and cracks the royal shell."
+          : `The matchlock volley punches into ${battleTargetName(targetId)}.`,
       });
     }
 
@@ -2239,7 +2261,7 @@ export class CorePhysicsWorld {
         machineId: "red-catch-sledge",
         targetId: "humpty",
         value: speed,
-        text: `The catch sledge receives Humpty at ${speed.toFixed(1)} m/s and keeps him off the stone floor.`,
+        text: `The straw-lined rescue litter receives Humpty at ${speed.toFixed(1)} m/s and keeps him off the stone floor.`,
       });
     }
   }
@@ -2327,44 +2349,44 @@ function battleMachineDefinition(id: string): {
   if (id === "red-engineers") return {
     team: "king",
     role: "rescue",
-    name: "Field Engineers",
-    purpose: "Brace damaged positions and raid exposed siege equipment.",
-    simpleMachines: [],
+    name: "Royal Sappers",
+    purpose: "Set gabions, shore damaged positions, and raid exposed powder stores.",
+    simpleMachines: ["wedge", "lever"],
   };
   if (id === "red-rescue-winch") return {
     team: "king",
     role: "rescue",
-    name: "Rescue Winch",
-    purpose: "Tension the cradle and arrest a developing fall.",
+    name: "Rescue Capstan",
+    purpose: "Tension block-and-tackle without lifting a fallen king back onto the tower.",
     simpleMachines: ["wheel-and-axle", "pulley"],
   };
   if (id === "red-catch-sledge") return {
     team: "king",
     role: "rescue",
-    name: "Catch Sledge",
-    purpose: "Roll a padded receiving bed beneath Humpty.",
+    name: "Gabion Rescue Cart",
+    purpose: "Roll a straw-lined litter and woven gabions beneath Humpty.",
     simpleMachines: ["inclined plane", "wheel-and-axle"],
   };
   if (id === "green-battering-ram") return {
     team: "queen",
     role: "war",
-    name: "Battering Ram",
-    purpose: "Drive a lower timber out and start a tower collapse.",
-    simpleMachines: ["lever", "wheel-and-axle"],
+    name: "Demi-Culverin",
+    purpose: "Fire heavy iron round shot into the lower tower.",
+    simpleMachines: ["wheel-and-axle", "inclined plane"],
   };
   if (id === "green-stone-thrower") return {
     team: "queen",
     role: "war",
-    name: "Stone Thrower",
-    purpose: "Drop a counterweight and sling stones into the upper tower.",
-    simpleMachines: ["lever", "pulley", "counterweight"],
+    name: "Bed Mortar",
+    purpose: "Lob powder shells over the defenses into the upper tower.",
+    simpleMachines: ["inclined plane", "wedge"],
   };
   if (id === "green-ballista") return {
     team: "queen",
     role: "war",
-    name: "Siege Ballista",
-    purpose: "Fire precise iron bolts at Humpty or Red equipment.",
-    simpleMachines: ["lever", "wheel-and-axle"],
+    name: "Matchlock Company",
+    purpose: "Fire coordinated volleys at Humpty or Red equipment.",
+    simpleMachines: ["lever", "wedge"],
   };
   return undefined;
 }
@@ -2375,7 +2397,7 @@ function battleMachineName(id: string): string {
 
 function battleTargetName(id: string): string {
   if (id === "humpty") return "Humpty";
-  if (id === "red-catch-sledge") return "Red's catch sledge";
+  if (id === "red-catch-sledge") return "Red's gabion rescue cart";
   if (id.startsWith("tower-")) return id.replace("tower-", "tower course ").replace("-", ", timber ");
   return id;
 }
