@@ -27,6 +27,7 @@ import {
   siegeUnits,
   type SiegeState,
 } from "./siege-rules.js";
+import { SIEGE_EQUIPMENT, siegeDrillStage, siegeEquipment } from "../../shared/siege-equipment.js";
 
 const PLANNING_TICKS = 10 * 60;
 const REVEAL_TICKS = 12 * 60;
@@ -47,6 +48,9 @@ export class BattleDirector {
   private sealedOrders: Partial<Record<Team, BattleOrderState>> = {};
   private visibleOrders: Partial<Record<Team, BattleOrderState>> = {};
   private outcome?: CoreMatchState["outcome"];
+  private pendingOutcome: "king" | "queen" | undefined;
+  private pendingPhysicalOrders: Partial<Record<Team, BattleOrderState>> = {};
+  private readonly stagedPhysicalTeams = new Set<Team>();
   private evidence = new Set<string>();
 
   constructor(
@@ -81,7 +85,25 @@ export class BattleDirector {
     const elapsed = this.physics.tick - this.roundStartedAt;
     if (this.battlePhase === "planning" && elapsed >= PLANNING_TICKS) this.revealOrders();
     if (this.battlePhase === "reveal" && elapsed >= REVEAL_TICKS) this.resolveOrders();
-    if (this.battlePhase === "resolving" && elapsed >= AFTERMATH_TICKS) this.battlePhase = "aftermath";
+    if (this.battlePhase === "resolving") {
+      const operationProgress = Math.max(0, Math.min(1, (elapsed - REVEAL_TICKS) / (AFTERMATH_TICKS - REVEAL_TICKS)));
+      for (const team of ["king", "queen"] as const) {
+        const order = this.pendingPhysicalOrders[team];
+        const effectAt = order ? siegeEquipment(order.unitId)?.effectAt ?? .66 : 1;
+        if (order && !this.stagedPhysicalTeams.has(team) && operationProgress >= effectAt) {
+          this.stagePhysicalEffect(order);
+          this.stagedPhysicalTeams.add(team);
+        }
+      }
+      if (elapsed >= AFTERMATH_TICKS) {
+        for (const team of ["king", "queen"] as const) {
+          const order = this.pendingPhysicalOrders[team];
+          if (order && !this.stagedPhysicalTeams.has(team)) this.stagePhysicalEffect(order);
+        }
+        if (this.pendingOutcome) this.complete(this.pendingOutcome);
+        else this.battlePhase = "aftermath";
+      }
+    }
     if (this.battlePhase === "aftermath" && elapsed >= ROUND_TICKS) this.startRound();
   }
 
@@ -129,7 +151,13 @@ export class BattleDirector {
     const activeRuleIds: Record<string, string> = {};
     for (const team of ["king", "queen"] as const) {
       const order = this.visibleOrders[team];
-      for (const workerId of this.physics.workerIds(team)) activeRuleIds[workerId] = order?.action ?? "hold-position";
+      const definition = order ? siegeEquipment(order.unitId) : undefined;
+      this.physics.workerIds(team).forEach((workerId, index) => {
+        const crew = definition?.crew[index];
+        activeRuleIds[workerId] = order && crew
+          ? `${order.unitId}:${crew.role}:${battle.chains[team].stageLabel}`
+          : "hold-position";
+      });
     }
     const machinePlans = {
       king: visibleKing ? orderSentence(visibleKing) : this.sealedOrders.king ? "Red order sealed" : "Red commander is reading the field",
@@ -150,7 +178,13 @@ export class BattleDirector {
       queenObjective: "Crack Humpty before the tenth turn is resolved.",
       rulebookSize: 7,
       activeRuleIds,
-      applicableRuleIds: Object.fromEntries(this.physics.workerIds().map((id) => [id, ["plan", "reveal", "resolve"]])),
+      applicableRuleIds: Object.fromEntries(this.physics.workerIds().map((id) => {
+        const team = id.startsWith("king-") ? "king" : "queen";
+        const affordances = SIEGE_EQUIPMENT
+          .filter((definition) => definition.team === team)
+          .flatMap((definition) => definition.affordances.map((affordance) => `${definition.id}:${affordance}`));
+        return [id, affordances];
+      })),
       machinePlans,
       machinePlanOptions: {
         king: planOptions(battle.units.filter((unit) => unit.team === "king")),
@@ -190,6 +224,9 @@ export class BattleDirector {
     this.round += 1;
     this.roundStartedAt = this.physics.tick;
     this.battlePhase = "planning";
+    this.pendingOutcome = undefined;
+    this.pendingPhysicalOrders = {};
+    this.stagedPhysicalTeams.clear();
     this.sealedOrders = openingOrders;
     this.visibleOrders = {};
     this.status = "active";
@@ -222,11 +259,12 @@ export class BattleDirector {
     if (!kingOrder || !queenOrder) return;
     const resolution = resolveSiegeRound(this.siege, this.round, this.seed, kingOrder, queenOrder);
     this.visibleOrders = { king: { ...resolution.kingOrder }, queen: { ...resolution.queenOrder } };
-    this.stagePhysicalEffects(resolution.kingOrder, resolution.queenOrder);
+    this.pendingPhysicalOrders = { king: resolution.kingOrder, queen: resolution.queenOrder };
+    this.stagedPhysicalTeams.clear();
     this.battlePhase = "resolving";
     this.emit({ text: resolution.summary, technical: `siege:round:${this.round}:resolved` });
     this.evidence.add(`round:${this.round}:resolved`);
-    if (resolution.outcome) this.complete(resolution.outcome);
+    this.pendingOutcome = resolution.outcome;
   }
 
   private complete(outcome: "king" | "queen"): void {
@@ -255,8 +293,8 @@ export class BattleDirector {
       humptyRisk,
       tempo: this.status === "complete" ? "complete" : this.round >= 10 ? "last-stand" : humptyRisk >= 70 ? "critical" : this.round >= 4 || humptyRisk >= 30 ? "pressing" : "opening",
       chains: {
-        king: compatibilityChain("king", this.visibleOrders.king),
-        queen: compatibilityChain("queen", this.visibleOrders.queen),
+        king: compatibilityChain("king", this.visibleOrders.king, this.battlePhase, elapsed),
+        queen: compatibilityChain("queen", this.visibleOrders.queen, this.battlePhase, elapsed),
       },
       machines: this.physics.battleMachineStates(),
       units,
@@ -270,13 +308,13 @@ export class BattleDirector {
     };
   }
 
-  private stagePhysicalEffects(kingOrder: BattleOrderState, queenOrder: BattleOrderState): void {
-    if (kingOrder.unitId === "red-rescue-winch") this.physics.operateBattleMachine("red-rescue-winch");
-    if (kingOrder.unitId === "red-catch-sledge") this.physics.operateBattleMachine("red-catch-sledge");
-    const targetId = physicalTargetId(queenOrder);
-    if (queenOrder.unitId === "green-battering-ram") this.physics.operateBattleMachine("green-battering-ram", targetId, queenOrder.hit !== false);
-    if (queenOrder.unitId === "green-stone-thrower") this.physics.operateBattleMachine("green-stone-thrower", targetId, queenOrder.hit !== false);
-    if (queenOrder.unitId === "green-ballista") this.physics.fireBattleBallista(targetId, queenOrder.hit !== false);
+  private stagePhysicalEffect(order: BattleOrderState): void {
+    if (order.unitId === "red-rescue-winch") this.physics.operateBattleMachine("red-rescue-winch");
+    if (order.unitId === "red-catch-sledge") this.physics.operateBattleMachine("red-catch-sledge");
+    const targetId = physicalTargetId(order);
+    if (order.unitId === "green-battering-ram") this.physics.operateBattleMachine("green-battering-ram", targetId, order.hit !== false);
+    if (order.unitId === "green-stone-thrower") this.physics.operateBattleMachine("green-stone-thrower", targetId, order.hit !== false);
+    if (order.unitId === "green-ballista") this.physics.fireBattleBallista(targetId, order.hit !== false);
   }
 
   private forwardPhysicsEvents(): void {
@@ -298,7 +336,12 @@ export class BattleDirector {
   }
 }
 
-function compatibilityChain(team: Team, order?: BattleOrderState): BattleChainState {
+function compatibilityChain(
+  team: Team,
+  order: BattleOrderState | undefined,
+  phase: BattleState["phase"],
+  elapsed: number,
+): BattleChainState {
   if (!order) {
     return {
       tacticId: "",
@@ -316,6 +359,9 @@ function compatibilityChain(team: Team, order?: BattleOrderState): BattleChainSt
       simpleMachines: [],
     };
   }
+  const definition = siegeEquipment(order.unitId);
+  const operationProgress = Math.max(0, Math.min(.999999, (elapsed - REVEAL_TICKS) / (AFTERMATH_TICKS - REVEAL_TICKS)));
+  const drillStage = phase === "resolving" ? siegeDrillStage(order.unitId, operationProgress) : undefined;
   return {
     tacticId: orderId(order),
     title: order.action,
@@ -324,12 +370,12 @@ function compatibilityChain(team: Team, order?: BattleOrderState): BattleChainSt
     machineName: order.unitName,
     targetId: order.targetId,
     targetName: order.targetName,
-    stage: order.status === "resolved" ? "assessing" : "operating",
-    stageLabel: order.status === "resolved" ? "Result recorded" : "Order revealed",
-    progress: order.status === "resolved" ? 1 : .5,
+    stage: phase === "resolving" ? "operating" : order.status === "resolved" ? "assessing" : "crewing",
+    stageLabel: drillStage?.label ?? (order.status === "resolved" ? "Result recorded" : "Crew moving to stations"),
+    progress: phase === "resolving" ? operationProgress : order.status === "resolved" ? 1 : .5,
     utility: 0,
     lastResult: order.result,
-    simpleMachines: [],
+    simpleMachines: [...(definition?.simpleMachines ?? [])],
   };
 }
 
@@ -339,7 +385,12 @@ function planOptions(units: BattleState["units"]): MachinePlanOptionState[] {
     ruleId: unit.availableActions.join("/"),
     label: `${unit.name}: ${unit.purpose}`,
     eligible: unit.state === "ready",
-    observedFacts: [`${unit.ammunition}/${unit.maxAmmunition} ammunition`, `${unit.integrity} integrity`],
+    observedFacts: [
+      `${unit.ammunition}/${unit.maxAmmunition} ${unit.munition}`,
+      `${unit.integrity} integrity`,
+      `crew: ${unit.crewRoles.join(", ")}`,
+      `affordances: ${unit.affordances.join(", ")}`,
+    ],
     missingFacts: unit.state === "ready" ? [] : [unit.state],
   }));
 }

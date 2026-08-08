@@ -259,6 +259,10 @@ export interface BattleMachineState {
   role: "war" | "rescue";
   name: string;
   purpose: string;
+  munition: string;
+  affordances: string[];
+  crewRoles: string[];
+  drill: string[];
   simpleMachines: string[];
   integrity: number;
   charges: number;
@@ -292,6 +296,10 @@ export interface BattleUnitState {
   name: string;
   role: string;
   purpose: string;
+  munition: string;
+  affordances: string[];
+  crewRoles: string[];
+  drill: string[];
   integrity: number;
   maxIntegrity: number;
   ammunition: number;

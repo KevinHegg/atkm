@@ -16,6 +16,7 @@ import {
   type TransformWriteRecord,
   type Vec3,
 } from "../../shared/core-protocol.js";
+import { siegeEquipment } from "../../shared/siege-equipment.js";
 import {
   INVENTORY_COUNT,
   INVENTORY_DEFINITIONS,
@@ -562,6 +563,10 @@ export class CorePhysicsWorld {
         role: definition.role,
         name: definition.name,
         purpose: definition.purpose,
+        munition: definition.munition,
+        affordances: [...definition.affordances],
+        crewRoles: definition.crew.map((crew) => crew.role),
+        drill: definition.drill.map((stage) => stage.label),
         simpleMachines: [...definition.simpleMachines],
         integrity,
         charges,
@@ -2344,51 +2349,25 @@ function battleMachineDefinition(id: string): {
   role: BattleMachineState["role"];
   name: string;
   purpose: string;
+  munition: string;
+  affordances: readonly string[];
+  crew: readonly { role: string }[];
+  drill: readonly { label: string }[];
   simpleMachines: readonly string[];
 } | undefined {
-  if (id === "red-engineers") return {
-    team: "king",
-    role: "rescue",
-    name: "Royal Sappers",
-    purpose: "Set gabions, shore damaged positions, and raid exposed powder stores.",
-    simpleMachines: ["wedge", "lever"],
+  const definition = siegeEquipment(id);
+  if (!definition) return undefined;
+  return {
+    team: definition.team,
+    role: definition.machineRole,
+    name: definition.name,
+    purpose: definition.purpose,
+    munition: definition.munition,
+    affordances: definition.affordances,
+    crew: definition.crew,
+    drill: definition.drill,
+    simpleMachines: definition.simpleMachines,
   };
-  if (id === "red-rescue-winch") return {
-    team: "king",
-    role: "rescue",
-    name: "Rescue Capstan",
-    purpose: "Tension block-and-tackle without lifting a fallen king back onto the tower.",
-    simpleMachines: ["wheel-and-axle", "pulley"],
-  };
-  if (id === "red-catch-sledge") return {
-    team: "king",
-    role: "rescue",
-    name: "Gabion Rescue Cart",
-    purpose: "Roll a straw-lined litter and woven gabions beneath Humpty.",
-    simpleMachines: ["inclined plane", "wheel-and-axle"],
-  };
-  if (id === "green-battering-ram") return {
-    team: "queen",
-    role: "war",
-    name: "Demi-Culverin",
-    purpose: "Fire heavy iron round shot into the lower tower.",
-    simpleMachines: ["wheel-and-axle", "inclined plane"],
-  };
-  if (id === "green-stone-thrower") return {
-    team: "queen",
-    role: "war",
-    name: "Bed Mortar",
-    purpose: "Lob powder shells over the defenses into the upper tower.",
-    simpleMachines: ["inclined plane", "wedge"],
-  };
-  if (id === "green-ballista") return {
-    team: "queen",
-    role: "war",
-    name: "Matchlock Company",
-    purpose: "Fire coordinated volleys at Humpty or Red equipment.",
-    simpleMachines: ["lever", "wedge"],
-  };
-  return undefined;
 }
 
 function battleMachineName(id: string): string {

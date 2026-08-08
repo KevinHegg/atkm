@@ -502,7 +502,7 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 .unit-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 30px 72px;
-  min-height: 45px;
+  min-height: 56px;
   align-items: center;
   gap: 10px;
   padding: 6px 18px;
@@ -512,6 +512,7 @@ button:disabled { cursor: not-allowed; opacity: .42; }
 .unit-row > div:first-child { min-width: 0; }
 .unit-row strong { display: block; overflow: hidden; color: var(--paper); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .unit-row div span { display: block; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.unit-row div .unit-crew { margin-top: 2px; color: #aeb9b3; font-size: 8px; }
 .unit-row > b { color: #dfe3dd; font-size: 12px; text-align: right; }
 .unit-row.recovering strong { color: #a6aea9; }
 .unit-row.spent,

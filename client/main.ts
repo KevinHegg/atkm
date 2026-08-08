@@ -30,6 +30,7 @@ import {
   type ReplaySummary,
   type Team,
 } from "../shared/core-protocol.js";
+import { siegeEquipment } from "../shared/siege-equipment.js";
 import { LabWorld } from "./lab-world.js";
 
 interface PublicReplaySummary extends ReplaySummary {
@@ -506,7 +507,13 @@ function renderOrders(snapshot: CoreSnapshot): void {
     const detail = document.createElement("p");
     if (order) {
       title.textContent = `${order.unitName} · ${actionLabel(order.action)}`;
-      detail.textContent = order.status === "resolved" ? order.result : `Target: ${order.targetName}`;
+      const chain = battle.chains[team];
+      const definition = siegeEquipment(order.unitId);
+      const stage = definition?.drill.find((candidate) => candidate.label === chain.stageLabel);
+      const lead = stage?.leadCrew.map((index) => definition?.crew[index]?.role).filter(Boolean).join(" + ");
+      detail.textContent = battle.phase === "resolving"
+        ? `${chain.stageLabel}${lead ? ` · ${lead}` : ""}`
+        : order.status === "resolved" ? order.result : `Target: ${order.targetName}`;
     } else if (battle.sealedTeams.includes(team)) {
       title.textContent = "Order sealed";
       detail.textContent = "Hidden until both commanders reveal.";
@@ -541,12 +548,16 @@ function unitRow(unit: BattleUnitState): HTMLElement {
   strong.textContent = unit.name;
   const role = document.createElement("span");
   role.textContent = unit.state === "recovering" ? "cooling down" : unit.role;
-  name.append(strong, role);
+  const crew = document.createElement("span");
+  crew.className = "unit-crew";
+  crew.textContent = unit.crewRoles.join(" · ");
+  name.append(strong, role, crew);
+  row.title = `${unit.purpose}\nCrew: ${unit.crewRoles.join(", ")}\nDrill: ${unit.drill.join("; ")}\nAffordances: ${unit.affordances.join("; ")}`;
   const integrity = document.createElement("b");
   integrity.textContent = String(Math.round(unit.integrity));
   const ammo = document.createElement("div");
   ammo.className = "ammo";
-  ammo.setAttribute("aria-label", `${unit.ammunition} of ${unit.maxAmmunition} ammunition`);
+  ammo.setAttribute("aria-label", `${unit.ammunition} of ${unit.maxAmmunition} ${unit.munition}`);
   for (let index = 0; index < unit.maxAmmunition; index += 1) {
     const pip = document.createElement("i");
     pip.classList.toggle("spent", index >= unit.ammunition);

@@ -27,6 +27,8 @@ fallen Humpty back onto the tower.
 
 ## Source Of Truth
 
+- `shared/siege-equipment.ts`: canonical equipment, ammunition, affordances,
+  three-person crews, stations, tools, and operating drills;
 - `server/core/siege-rules.ts`: unit catalog, legal orders, deterministic
   commanders, counterplay, damage, ammunition, and victory rules;
 - `server/core/battle-director.ts`: planning/reveal/resolution timing and public
@@ -53,6 +55,12 @@ fallen Humpty back onto the tower.
 - PlayCanvas consumes snapshots and never creates gameplay authority.
 - Orders must name an advertised unit, action, and target. Invalid, disabled,
   cooling, or spent equipment cannot act.
+- Names are contracts, not skins. Strategy, agent context, crew stations,
+  visible tools, animation, ammunition, targets, and physical effects must all
+  derive from the same canonical equipment definition.
+- A cannon shot, mortar shell, volley, rescue pull, cart deployment, or sapper
+  effect may begin only when its visible drill reaches its declared effect
+  stage.
 - Both valid orders resolve simultaneously. Destroying a unit during an
   exchange does not erase the order it already fired.
 - Ammunition, integrity, cooldowns, cover, and the rescue-litter save are finite and

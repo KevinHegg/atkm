@@ -22,8 +22,8 @@ interface PublicReplaySummary extends ReplaySummary {
 }
 
 const OUTPUT_DIR = resolve(process.cwd(), "public", "replays");
-const BUILD_ID = "toy-armory-0806";
-const CREATED_AT = "2026-08-06T21:00:00.000Z";
+const BUILD_ID = "canonical-drills-0807";
+const CREATED_AT = "2026-08-08T00:50:00.000Z";
 const MAX_SECONDS = 200;
 const EVENT_LIMIT = 18;
 const ACTION_FRAME_INTERVAL = .2;
@@ -33,21 +33,21 @@ const demos: DemoSpec[] = [
     id: "the-sledgebreaker",
     seed: 10,
     title: "The Powder Train Raid",
-    description: "Royal sappers raid the powder train while Green's culverin and mortar search for a breach.",
+    description: "Royal sappers work pick, fascine, and gabion while Green's gun crew sponges, rams, lays, and fires the demi-culverin.",
     frameInterval: 1,
   },
   {
     id: "the-ten-minute-hold",
     seed: 4198,
     title: "The Broken Foundation",
-    description: "Green pounds the tower with round shot and mortar shells while Red races a gabion rescue cart beneath the crown.",
+    description: "Iron round shot and fused mortar shells batter the foundation while Red's capstan and gabion cart crews attempt the rescue.",
     frameInterval: 1,
   },
   {
     id: "the-king-shot",
     seed: 1881,
     title: "The Last Volley",
-    description: "A decapitation duel spends the rescue litter early and comes down to Green's final matchlock volley.",
+    description: "A three-rank matchlock company primes, presents, fires, and recovers while the rescue crews fight for the crown platform.",
     frameInterval: 1,
   },
 ];

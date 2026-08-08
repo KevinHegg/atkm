@@ -11,6 +11,7 @@ import {
   type PartFamily,
 } from "../shared/core-protocol.js";
 import { AGENT_OBJECTIVES, AGENT_RULES } from "../shared/agent-rules.js";
+import { SIEGE_EQUIPMENT, siegeDrillStage } from "../shared/siege-equipment.js";
 import { INVENTORY_COUNT, INVENTORY_DEFINITIONS } from "../server/core/catalog.js";
 import { CorePhysicsWorld, QUEEN_CROWN_BOLT_COUNT, TOWER_SPEC } from "../server/core/physics.js";
 import {
@@ -440,6 +441,47 @@ test("the siege director reveals and resolves one simultaneous order per team", 
   }
 });
 
+test("every formed unit exposes one canonical item, crew, munition, and contiguous drill", () => {
+  assert.equal(SIEGE_EQUIPMENT.length, 6);
+  for (const definition of SIEGE_EQUIPMENT) {
+    assert.equal(definition.crew.length, 3);
+    assert.ok(definition.munition.length > 0);
+    assert.ok(definition.affordances.length >= 5);
+    assert.equal(definition.drill[0]?.from, 0);
+    assert.equal(definition.drill.at(-1)?.to, 1);
+    for (let index = 1; index < definition.drill.length; index += 1) {
+      assert.equal(definition.drill[index - 1]?.to, definition.drill[index]?.from);
+    }
+    assert.equal(siegeDrillStage(definition.id, definition.effectAt)?.id, definition.effectStage);
+  }
+});
+
+test("the demi-culverin fires only when its visible drill reaches touch-off", async () => {
+  const simulation = await CoreSimulation.create({ seed: 4198, build: "test", autoMatch: true });
+  try {
+    assert.equal(simulation.handleCommand({
+      type: "battle-order",
+      team: "king",
+      unitId: "red-engineers",
+      action: "fortify",
+      targetId: "foundation",
+    }).ok, true);
+    assert.equal(simulation.handleCommand({
+      type: "battle-order",
+      team: "queen",
+      unitId: "green-battering-ram",
+      action: "breach",
+      targetId: "foundation",
+    }).ok, true);
+    while (simulation.snapshot().match.battle?.phase !== "resolving") simulation.step();
+    assert.equal(simulation.snapshot().events.some((event) => event.technical?.includes("physical:cannon-shot")), false);
+    while (!simulation.snapshot().events.some((event) => event.technical?.includes("physical:cannon-shot"))) simulation.step();
+    assert.equal(simulation.snapshot().match.battle?.chains.queen.stageLabel, "Touch the vent with slow match");
+  } finally {
+    simulation.destroy();
+  }
+});
+
 test("matchlock volleys resolve to a physical impact or a finite miss", async () => {
   const hitWorld = await CorePhysicsWorld.create(1881, true);
   const missWorld = await CorePhysicsWorld.create(1881, true);
@@ -630,7 +672,8 @@ test("the legacy lab still expands fixtures while the repo contract points to th
     assert.ok(expanded.every((plan) => plan.requests.length > 0));
     assert.ok(expanded.every((plan) => plan.requests.every((request) =>
       request.actorIds.every((actorId) => isolated.workerIds("queen").includes(actorId)))));
-    assert.equal(REPO_AGENT_CONTEXT.contractVersion, "simultaneous-siege-v1");
+    assert.equal(REPO_AGENT_CONTEXT.contractVersion, "canonical-siege-affordances-v2");
+    assert.ok(REPO_AGENT_CONTEXT.sourceOfTruth.includes("shared/siege-equipment.ts"));
     assert.ok(REPO_AGENT_CONTEXT.sourceOfTruth.includes("server/core/siege-rules.ts"));
     assert.ok(REPO_AGENT_CONTEXT.mcpTools.includes("list_legal_siege_orders"));
   } finally {

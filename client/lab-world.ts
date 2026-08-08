@@ -7,6 +7,7 @@ import type {
   PartFamily,
   Team,
 } from "../shared/core-protocol.js";
+import { siegeDrillStage, siegeEquipment, type SiegeCrewTool } from "../shared/siege-equipment.js";
 
 interface RenderBody {
   root: pc.Entity;
@@ -33,7 +34,7 @@ interface WorkerVisual {
   rightArm: pc.Entity;
   leftLeg: pc.Entity;
   rightLeg: pc.Entity;
-  tool: pc.Entity;
+  tools: Map<SiegeCrewTool, pc.Entity>;
   team: Team;
   index: number;
   phase: string;
@@ -981,19 +982,34 @@ export class LabWorld {
     const rightArm = this.primitive("worker-right-arm", "cylinder", rig, new pc.Vec3(.34, .02, .03), new pc.Vec3(.12, .62, .12), uniform, new pc.Vec3(0, 0, 12));
     const leftLeg = this.primitive("worker-left-leg", "cylinder", rig, new pc.Vec3(-.16, -.48, 0), new pc.Vec3(.12, .55, .12), this.material("ink", palette.ink, .42));
     const rightLeg = this.primitive("worker-right-leg", "cylinder", rig, new pc.Vec3(.16, -.48, 0), new pc.Vec3(.12, .55, .12), this.material("ink", palette.ink, .42));
-    const tool = new pc.Entity(`${id}-tool`);
-    tool.setLocalPosition(.34, .12, .12);
-    rig.addChild(tool);
-    if (team === "queen") {
-      this.primitive("matchlock-stock", "box", tool, new pc.Vec3(-.28, 0, 0), new pc.Vec3(1.25, .1, .12), this.material("matchlock-stock", palette.oakDark, .18), new pc.Vec3(0, 0, -8));
-      this.primitive("matchlock-barrel", "cylinder", tool, new pc.Vec3(-.82, .08, 0), new pc.Vec3(.045, 1.05, .045), this.material("matchlock-iron", palette.iron, .55, .7), new pc.Vec3(0, 0, 90));
-      this.primitive("slow-match", "cylinder", tool, new pc.Vec3(-.18, .17, 0), new pc.Vec3(.02, .28, .02), this.material("slow-match", new pc.Color(.78, .36, .08), .2), new pc.Vec3(0, 0, 28));
-    } else {
-      this.primitive("sapper-handle", "cylinder", tool, new pc.Vec3(0, -.1, 0), new pc.Vec3(.045, .88, .045), this.material("sapper-handle", palette.oakLight, .16), new pc.Vec3(0, 0, 24));
-      this.primitive("sapper-head", "box", tool, new pc.Vec3(-.18, .28, 0), new pc.Vec3(.42, .14, .15), this.material("sapper-iron", palette.iron, .55, .68), new pc.Vec3(0, 0, 24));
-    }
+    const tools = new Map<SiegeCrewTool, pc.Entity>();
+    const toolGroup = (kind: SiegeCrewTool): pc.Entity => {
+      const tool = new pc.Entity(`${id}-${kind}`);
+      tool.setLocalPosition(.34, .12, .12);
+      tool.enabled = false;
+      rig.addChild(tool);
+      tools.set(kind, tool);
+      return tool;
+    };
+    const sapper = toolGroup("sapper-tool");
+    this.primitive("sapper-handle", "cylinder", sapper, new pc.Vec3(0, -.1, 0), new pc.Vec3(.045, .88, .045), this.material("sapper-handle", palette.oakLight, .16), new pc.Vec3(0, 0, 24));
+    this.primitive("sapper-head", "box", sapper, new pc.Vec3(-.18, .28, 0), new pc.Vec3(.42, .14, .15), this.material("sapper-iron", palette.iron, .55, .68), new pc.Vec3(0, 0, 24));
+    const matchlock = toolGroup("matchlock");
+    this.primitive("matchlock-stock", "box", matchlock, new pc.Vec3(-.28, 0, 0), new pc.Vec3(1.25, .1, .12), this.material("matchlock-stock", palette.oakDark, .18), new pc.Vec3(0, 0, -8));
+    this.primitive("matchlock-barrel", "cylinder", matchlock, new pc.Vec3(-.82, .08, 0), new pc.Vec3(.045, 1.05, .045), this.material("matchlock-iron", palette.iron, .55, .7), new pc.Vec3(0, 0, 90));
+    this.primitive("slow-match", "cylinder", matchlock, new pc.Vec3(-.18, .17, 0), new pc.Vec3(.02, .28, .02), this.material("slow-match", new pc.Color(.78, .36, .08), .2), new pc.Vec3(0, 0, 28));
+    const rammer = toolGroup("sponge-rammer");
+    this.primitive("rammer-staff", "cylinder", rammer, new pc.Vec3(-.62, 0, 0), new pc.Vec3(.045, 1.5, .045), this.material("rammer-staff", palette.oakLight, .16), new pc.Vec3(0, 0, 90));
+    this.primitive("rammer-head", "cylinder", rammer, new pc.Vec3(-1.38, 0, 0), new pc.Vec3(.12, .2, .12), this.material("rammer-head", new pc.Color(.28, .23, .15), .04), new pc.Vec3(0, 0, 90));
+    const linstock = toolGroup("linstock");
+    this.primitive("linstock-staff", "cylinder", linstock, new pc.Vec3(-.22, .06, 0), new pc.Vec3(.035, .86, .035), this.material("linstock-staff", palette.oakLight, .16), new pc.Vec3(0, 0, 68));
+    this.primitive("linstock-match", "sphere", linstock, new pc.Vec3(-.58, .22, 0), new pc.Vec3(.09, .09, .09), this.material("linstock-ember", new pc.Color(1, .22, .015), .28));
+    const ropeCoil = toolGroup("rope-coil");
+    const ropeMesh = pc.createTorus(this.app.graphicsDevice, { ringRadius: .19, tubeRadius: .035, segments: 18, sides: 6 });
+    this.meshEntity("rope-coil", ropeMesh, this.material("crew-rope", palette.rope, .12), ropeCoil);
+    ropeCoil.setLocalEulerAngles(90, 0, 0);
     const index = Number(id.at(-1) ?? "1") - 1;
-    this.workerVisuals.set(id, { rig, leftArm, rightArm, leftLeg, rightLeg, tool, team, index, phase: "idle" });
+    this.workerVisuals.set(id, { rig, leftArm, rightArm, leftLeg, rightLeg, tools, team, index, phase: "idle" });
   }
 
   private teamWrap(root: pc.Entity, team: Team, size: pc.Vec3, position: pc.Vec3): void {
@@ -1145,8 +1161,9 @@ export class LabWorld {
       const order = id.startsWith("red-") ? redOrder : greenOrder;
       const engaged = resolving && order?.unitId === id;
       for (const wheel of visual.wheels) wheel.setLocalEulerAngles(90, wheelSpin, 0);
-      const powderLife = engaged && progress >= .31 && progress <= .58
-        ? Math.sin((progress - .31) / .27 * Math.PI)
+      const effectAt = siegeEquipment(id)?.effectAt ?? .66;
+      const powderLife = engaged && progress >= effectAt - .035 && progress <= effectAt + .2
+        ? Math.sin((progress - effectAt + .035) / .235 * Math.PI)
         : 0;
       if (visual.effect) {
         visual.effect.enabled = powderLife > .02;
@@ -1164,18 +1181,18 @@ export class LabWorld {
         visual.motion.setLocalScale(1, 1 + Math.abs(catchPulse) * .65, 1);
         visual.motion.setLocalEulerAngles(0, 0, catchPulse * 3.5);
       } else if (visual.kind === "cannon") {
-        const recoil = engaged && progress >= .34
-          ? Math.sin((progress - .34) * Math.PI * 5) * Math.exp(-(progress - .34) * 6)
+        const recoil = engaged && progress >= effectAt
+          ? Math.sin((progress - effectAt) * Math.PI * 5) * Math.exp(-(progress - effectAt) * 6)
           : 0;
         visual.motion.setLocalPosition(-.18 + recoil * .58, .2, 0);
       } else if (visual.kind === "mortar") {
-        const recoil = engaged && progress >= .34
-          ? Math.sin((progress - .34) * Math.PI * 5) * Math.exp(-(progress - .34) * 7)
+        const recoil = engaged && progress >= effectAt
+          ? Math.sin((progress - effectAt) * Math.PI * 5) * Math.exp(-(progress - effectAt) * 7)
           : 0;
         visual.motion.setLocalPosition(-.22 + recoil * .16, .12 - Math.abs(recoil) * .18, 0);
       } else if (visual.kind === "matchlock") {
-        const kick = engaged && progress >= .34
-          ? Math.sin((progress - .34) * Math.PI * 9) * Math.exp(-(progress - .34) * 10)
+        const kick = engaged && progress >= effectAt
+          ? Math.sin((progress - effectAt) * Math.PI * 9) * Math.exp(-(progress - effectAt) * 10)
           : 0;
         visual.motion.setLocalPosition(-.18 + kick * .24, .45, 0);
       }
@@ -1184,6 +1201,7 @@ export class LabWorld {
     for (const visual of this.workerVisuals.values()) {
       const order = visual.team === "king" ? redOrder : greenOrder;
       const machine = order ? this.bodies.get(order.unitId) : undefined;
+      for (const tool of visual.tools.values()) tool.enabled = false;
       if (!battle || !order || !machine || battle.phase === "planning") {
         const current = visual.rig.getLocalPosition();
         visual.rig.setLocalPosition(
@@ -1191,38 +1209,59 @@ export class LabWorld {
           pc.math.lerp(current.y, 0, .08),
           pc.math.lerp(current.z, 0, .08),
         );
-        visual.tool.setLocalEulerAngles(0, 0, visual.team === "queen" ? -8 : 24);
         continue;
       }
+      const definition = siegeEquipment(order.unitId);
+      const station = definition?.crew[visual.index];
+      if (!definition || !station) continue;
       const side = visual.team === "king" ? -1 : 1;
-      const spacing = order.unitId === "green-ballista" ? .62 : .72;
       const target = new pc.Vec3(
-        machine.currentPosition.x + side * (order.unitId === "red-catch-sledge" ? 1.4 : .9),
+        machine.currentPosition.x + side * station.outboard,
         .775,
-        machine.currentPosition.z + (visual.index - 1) * spacing,
+        machine.currentPosition.z + station.lateral,
       );
       const current = visual.rig.getPosition();
       const next = new pc.Vec3().lerp(current, target, battle.phase === "reveal" ? .09 : .16);
       visual.rig.setPosition(next);
       visual.rig.setEulerAngles(0, visual.team === "king" ? 90 : -90, 0);
       const engaged = resolving && progress > .02;
-      const workCycle = Math.sin((progress * 5 + visual.index * .32) * Math.PI);
+      const drillStage = engaged ? siegeDrillStage(order.unitId, progress) : undefined;
+      const leading = drillStage?.leadCrew.includes(visual.index) ?? false;
+      const workCycle = leading ? Math.sin((progress * definition.drill.length + visual.index * .18) * Math.PI * 2) : 0;
       const gait = battle.phase === "reveal" ? Math.sin(this.elapsed * 12 + visual.index) * 28 : 0;
       visual.leftLeg.setLocalEulerAngles(gait, 0, 0);
       visual.rightLeg.setLocalEulerAngles(-gait, 0, 0);
-      if (visual.team === "queen") {
-        const aim = engaged ? smoothStep(.05, .3, progress) : 0;
-        const recoil = engaged && progress >= .34
-          ? Math.sin((progress - .34) * Math.PI * 8) * Math.exp(-(progress - .34) * 9)
-          : 0;
-        visual.leftArm.setLocalEulerAngles(58 * aim - recoil * 22, 0, -18);
-        visual.rightArm.setLocalEulerAngles(58 * aim + recoil * 18, 0, 18);
-        visual.tool.setLocalEulerAngles(0, 0, -8 + aim * 8 - recoil * 12);
+      const activeTool = station.tool === "none" ? undefined : visual.tools.get(station.tool);
+      if (activeTool) {
+        activeTool.enabled = true;
+        activeTool.setLocalPosition(.34, .12, .12);
+        activeTool.setLocalEulerAngles(0, 0, station.tool === "sapper-tool" ? 24 : station.tool === "matchlock" ? -8 : 0);
+      }
+      if (order.unitId === "green-ballista") {
+        const present = ["shoulder", "present", "volley"].includes(drillStage?.id ?? "") ? 1 : 0;
+        const recoil = drillStage?.id === "volley" ? Math.max(0, workCycle) : 0;
+        visual.leftArm.setLocalEulerAngles(58 * present - recoil * 20, 0, -18);
+        visual.rightArm.setLocalEulerAngles(58 * present + recoil * 16, 0, 18);
+        activeTool?.setLocalEulerAngles(0, 0, -8 + present * 8 - recoil * 12);
+      } else if (station.tool === "sponge-rammer") {
+        const stroke = leading ? workCycle : 0;
+        visual.leftArm.setLocalEulerAngles(48 + stroke * 24, 0, -18);
+        visual.rightArm.setLocalEulerAngles(48 - stroke * 24, 0, 18);
+        activeTool?.setLocalPosition(.18 - stroke * .42, .18, .12);
+        activeTool?.setLocalEulerAngles(0, 0, -4 + stroke * 8);
+      } else if (station.tool === "linstock") {
+        const firing = drillStage?.id === "fire" || drillStage?.id === "volley";
+        visual.leftArm.setLocalEulerAngles(firing ? 58 : 24, 0, -18);
+        visual.rightArm.setLocalEulerAngles(firing ? 48 : 18, 0, 18);
+        activeTool?.setLocalEulerAngles(0, 0, firing ? -48 + workCycle * 8 : 18);
+      } else if (station.tool === "sapper-tool") {
+        visual.leftArm.setLocalEulerAngles(40 + workCycle * 34, 0, -18);
+        visual.rightArm.setLocalEulerAngles(40 - workCycle * 34, 0, 18);
+        activeTool?.setLocalEulerAngles(0, 0, 24 - workCycle * 62);
       } else {
-        const haul = engaged ? workCycle : 0;
-        visual.leftArm.setLocalEulerAngles(42 + haul * 34, 0, -18);
-        visual.rightArm.setLocalEulerAngles(42 - haul * 34, 0, 18);
-        visual.tool.setLocalEulerAngles(0, 0, 24 - haul * 62);
+        const push = leading && ["haul", "push", "run-out", "bars", "heave", "shell", "charge"].includes(drillStage?.id ?? "");
+        visual.leftArm.setLocalEulerAngles(push ? 66 + workCycle * 12 : 24, 0, -18);
+        visual.rightArm.setLocalEulerAngles(push ? 66 - workCycle * 12 : 18, 0, 18);
       }
     }
 

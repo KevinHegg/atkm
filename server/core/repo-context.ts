@@ -1,9 +1,10 @@
 export const REPO_AGENT_CONTEXT = {
-  contractVersion: "simultaneous-siege-v1",
+  contractVersion: "canonical-siege-affordances-v2",
   authority: "The deterministic siege rules decide tactical outcomes; Rapier 3D is the only physical authority.",
   sourceOfTruth: [
     "AGENTS.md",
     "shared/core-protocol.ts",
+    "shared/siege-equipment.ts",
     "server/core/siege-rules.ts",
     "server/core/battle-director.ts",
     "server/core/physics.ts",
@@ -14,6 +15,8 @@ export const REPO_AGENT_CONTEXT = {
     "Both sealed orders reveal together and resolve simultaneously.",
     "Ammunition, integrity, cooldowns, cover, and the one-use catch remain finite and public.",
     "Seeded commanders are deterministic and cannot invent private actions or outcomes.",
+    "Every unit, crew role, tool, munition, legal target, and drill step comes from the canonical equipment catalog.",
+    "A physical effect cannot begin before its visible canonical drill reaches the declared effect stage.",
     "The construction kit is an isolated engineering lab and is not spawned in the main battle.",
   ],
   mcpTools: [

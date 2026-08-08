@@ -53,7 +53,9 @@ controls pause, refit the camera, expose physical diagnostics, and restart.
 ## Architecture
 
 Rapier 3D on the server is the only gameplay physics world. PlayCanvas renders
-public snapshots. `server/core/siege-rules.ts` owns the tactical rules;
+public snapshots. `shared/siege-equipment.ts` is the canonical catalog for each
+item's ammunition, affordances, crew roles, tools, stations, and drill.
+`server/core/siege-rules.ts` owns the tactical rules;
 `server/core/battle-director.ts` owns turn timing; `shared/core-protocol.ts`
 defines the public contract.
 
