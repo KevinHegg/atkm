@@ -38,7 +38,7 @@ unlock every verse.
 - **Soft things save him.** Hay, stretchers and the arms of the King's men cushion him.
 - **The King's men put him back.** When he lands safely, the stagehands lower a hook
   from the flies and hoist him back to the highest perch near his old spot. That
-  costs you the shot.
+  costs you the shot. If that was your last shot, the curtain comes down straight away.
 - **The verse ends when he cracks.** Until then, everything you break, bowl over, ring or
   startle counts as **mayhem**, and the King sends you the bill. Each verse has a spare
   round shot for exploring: spend it on mischief, but save enough to finish the job.
@@ -54,8 +54,8 @@ unlock every verse.
 - **A great fall** (at least the verse's height, shown by the surveyor's line) earns a
   mayhem bonus on top of the crack.
 - **Treasure chests.** Every verse has an iron-bound chest of spare powder somewhere on
-  stage. Any munition that reaches it forces it open: one more of every kind of shot the
-  verse stocks.
+  stage. Any munition that reaches it forces it open for three rounds: one to replace the
+  shot that opened it, then one each to whichever racks are emptiest (left to right on a tie).
 - **Reviews and replays.** After the curtain the morning papers review the performance,
   and **Replay** shows the final shot again in slow motion. The simulation is
   deterministic, so the replay is exact.
@@ -64,7 +64,8 @@ unlock every verse.
   - **Mortar shells** lob over walls and burst on contact.
   - **Grapeshot** sprays small balls that bowl over the King's men.
   - **Chain shot** is two spinning balls on a chain. The chain is a blade: it knocks the
-    blocks it sweeps through and it cuts rope and maypoles.
+    blocks it sweeps through and it cuts rope and maypoles. Its aim arc stops where a
+    whirling ball will first clip something, not just where the middle of the chain would.
   - **Fizzing bombs** are lobbed from the mortar. The fuse is lit when the bomb lands; it
     bounces and rolls, then goes off wherever it has got to.
 - **Powder kegs** explode when struck hard, and set off their neighbours. Stone and brick
@@ -92,8 +93,9 @@ unlock every verse.
   blunderbuss (key **6**) sends him packing without spending a shot.
 - **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the moon, Jack and
   Jill's hill, the cuckoo clock, the well, the spider, the Grand Old Duke of York's men
-  on the painted hill, or Old King Cole in his royal box, and see what happens. None of
-  them change the verse, but each pays mayhem once.
+  on the painted hill, Old King Cole in his royal box (or the stilts it stands on), or the
+  two stagehands at the fly line, and see what happens. None of them change the verse, but
+  each pays mayhem once, and any of them might be hiding the verse's star.
 - **Gags.** A painter's pot on a stepladder, knocked onto a guard's head, blinds his crew
   for a while. A sandbag hanging from the flies swings like a wrecking ball when shot;
   chain shot cuts it loose. The stagehands who work the hoist can be seen in the wings,

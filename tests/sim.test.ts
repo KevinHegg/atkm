@@ -460,9 +460,9 @@ test("any munition that reaches a chest forces it open and tops up the battery",
     assert.ok(game.fire(chest));
     const events = await run(game, 2);
     const opened = events.find((event) => event.type === "chest");
-    assert.ok(opened && opened.type === "chest" && opened.gained[ammo] === 1, `${ammo} should force the chest`);
-    assert.equal(game.ammo[ammo], 2, "one spent, one gained");
-    assert.equal(game.issued[ammo], 3);
+    assert.ok(opened && opened.type === "chest" && opened.gained[ammo] === 3, `${ammo} should force the chest`);
+    assert.equal(game.ammo[ammo], 4, "one spent, three gained");
+    assert.equal(game.issued[ammo], 5);
     game.destroy();
   }
 });
@@ -602,4 +602,56 @@ test("a crew knocked flat drops through the trapdoor and climbs out on its feet,
   for (let step = 0; step < 60 * 3; step += 1, time += STEP) steerCrew(crew, STEP, time, undefined, 0.5);
   assert.equal(crew.sink, 0);
   assert.equal(crew.mode, "cheer");
+});
+
+test("a chest replaces the shot that opened it, then fills the emptiest racks, left to right", async () => {
+  const game = await Game.create(arena((mason) => {
+    mason.chest(-4, -2);
+    return perchAt(3, mason.wall("stone", 3, -1, 2, 5), -1);
+  }, { ammo: { shot: 3, shell: 1, bomb: 2 } }));
+  await stepUntilReady(game);
+  // Spend the only shell well away from the chest, then open it with round shot.
+  game.select("shell");
+  assert.ok(game.fire({ x: 8, y: 0.3, z: 5 }));
+  await run(game, 2);
+  await stepUntilReady(game);
+  game.select("shot");
+  assert.ok(game.fire({ ...game.bodies.find((body) => body.kind === "chest")!.position }));
+  const opened = (await run(game, 2)).find((event) => event.type === "chest");
+  assert.ok(opened && opened.type === "chest");
+  // Round shot back (3 of 3), the empty shell rack next (1 of 1), then a three-way tie: leftmost wins.
+  assert.deepEqual(opened.gained, { shot: 2, shell: 1 });
+  assert.deepEqual({ shot: game.ammo.shot, shell: game.ammo.shell, bomb: game.ammo.bomb }, { shot: 4, shell: 1, bomb: 2 });
+  game.destroy();
+});
+
+test("the chain shot's arc stops where its whirling balls will first strike", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("the-encore")!);
+  await stepUntilReady(game);
+  game.select("chain");
+  // Just clear of the low wall down front for a round shot, but not for a chain's balls.
+  const target = { x: 2.5, y: 0.8, z: -1.4 };
+  assert.ok((game.aim(target, "shot").hit?.z ?? 0) < 0, "round shot clears the wall");
+  const preview = game.aim(target, "chain");
+  assert.ok(preview.hit && preview.hit.z > 0.5, `the chain's arc ends at the wall (z ${preview.hit?.z.toFixed(2)})`);
+  game.destroy();
+});
+
+test("once he's down safe with nothing left to fire, the curtain doesn't wait for the scenery", async () => {
+  const game = await Game.create(arena((mason) => {
+    mason.sandbag(3, 1.2, -2);
+    return perchAt(-3, 1.1, -1);
+  }, { ammo: { shot: 1 } }));
+  await stepUntilReady(game);
+  // The last shot sets the sandbag swinging for a good long while; he tumbles off his low perch.
+  assert.ok(game.fire({ ...game.bodies.find((body) => body.kind === "sandbag")!.position }));
+  wake(game);
+  const events = await run(game, 14, (event) => event.type === "result");
+  assert.ok(!game.cracked);
+  assert.equal(game.phase, "lost");
+  assert.ok(game.time < 6, `the verse ended ${game.time.toFixed(1)} s in`);
+  assert.ok(events.some((event) => event.type === "caught"));
+  const bag = game.world.bodies.getAll().find((body) => body.isDynamic() && body.linvel().x ** 2 + body.linvel().z ** 2 > 0.35 ** 2);
+  assert.ok(bag, "the sandbag is still swinging when the curtain falls");
 });

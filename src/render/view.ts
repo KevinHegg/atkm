@@ -501,6 +501,8 @@ export class StageView {
       this.curios.trigger(event.id, this.elapsed);
       if (event.id === "king") this.company.kingReacts("outrage", this.elapsed);
       if (event.id === "duke") this.company.dukeStruck(this.elapsed);
+      if (event.id === "stagehands") this.company.stagehandsStruck(this.elapsed);
+      if (event.id === "tower") this.company.towerStruck(this.elapsed);
       this.flash(event.at, 0.5);
     } else if (event.type === "ricochet") {
       for (let index = 0; index < 6; index += 1) {

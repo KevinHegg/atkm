@@ -575,6 +575,8 @@ function starHolderName(holder: LevelDef["star"]): string {
       spider: "Miss Muffet's spider",
       king: "Old King Cole",
       duke: "the Grand Old Duke's army",
+      stagehands: "the stagehands",
+      tower: "the royal box",
     };
     return names[holder.curio];
   }
@@ -1252,13 +1254,15 @@ const CURIO_SOUNDS: Record<CurioId, () => void> = {
   cuckoo: () => audio.cuckoo(),
   well: () => audio.dingDong(),
   spider: () => audio.zip(),
+  stagehands: () => audio.oof(),
+  tower: () => audio.rattle(),
 };
 
 function playCurio(id: CurioId): void {
   CURIO_SOUNDS[id]();
   audio.laugh();
   if (screen !== "play") return;
-  if (id === "king") {
+  if (id === "king" || id === "tower") {
     cue("kingOutrage", 1, 4);
     return;
   }

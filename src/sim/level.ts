@@ -95,8 +95,6 @@ export interface ChestDef {
   /** Centre of the chest. */
   pos: Vec3;
   yaw: number;
-  /** What's inside; by default one more of every kind of shot the verse stocks. */
-  ammo?: Partial<Record<StockKind, number>>;
 }
 
 /** A ring of stage trapdoors: pull the lever and anyone standing on them drops below. */
@@ -345,12 +343,11 @@ export class Mason {
   }
 
   /** A treasure chest of spare powder and shot. */
-  chest(x: number, z: number, opts: { y?: number; yaw?: number; ammo?: Partial<Record<StockKind, number>> } = {}): void {
+  chest(x: number, z: number, opts: { y?: number; yaw?: number } = {}): void {
     this.pieces.push({
       kind: "chest",
       pos: { x, y: (opts.y ?? 0) + CHEST_SIZE.y / 2 + GAP, z },
       yaw: opts.yaw ?? 0,
-      ...(opts.ammo ? { ammo: opts.ammo } : {}),
     });
   }
 

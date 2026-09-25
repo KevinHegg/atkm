@@ -70,8 +70,18 @@ export const HUMPTY_MASS = 90;
 const FALLING_RELOAD = 2.5;
 /** Largest blow (N·s) the chain of a chain shot deals to one body in one pass. */
 const CHAIN_BLOW = 420;
+/** Chain shot: the rope between the balls, and how far a ball can whirl from their middle. */
+const CHAIN_LENGTH = 1.25;
+const SHOT_RADIUS_CHAIN = 0.17;
+const CHAIN_REACH = CHAIN_LENGTH / 2 + SHOT_RADIUS_CHAIN;
+/** Shared by every aim preview; made once Rapier has loaded. */
+let chainDisc: RAPIER.Cylinder | undefined;
+/** A forced chest: one to replace the shot that opened it, and two more for the emptiest racks. */
+const CHEST_EXTRA = 2;
 /** Height of the rail round the music box's seat. */
 const TURNTABLE_RAIL = 0.1;
+/** Curios with a line of their own on the King's bill; the rest are "scenery disturbed". */
+const CURIO_SCORE: Partial<Record<CurioId, MayhemKind>> = { king: "royal", duke: "duke", stagehands: "stagehand", tower: "tower" };
 /** Structural bodies that are rides, not masonry. */
 const RIDES = new Set(["seat", "seesaw", "cradle"]);
 /** How tall the sides of the rock-a-bye basket are. */
@@ -137,8 +147,6 @@ interface Entity {
   cuedAt?: number;
   /** A springy bed's launch speed. */
   spring?: number;
-  /** A treasure chest's contents. */
-  contents?: Partial<Record<StockKind, number>>;
   /** Rocked by the wind machine. */
   windy?: boolean;
 }
@@ -263,7 +271,7 @@ export class Game {
   private releaseTime = -10;
   /** Perches he slid off without being shot; the stagehands avoid them. */
   private readonly badPerches: Vec3[] = [];
-  private pendingExplosions: Array<{ at: Vec3; radius: number; power: number; keg: boolean }> = [];
+  private pendingExplosions: Array<{ at: Vec3; radius: number; power: number; keg: boolean; ammo?: StockKind }> = [];
   /** Set by a safe landing: the stagehands will fetch him once he is still. */
   private needsHoist = false;
   private lastStock: StockKind = "shot";
@@ -496,6 +504,10 @@ export class Game {
     const dt = 0.03;
     const range = kind === "blunderbuss" ? 40 : 220;
     const flags = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS;
+    // Chain shot whirls its balls round in the plane it was fired in, and that plane keeps its
+    // heading all the way; the arc must stop where a ball or the chain first touches, not just
+    // where the middle does, or a shot skimming a wall "passes" and then drops short.
+    const sweep = kind === "chain" ? this.chainSweep(velocity) : undefined;
     for (let index = 1; index < range; index += 1) {
       step += 1;
       const previous = points[points.length - 1]!;
@@ -505,6 +517,20 @@ export class Game {
       const direction = { x: segment.x / length, y: segment.y / length, z: segment.z / length };
       const ray = new RAPIER.Ray(previous, direction);
       const contact = this.world.castRayAndGetNormal(ray, length, true, flags, groups(G.PROJ, ALL & ~G.PROJ & ~G.DEBRIS));
+      if (sweep) {
+        const swept = this.world.castShape(previous, sweep.rotation, segment, sweep.disc, 0, 1, true, flags, groups(G.PROJ, ALL & ~G.PROJ & ~G.DEBRIS));
+        if (swept && (!contact || swept.time_of_impact * length < contact.timeOfImpact)) {
+          const at = {
+            x: previous.x + segment.x * swept.time_of_impact,
+            y: previous.y + segment.y * swept.time_of_impact,
+            z: previous.z + segment.z * swept.time_of_impact,
+          };
+          points.push(at);
+          hit = at;
+          hitKind = this.byCollider.get(swept.collider.handle)?.view.kind;
+          break;
+        }
+      }
       if (contact) {
         const at = {
           x: previous.x + direction.x * contact.timeOfImpact,
@@ -536,6 +562,15 @@ export class Game {
       if (next.y < -1) break;
     }
     return { points, hit, hitKind, reachable: solution.reachable, from, velocity };
+  }
+
+  /** The disc a chain shot's balls and chain sweep out, set square to its launch. */
+  private chainSweep(velocity: Vec3): { disc: RAPIER.Cylinder; rotation: Quat } {
+    const forward = normalise(velocity);
+    const side = normalise({ x: -forward.z, y: 0, z: forward.x });
+    const axis = normalise(cross(side, forward));
+    chainDisc ??= new RAPIER.Cylinder(SHOT_RADIUS_CHAIN, CHAIN_REACH);
+    return { disc: chainDisc, rotation: yAxisTo(axis.y < 0 ? { x: -axis.x, y: -axis.y, z: -axis.z } : axis) };
   }
 
   // ---------------------------------------------------------------- commands
@@ -601,7 +636,7 @@ export class Game {
         0.17,
         14,
       );
-      this.world.createImpulseJoint(RAPIER.JointData.rope(1.25, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }), a.body, b.body, true);
+      this.world.createImpulseJoint(RAPIER.JointData.rope(CHAIN_LENGTH, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }), a.body, b.body, true);
       a.view.link = b.view.id;
       b.view.link = a.view.id;
     }
@@ -1134,21 +1169,31 @@ export class Game {
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
       body,
     );
-    const stocked = (Object.keys(this.level.ammo) as StockKind[]).filter((kind) => (this.level.ammo[kind] ?? 0) > 0);
-    const contents = def.ammo ?? Object.fromEntries(stocked.map((kind) => [kind, 1]));
-    this.register("chest", "chest", { ...CHEST_SIZE }, body, [collider], { contents });
+    this.register("chest", "chest", { ...CHEST_SIZE }, body, [collider]);
   }
 
-  /** Forced open: the powder and shot inside go straight to the Queen's battery. */
-  private openChest(chest: Entity): void {
+  /**
+   * Forced open: three rounds go straight to the Queen's battery. The first replaces the shot that
+   * opened it (a keg's blast counts as the last shot fired); the others go, one at a time, to
+   * whichever rack is emptiest against what the verse started with, left to right on a tie.
+   */
+  private openChest(chest: Entity, spent?: StockKind): void {
     if (chest.view.open || this.cracked || this.phase === "lost") return;
     chest.view.open = true;
+    const stocked = STOCK.filter((kind) => (this.level.ammo[kind] ?? 0) > 0);
+    if (!stocked.length) return;
     const gained: Partial<Record<StockKind, number>> = {};
-    for (const [kind, count] of Object.entries(chest.contents ?? {}) as Array<[StockKind, number]>) {
-      if (!count) continue;
-      this.ammo[kind] += count;
-      this.issued[kind] += count;
-      gained[kind] = count;
+    const give = (kind: StockKind): void => {
+      this.ammo[kind] += 1;
+      this.issued[kind] += 1;
+      gained[kind] = (gained[kind] ?? 0) + 1;
+    };
+    const lastFired = [...this.log].reverse().find((entry) => entry.ammo !== "blunderbuss")?.ammo as StockKind | undefined;
+    const refund = [spent, lastFired].find((kind): kind is StockKind => kind !== undefined && stocked.includes(kind)) ?? stocked[0]!;
+    give(refund);
+    for (let extra = 0; extra < CHEST_EXTRA; extra += 1) {
+      const fill = (kind: StockKind): number => this.ammo[kind] / (this.level.ammo[kind] ?? 1);
+      give(stocked.reduce((emptiest, kind) => (fill(kind) < fill(emptiest) - 1e-9 ? kind : emptiest)));
     }
     const at = { ...chest.view.position };
     this.events.push({ type: "chest", at, gained });
@@ -1569,7 +1614,7 @@ export class Game {
     for (const shell of bursting) {
       if (shell.view.removed) continue;
       const at = shell.body.translation();
-      this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.1, power: 620, keg: false });
+      this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.1, power: 620, keg: false, ammo: "shell" });
       this.remove(shell);
     }
     for (const [first, second] of touches) {
@@ -1588,7 +1633,7 @@ export class Game {
           // Each piece of scenery pays out once: explore, don't farm.
           if (!curio.scored) {
             curio.scored = true;
-            this.score(curio.id === "king" ? "royal" : curio.id === "duke" ? "duke" : "curio", curio.at);
+            this.score(CURIO_SCORE[curio.id] ?? "curio", curio.at);
           }
           const holder = this.level.star;
           if ("curio" in holder && holder.curio === curio.id) this.releaseStar(curio.at);
@@ -1596,7 +1641,7 @@ export class Game {
         }
         const owner = this.byCollider.get(other);
         if (!owner) continue;
-        if (owner.view.kind === "chest" && !free) this.openChest(owner);
+        if (owner.view.kind === "chest" && !free) this.openChest(owner, shot.ammo === "blunderbuss" ? undefined : shot.ammo);
         // A shot that strikes one of the King's men fair and square bowls his crew over.
         if (owner.crew && owner.role !== "bed" && !free && lengthOf(shot.lastVelocity ?? shot.body.linvel()) > 4) this.stun(owner.crew, owner.view.position);
         if (owner.bounce && owner.look) {
@@ -1709,7 +1754,7 @@ export class Game {
         this.startPositions.delete(entity.view.id);
         this.remove(entity);
       } else if (entity.view.kind === "bomb") {
-        this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.4, power: 820, keg: false });
+        this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.4, power: 820, keg: false, ammo: "bomb" });
         this.remove(entity);
       }
     }
@@ -1727,7 +1772,7 @@ export class Game {
           continue;
         }
         if (entity.view.kind === "rat" || entity.view.kind === "turntable") continue;
-        if (entity.view.kind === "chest" && gap < 2) this.openChest(entity);
+        if (entity.view.kind === "chest" && gap < 2) this.openChest(entity, blast.ammo);
         if (!entity.body.isDynamic()) continue;
         if (this.shielded(blast.at, entity)) continue;
         if (entity.view.kind === "keg" && entity.fuseAt === undefined) {
@@ -2201,6 +2246,16 @@ export class Game {
     }
   }
 
+  /** No shot still in the air or rolling fast, no lit fuse and no blast waiting to go off. */
+  private nothingPending(): boolean {
+    if (this.pendingExplosions.length) return false;
+    for (const entity of this.entities.values()) {
+      if (entity.fuseAt !== undefined) return false;
+      if (entity.ammo && entity.ammo !== "blunderbuss" && !entity.view.removed && lengthOf(entity.body.linvel()) > 1.5) return false;
+    }
+    return true;
+  }
+
   private isSettled(): boolean {
     for (const entity of this.entities.values()) {
       // A lit fuse is unfinished business, however still the bomb sits.
@@ -2229,7 +2284,10 @@ export class Game {
     }
     if (this.ammoLeft === 0) {
       this.settledFor = this.isSettled() && !this.humptyAirborne ? this.settledFor + STEP : 0;
-      if (this.settledFor > 1.2 || this.time - this.lastShotAt > 14) {
+      // He came down safe, the battery is empty and nothing is flying or fizzing: no need to wait
+      // for every swinging sandbag and rolling keg to stop before the curtain comes down.
+      const safeDown = this.needsHoist && !this.humptyAirborne && this.restTimer > 1.3 && this.nothingPending();
+      if (safeDown || this.settledFor > 1.2 || this.time - this.lastShotAt > 14) {
         this.phase = "lost";
         this.finishStats();
         this.events.push({ type: "result", won: false });

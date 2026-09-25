@@ -40,6 +40,8 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   const stories: Array<[boolean, number, () => string]> = [
     [count("star") > 0, 95, () => `STAR FOUND HIDING IN ${(input.starFrom ?? "the scenery").toUpperCase()}`],
     [count("royal") > 0, 90, () => "KING COLE OUTRAGED IN HIS OWN BOX"],
+    [count("tower") > 0, 72, () => "ROYAL BOX SHAKEN TO ITS STILTS; FIDDLERS MISS A BEAT"],
+    [count("stagehand") > 0, 62, () => "STAGEHANDS FLATTENED; SANDWICH LOST IN THE CONFUSION"],
     [count("bounce") >= 2, 58, () => "EGG BOUNCES ON ROYAL BED; SPRINGS CONFISCATED"],
     [count("wind") > 0, 57, () => "GALE BLOWS THROUGH THEATRE; CRADLE ROCKED"],
     [count("chest") > 0, 52, () => "QUEEN RAIDS ROYAL POWDER CHEST"],
@@ -65,7 +67,8 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   if (count("bowled")) extras.push(`${count("bowled")} of the King's men bowled over`);
   if (count("masonry")) extras.push(`${count("masonry")} blocks brought down`);
   if (count("keg")) extras.push(`${count("keg")} kegs of powder set off`);
-  if (count("curio") + count("royal") + count("duke")) extras.push("the scenery thoroughly disturbed");
+  if (count("curio") + count("royal") + count("duke") + count("tower")) extras.push("the scenery thoroughly disturbed");
+  if (count("stagehand")) extras.push("two stagehands knocked off their feet");
   if (extras.length) sentences.push(`The evening also saw ${listOf(extras)}.`);
   sentences.push(`Damages to the Crown: ${input.mayhem.toLocaleString("en-GB")} crowns.`);
   const critic = [

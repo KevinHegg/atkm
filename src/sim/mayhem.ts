@@ -24,6 +24,8 @@ export type MayhemKind =
   | "star"
   | "great"
   | "trap"
+  | "stagehand"
+  | "tower"
   | "crack";
 
 export interface MayhemRule {
@@ -54,6 +56,8 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   star: { points: 100, bill: "A hidden star, found", shout: "A star!" },
   great: { points: 150, bill: "A great fall", shout: "A great fall!" },
   trap: { points: 50, bill: "King's men down the trapdoor", shout: "A-tishoo!" },
+  stagehand: { points: 75, bill: "Stagehands flattened", shout: "Oi!" },
+  tower: { points: 75, bill: "The royal box, rattled", shout: "Steady on!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };
 

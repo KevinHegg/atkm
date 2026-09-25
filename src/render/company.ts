@@ -19,15 +19,22 @@ export class Company {
   private readonly kit: Kit;
   private readonly root: pc.Entity;
   private readonly haulers: Stagehand[];
+  private readonly haulerYaw = [-60, -120];
   private readonly mopper: Stagehand;
   private readonly mop: pc.Entity;
   private readonly king: KingRig;
+  /** The box and everyone in it, above the stilts: it rattles when the stilts are struck. */
+  private readonly boxSway: pc.Entity;
   private readonly fiddlers: Array<{ root: pc.Entity; bow: pc.Entity }> = [];
   private readonly soldiers: Array<{ root: pc.Entity; offset: number }> = [];
   private readonly duke: pc.Entity;
   private readonly puff: (at: pc.Vec3) => void;
   private kingAct: { kind: "outrage" | "cheer" | "sulk" | "laugh"; started: number } | undefined;
   private dukeHit = -99;
+  private handsHit = -99;
+  private towerHit = -99;
+  private sandwichLost = false;
+  private dustDone = true;
   private mopJob: { at: pc.Vec3; started: number } | undefined;
   private nextPipe = 4;
 
@@ -41,8 +48,8 @@ export class Company {
     kit.primitive("fly-line", "cylinder", staticParent, V(12.1, 8, -8.3), { x: 0.05, y: 16, z: 0.05 }, rope);
     kit.primitive("fly-cleat", "box", staticParent, V(12.1, 1.1, -8.3), { x: 0.18, y: 0.08, z: 0.08 }, kit.material("iron", palette.iron, 0.55, 0.68));
     this.haulers = [
-      buildStagehand(kit, this.root, "sandwich", V(12.55, 0, -8.55), -60),
-      buildStagehand(kit, this.root, "none", V(12.6, 0, -7.75), -120),
+      buildStagehand(kit, this.root, "sandwich", V(12.55, 0, -8.55), this.haulerYaw[0]!),
+      buildStagehand(kit, this.root, "none", V(12.6, 0, -7.75), this.haulerYaw[1]!),
     ];
     this.mopper = buildStagehand(kit, this.root, "none", V(17, 0, 0), -90);
     this.mopper.root.name = "mopper";
@@ -51,35 +58,69 @@ export class Company {
     kit.primitive("mop-head", "cylinder", this.mop, V(0, -0.62, 0.38), { x: 0.3, y: 0.18, z: 0.3 }, kit.material("mop-strands", palette.cream, 0.1), V(20, 0, 0), false);
     this.mopper.root.enabled = false;
 
-    // Old King Cole's box, high on the stage-right wing, looking down on the stage and the stalls.
+    // Old King Cole's box, high on braced stilts at stage right, looking down on the stage.
     const box = CURIOS.find((curio) => curio.id === "king")!.at;
-    const boxRoot = kit.group("royal-box", staticParent, V(box.x, 0, box.z), V(0, -28, 0));
     const floor = 4.1;
     const crimson = palette.king;
     const gold = palette.gold;
+    const timber = palette.oakDark;
+    const stilts = kit.group("royal-box-stilts", staticParent, V(box.x, 0, box.z), V(0, -28, 0));
+    const legX = 0.95;
+    const legZ = 0.78;
+    const stiltParts: Box[] = [];
+    for (const x of [-legX, legX]) {
+      for (const z of [-legZ, legZ]) {
+        stiltParts.push(
+          { center: [x, 0.14, z], size: [0.44, 0.28, 0.44], color: palette.stone },
+          { center: [x, floor / 2, z], size: [0.22, floor, 0.22], color: timber },
+          { center: [x, 0.62, z], size: [0.28, 0.08, 0.28], color: gold },
+          { center: [x, floor - 0.3, z], size: [0.28, 0.08, 0.28], color: gold },
+        );
+      }
+    }
+    for (const y of [1.45, 2.85]) {
+      for (const z of [-legZ, legZ]) stiltParts.push({ center: [0, y, z], size: [legX * 2, 0.13, 0.12], color: timber });
+      for (const x of [-legX, legX]) stiltParts.push({ center: [x, y, 0], size: [0.12, 0.13, legZ * 2], color: timber });
+    }
+    // A ladder up the side, for the King (and, on a bad night, the fiddlers).
+    for (const z of [-0.26, 0.26]) stiltParts.push({ center: [legX + 0.2, (floor + 0.5) / 2, z], size: [0.07, floor + 0.5, 0.07], color: palette.oak });
+    for (let rung = 0.4; rung < floor; rung += 0.38) stiltParts.push({ center: [legX + 0.2, rung, 0], size: [0.06, 0.05, 0.52], color: palette.oak });
+    kit.meshEntity("royal-box-stilts", kit.boxes("royal-box-stilts", stiltParts), kit.paintMaterial(0.2), stilts);
+    // Cross-bracing: an X in every bay, front and back, and a diagonal down each side.
+    const brace = kit.material("oak-dark", timber, 0.16);
+    const bays: Array<[number, number]> = [[0.3, 1.45], [1.45, 2.85], [2.85, floor - 0.1]];
+    for (const [low, high] of bays) {
+      const rise = high - low;
+      const across = Math.hypot(legX * 2, rise);
+      const tilt = (Math.atan2(rise, legX * 2) * 180) / Math.PI;
+      for (const z of [-legZ - 0.06, legZ + 0.06]) {
+        for (const sign of [-1, 1]) kit.primitive("brace", "box", stilts, V(0, (low + high) / 2, z), { x: across, y: 0.09, z: 0.06 }, brace, V(0, 0, sign * tilt));
+      }
+      const deep = Math.hypot(legZ * 2, rise);
+      const lean = (Math.atan2(rise, legZ * 2) * 180) / Math.PI;
+      for (const x of [-legX - 0.06, legX + 0.06]) kit.primitive("brace", "box", stilts, V(x, (low + high) / 2, 0), { x: 0.06, y: 0.09, z: deep }, brace, V(x < 0 ? lean : -lean, 0, 0));
+    }
+
+    this.boxSway = kit.group("royal-box", this.root, V(box.x, floor, box.z), V(0, -28, 0));
     const boxParts: Box[] = [
-      // A slim gilt column holds the box up; crews can pass beside it.
-      { center: [0.6, floor / 2, -0.6], size: [0.3, floor, 0.3], color: shade(crimson, 0.7) },
-      { center: [0.6, 0.6, -0.6], size: [0.36, 0.08, 0.36], color: gold },
-      { center: [0.6, floor - 0.35, -0.6], size: [0.36, 0.08, 0.36], color: gold },
-      { center: [0.2, floor - 0.3, 0], size: [1.6, 0.34, 1.2], color: shade(crimson, 0.6) },
-      { center: [0, floor - 0.05, 0], size: [2.2, 0.14, 1.9], color: palette.oakDark },
-      { center: [0, floor + 0.42, 0.9], size: [2.2, 0.8, 0.12], color: crimson },
-      { center: [0, floor + 0.84, 0.92], size: [2.3, 0.08, 0.18], color: gold },
-      { center: [0, floor + 0.08, 0.92], size: [2.3, 0.08, 0.16], color: gold },
-      { center: [-1.08, floor + 0.42, 0], size: [0.12, 0.8, 1.9], color: crimson },
-      { center: [1.08, floor + 0.42, 0], size: [0.12, 0.8, 1.9], color: crimson },
-      { center: [0, floor + 1.3, -0.92], size: [2.2, 2.6, 0.1], color: shade(crimson, 0.55) },
-      { center: [0, floor + 2.55, 0.1], size: [2.4, 0.26, 2.1], color: crimson },
-      { center: [0, floor + 2.4, 1.14], size: [2.4, 0.1, 0.06], color: gold },
+      { center: [0, -0.2, 0], size: [2.1, 0.24, 1.8], color: shade(crimson, 0.6) },
+      { center: [0, -0.05, 0], size: [2.2, 0.14, 1.9], color: palette.oakDark },
+      { center: [0, 0.42, 0.9], size: [2.2, 0.8, 0.12], color: crimson },
+      { center: [0, 0.84, 0.92], size: [2.3, 0.08, 0.18], color: gold },
+      { center: [0, 0.08, 0.92], size: [2.3, 0.08, 0.16], color: gold },
+      { center: [-1.08, 0.42, 0], size: [0.12, 0.8, 1.9], color: crimson },
+      { center: [1.08, 0.42, 0], size: [0.12, 0.8, 1.9], color: crimson },
+      { center: [0, 1.3, -0.92], size: [2.2, 2.6, 0.1], color: shade(crimson, 0.55) },
+      { center: [0, 2.55, 0.1], size: [2.4, 0.26, 2.1], color: crimson },
+      { center: [0, 2.4, 1.14], size: [2.4, 0.1, 0.06], color: gold },
     ];
     for (let index = 0; index < 6; index += 1) {
-      boxParts.push({ center: [-1 + index * 0.4, floor + 2.3, 1.12], size: [0.34, 0.26, 0.04], color: index % 2 ? gold : crimson });
+      boxParts.push({ center: [-1 + index * 0.4, 2.3, 1.12], size: [0.34, 0.26, 0.04], color: index % 2 ? gold : crimson });
     }
-    kit.meshEntity("royal-box", kit.boxes("royal-box", boxParts), kit.paintMaterial(0.25), boxRoot);
-    kit.primitive("box-crest", "sphere", boxRoot, V(0, floor + 0.46, 0.98), { x: 0.36, y: 0.36, z: 0.08 }, kit.material("gold", gold, 0.72, 0.55));
+    kit.meshEntity("royal-box", kit.boxes("royal-box", boxParts), kit.paintMaterial(0.25), this.boxSway);
+    kit.primitive("box-crest", "sphere", this.boxSway, V(0, 0.46, 0.98), { x: 0.36, y: 0.36, z: 0.08 }, kit.material("gold", gold, 0.72, 0.55));
     // He sits on a tall throne, so he can be seen over the front of the box.
-    const kingRoot = kit.group("king-cole", this.root, V(box.x, floor + 0.4, box.z), V(0, -28, 0));
+    const kingRoot = kit.group("king-cole", this.boxSway, V(0, 0.4, 0));
     this.king = buildKing(kit, kingRoot);
     for (const [dx, dz] of [[-0.75, -0.45], [0.75, -0.45], [0.05, -0.62]] as const) {
       const fiddler = kit.group("fiddler", kingRoot, V(dx, -0.1, dz));
@@ -140,6 +181,24 @@ export class Company {
     this.mopper.root.enabled = false;
     this.kingAct = undefined;
     this.dukeHit = -99;
+    this.handsHit = -99;
+    this.towerHit = -99;
+    this.sandwichLost = false;
+    this.dustDone = true;
+  }
+
+  /** A shot through the fly-line crew: both go over like skittles, and the sandwich is lost. */
+  stagehandsStruck(now: number): void {
+    if (now - this.handsHit < 3.4) return;
+    this.handsHit = now;
+    this.sandwichLost = true;
+    this.dustDone = false;
+  }
+
+  /** A shot into the stilts: the whole box shudders, and the King is not amused. */
+  towerStruck(now: number): void {
+    this.towerHit = now;
+    this.kingReacts("outrage", now);
   }
 
   /** Something the King has an opinion about. */
@@ -165,7 +224,27 @@ export class Company {
   }
 
   private animateHaulers(now: number, hoisting: boolean): void {
+    // Knocked flat: over backwards, a moment on the boards, then up again rubbing their heads.
+    const hit = now - this.handsHit;
+    const down = hit < 0.25 ? Math.sin((hit / 0.25) * Math.PI * 0.5) : hit < 2.6 ? 1 : hit < 3.4 ? 1 - (hit - 2.6) / 0.8 : 0;
+    if (!this.dustDone && hit > 0.25) {
+      this.dustDone = true;
+      for (const hand of this.haulers) this.puff(hand.root.getPosition().clone().add(V(0, 0.2, 0)));
+    }
     this.haulers.forEach((hand, index) => {
+      const fall = new pc.Quat().setFromEulerAngles(0, this.haulerYaw[index]!, 0).mul(new pc.Quat().setFromEulerAngles(-84 * down, 0, 0));
+      hand.root.setLocalRotation(fall);
+      if (hand.prop && this.sandwichLost) hand.prop.enabled = false;
+      if (down > 0) {
+        hand.armL.setLocalEulerAngles(150 - down * 40, 0, 30 + Math.sin(now * 20 + index) * 10 * down);
+        hand.armR.setLocalEulerAngles(150 - down * 40, 0, -30 - Math.sin(now * 20 + index) * 10 * down);
+        hand.legL.setLocalEulerAngles(down * 30, 0, 0);
+        hand.legR.setLocalEulerAngles(-down * 10, 0, 0);
+        hand.head.setLocalEulerAngles(hit > 2.6 ? Math.sin(now * 9) * 10 : 0, 0, 0);
+        return;
+      }
+      hand.legL.setLocalEulerAngles(0, 0, 0);
+      hand.legR.setLocalEulerAngles(0, 0, 0);
       if (hoisting) {
         // Hand over hand on the fly line.
         const phase = now * 5 + index * 1.7;
@@ -178,7 +257,7 @@ export class Company {
       }
       hand.body.setLocalEulerAngles(0, 0, 0);
       hand.body.setLocalPosition(0, Math.sin(now * 1.5 + index) * 0.01, 0);
-      if (hand.prop) hand.prop.enabled = true;
+      if (hand.prop) hand.prop.enabled = !this.sandwichLost;
       if (index === 0) {
         // A bite of sandwich every few seconds.
         const bite = Math.max(0, Math.sin(((now % 4.5) / 4.5) * Math.PI * 2 - 1.2));
@@ -238,6 +317,10 @@ export class Company {
   }
 
   private animateKing(now: number): void {
+    // The box shudders on its stilts, dying away.
+    const shake = now - this.towerHit;
+    const sway = shake < 1.8 ? Math.sin(shake * 19) * 3.2 * (1 - shake / 1.8) : 0;
+    this.boxSway.setLocalEulerAngles(sway, -28, sway * 0.6);
     const king = this.king;
     const act = this.kingAct;
     const age = act ? now - act.started : Infinity;

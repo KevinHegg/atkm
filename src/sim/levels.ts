@@ -146,7 +146,7 @@ function thePowderRoom(): LevelDef {
     ammo: { shot: 3 },
     greatFall: 3.8,
     mayhem: 750,
-    star: { crew: "litter-c" },
+    star: { curio: "stagehands" },
     humpty: perchAt(0, top, -1.4),
     pieces: m.pieces,
     crews: [
@@ -551,7 +551,7 @@ function rockABye(): LevelDef {
     hint: "Cut the lines now and he drops in the hay. Strike the wind machine first: when the cradle swings out over the boards, cut it down.",
     ammo: { chain: 2, shot: 3 },
     greatFall: 4.5,
-    mayhem: 1025,
+    mayhem: 825,
     star: { curio: "spider" },
     humpty: perchAt(seat.x, seat.y, seat.z),
     pieces: m.pieces,
@@ -624,7 +624,6 @@ export const LEVELS: readonly LevelDef[] = [
   heyDiddleDiddle(),
   allTheKingsHorses(),
   chainOfCommand(),
-  ringOfRoses(),
   hangingByAThread(),
   rockABye(),
   seeSawMargeryDaw(),
@@ -632,6 +631,7 @@ export const LEVELS: readonly LevelDef[] = [
   rememberRemember(),
   theKeep(),
   theEncore(),
+  ringOfRoses(),
 ];
 
 export function levelById(id: string): LevelDef | undefined {

@@ -315,6 +315,21 @@ export class TheatreAudio {
   }
 
   /** A paint pot comes down over somebody's head. */
+  /** Two stagehands knocked flat: a surprised "oof" apiece and a thump on the boards. */
+  oof(): void {
+    this.tone(260, 0.18, 0.22, "triangle", { to: 140 });
+    this.tone(200, 0.2, 0.2, "triangle", { to: 110, delay: 0.14 });
+    this.burst({ duration: 0.12, volume: 0.3, filter: "lowpass", frequency: 300, delay: 0.3 });
+  }
+
+  /** The royal box shaken on its stilts: timbers knocking and a long creak. */
+  rattle(): void {
+    for (let index = 0; index < 7; index += 1) {
+      this.burst({ duration: 0.05, volume: 0.22 - index * 0.025, filter: "bandpass", frequency: 700 + (index % 3) * 180, q: 3, delay: index * 0.09 });
+    }
+    this.tone(95, 0.9, 0.12, "triangle", { to: 130, delay: 0.1, attack: 0.1 });
+  }
+
   clang(): void {
     this.tone(880, 0.6, 0.18, "triangle", { to: 820 });
     this.tone(1320, 0.4, 0.08, "sine", { to: 1200 });

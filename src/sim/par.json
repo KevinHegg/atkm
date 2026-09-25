@@ -98,13 +98,13 @@
   ],
   "the-encore": [
     {
-      "ammo": "bomb",
+      "ammo": "shot",
       "at": {
-        "x": -0.51,
-        "y": 3.45,
+        "x": 0,
+        "y": 4.96,
         "z": -2.4
       },
-      "wait": 2.5
+      "wait": 0
     }
   ],
   "hanging-by-a-thread": [
@@ -145,7 +145,7 @@
       "ammo": "bomb",
       "at": {
         "x": 1.48,
-        "y": 1.38,
+        "y": 0.28,
         "z": -2.6
       },
       "wait": 0
@@ -175,12 +175,11 @@
     {
       "ammo": "chain",
       "at": {
-        "x": 0.38,
-        "y": 0.1,
-        "z": 0
+        "x": 0.95,
+        "y": 5.03,
+        "z": -2.4
       },
-      "relativeToHumpty": true,
-      "wait": 2.5
+      "wait": 0
     }
   ],
   "ring-of-roses": [

@@ -13,7 +13,9 @@ Core promises:
 - Only a hard impact cracks Humpty. Projectile contact never cracks him directly,
   and crew contact never cracks him.
 - The aim arc is honest: it is the real launch solution, and it stops at the first
-  collider the shot will touch. Off a bumper it continues with the true bounce.
+  collider the shot will touch. Off a bumper it continues with the true bounce. Chain
+  shot sweeps a disc (`CHAIN_REACH`) set square to its launch, so its arc stops where a
+  ball first clips something.
 - Only chain shot cuts rope and maypoles; nothing else moves a maypole. Curios never
   change a verse's physics (they pay mayhem once and may hide its star). The rat never steals the last charge, and the blunderbuss never spends
   a verse's shot.
@@ -32,8 +34,12 @@ Core promises:
   or the rat; released when a munition knocks that figure down). Set mayhem targets with
   `npm run solve -- --mayhem`: about the par line's mayhem plus one good exploring shot.
 - Every verse has one treasure chest (`Mason.chest`): any munition that reaches it, or a
-  blast within 2 m, opens it for one more of each stocked kind (`Game.issued` tracks the
-  totals for the tray). Nothing opens after the crack.
+  blast within 2 m, opens it for three rounds: one of the kind that opened it (a keg's
+  blast counts as the last shot fired), then `CHEST_EXTRA` more, one at a time, to the
+  rack emptiest against the verse's starting stock, left to right on a tie (`Game.issued`
+  tracks the totals for the tray). Nothing opens after the crack.
+- With the battery empty, the verse is lost as soon as Humpty has come down safe and
+  nothing is flying, fizzing or about to blow; it does not wait for swinging scenery.
 - A shot that strikes one of the King's men fair and square bowls his crew over, as well
   as the contact-force rule for things falling on them.
 - Nothing scores and no star is released before the Queen's first shot, and the free
