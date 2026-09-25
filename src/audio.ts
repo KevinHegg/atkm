@@ -321,6 +321,36 @@ export class TheatreAudio {
     this.burst({ duration: 0.2, volume: 0.25, filter: "lowpass", frequency: 900, delay: 0.05 });
   }
 
+  /** A chest forced open: a creak of hinges and a jingle of shot and coin. */
+  chest(): void {
+    this.tone(220, 0.35, 0.12, "sawtooth", { to: 330, attack: 0.05 });
+    for (let index = 0; index < 7; index += 1) this.tone(1800 + Math.random() * 1600, 0.12, 0.07, "triangle", { delay: 0.25 + index * 0.06 + Math.random() * 0.04 });
+  }
+
+  /** The hidden star floats free: a rising, twinkling arpeggio. */
+  starChime(): void {
+    const notes = [72, 76, 79, 84, 88, 91];
+    notes.forEach((note, index) => {
+      const frequency = 440 * Math.pow(2, (note - 69) / 12);
+      this.tone(frequency, 0.6, 0.09, "sine", { delay: index * 0.09, attack: 0.004 });
+      this.tone(frequency * 2.01, 0.3, 0.03, "sine", { delay: index * 0.09 + 0.02, attack: 0.004 });
+    });
+    for (let index = 0; index < 8; index += 1) this.tone(2600 + Math.random() * 2000, 0.15, 0.03, "sine", { delay: 0.55 + index * 0.08 });
+  }
+
+  /** The wind machine's gale: a howl rising and falling. Call it while the wind blows; it paces itself. */
+  gust(): void {
+    if (!this.throttle("gust", 700)) return;
+    this.burst({ duration: 1.1, volume: 0.16, filter: "bandpass", frequency: 500 + Math.random() * 300, sweepTo: 1100 + Math.random() * 500, q: 2.2 });
+  }
+
+  /** Bedsprings. */
+  sproing(): void {
+    this.tone(180, 0.45, 0.3, "triangle", { to: 620 });
+    this.tone(360, 0.4, 0.08, "sine", { to: 1400, delay: 0.03 });
+    this.tone(900, 0.2, 0.05, "square", { to: 700, delay: 0.12 });
+  }
+
   /** Mayhem points ticking up: a little coin-counter blip. */
   tally(size: number): void {
     if (!this.throttle("tally", 90)) return;

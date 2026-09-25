@@ -6,8 +6,11 @@ export const RAT_LARDER: Vec3 = { x: -2.5, y: 0, z: 6.7 };
 /** He slips out from behind the upstage wing flats, where the audience can see all of his approach. */
 const OFFSTAGE_X = 15.6;
 const ENTRY_Z = -8.6;
-/** He cuts across the lawn by way of this point (mirrored for each wing) so his whole approach is in view. */
-const WAYPOINT = { x: 5.2, z: 1.4 };
+/**
+ * He cuts across the lawn by way of this point (mirrored for each wing) so his whole approach is
+ * in view, and round the ends of the ramparts rather than through them.
+ */
+const WAYPOINT = { x: 7.4, z: 2.6 };
 
 export type RatMode = "off" | "creep" | "gnaw" | "flee" | "stunned";
 

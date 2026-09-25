@@ -10,6 +10,7 @@ import { MAYHEM, type MayhemKind } from "./sim/mayhem.js";
 import { LEVELS } from "./sim/levels.js";
 import parSolutions from "./sim/par.json" with { type: "json" };
 import type { PlannedShot } from "./sim/autoplay.js";
+import type { LevelDef } from "./sim/level.js";
 import type { AmmoKind, CurioId, GameEvent, StockKind, Vec3 } from "./sim/types.js";
 
 const BASE = import.meta.env.BASE_URL;
@@ -321,9 +322,14 @@ async function startLevel(index: number): Promise<void> {
 
 interface ReplayRun {
   original: Game;
+  shadow: Game;
   shots: Game["log"];
   next: number;
   lastStep: number;
+  /** The step to rewind to before the slow-motion part starts. */
+  from: number;
+  /** Rewound and on stage. */
+  ready: boolean;
 }
 
 let replaying: ReplayRun | undefined;
@@ -347,36 +353,43 @@ async function startReplay(): Promise<void> {
     const shadow = await Game.create(original.level);
     const shots = original.log;
     const lastStep = shots[shots.length - 1]!.step;
-    const run: ReplayRun = { original, shots, next: 0, lastStep };
     // Start just before the last real shot (a blunderbuss blast may have come after it).
     const finale = [...shots].reverse().find((shot) => shot.ammo !== "blunderbuss") ?? shots[shots.length - 1]!;
-    const from = Math.max(0, finale.step - 75);
-    while (shadow.steps < from) {
-      fireDue(shadow, run);
-      shadow.step();
-    }
-    shadow.drainEvents();
-    replaying = run;
-    game = shadow;
-    accumulator = 0;
-    timeScale = 0.6;
-    hitStop = 0;
-    crackedAt = -1;
-    for (const bubble of [...bubbles]) dismissBubble(bubble);
-    $("#popups").replaceChildren();
-    view.bind(shadow);
-    view.setCameraMode("replay");
+    replaying = { original, shadow, shots, next: 0, lastStep, from: Math.max(0, finale.step - 75), ready: false };
+    $("#replay-banner span").textContent = "Rewinding…";
     show("replay");
   } finally {
     loading = false;
   }
 }
 
+/** Rewind a few milliseconds' worth of steps per frame, so a long verse never freezes the page. */
+function rewindReplay(run: ReplayRun): void {
+  const deadline = performance.now() + 10;
+  while (run.shadow.steps < run.from && performance.now() < deadline) {
+    fireDue(run.shadow, run);
+    run.shadow.step();
+  }
+  if (run.shadow.steps < run.from) return;
+  run.shadow.drainEvents();
+  run.ready = true;
+  game = run.shadow;
+  accumulator = 0;
+  timeScale = 0.6;
+  hitStop = 0;
+  crackedAt = -1;
+  for (const bubble of [...bubbles]) dismissBubble(bubble);
+  $("#popups").replaceChildren();
+  $("#replay-banner span").textContent = "Replay";
+  view.bind(run.shadow);
+  view.setCameraMode("replay");
+}
+
 function endReplay(): void {
   const run = replaying;
   if (!run) return;
   replaying = undefined;
-  game?.destroy();
+  run.shadow.destroy();
   game = run.original;
   view.bind(run.original);
   view.setCameraMode("play");
@@ -413,6 +426,7 @@ function showResult(): void {
     tally: current.mayhem.entries,
     shots: current.stats.shots,
     title: level.title,
+    starFrom: starHolderName(level.star),
   });
   $("#paper-name").textContent = notice.paper;
   $("#paper-date").textContent = `Verse ${NUMERALS[levelIndex]} · price one penny`;
@@ -444,6 +458,27 @@ function showResult(): void {
   else audio.sadTrombone();
 }
 
+/** Who hides the star, as a newspaper would put it. */
+function starHolderName(holder: LevelDef["star"]): string {
+  if ("rat" in holder) return "the rat";
+  if ("curio" in holder) {
+    const names: Record<CurioId, string> = {
+      cow: "the cow",
+      moon: "the moon",
+      "jack-and-jill": "Jack and Jill",
+      cuckoo: "the cuckoo clock",
+      well: "the well",
+      spider: "Miss Muffet's spider",
+      king: "Old King Cole",
+      duke: "the Grand Old Duke's army",
+    };
+    return names[holder.curio];
+  }
+  if (holder.crew.startsWith("guard")) return "a King's guard";
+  if (holder.crew.startsWith("cart")) return "the King's horses";
+  return "a stretcher crew";
+}
+
 // ------------------------------------------------------------------ HUD
 
 function ammoIcon(kind: AmmoKind): string {
@@ -472,7 +507,7 @@ function renderTray(): void {
   if (!current) return;
   AMMO_ORDER.forEach((kind, index) => {
     const blunderbuss = kind === "blunderbuss";
-    const total = blunderbuss ? (current.vermin ? 1 : 0) : current.level.ammo[kind] ?? 0;
+    const total = blunderbuss ? (current.vermin ? 1 : 0) : current.issued[kind as StockKind];
     if (total <= 0) return;
     const left = blunderbuss ? 1 : current.ammo[kind];
     const button = document.createElement("button");
@@ -512,8 +547,14 @@ function updateObjectives(): void {
   };
   const over = current.phase === "won" || current.phase === "lost";
   set("cracked", stars.cracked, current.phase === "lost");
-  set("great", stars.great, over && !stars.great);
   set("mayhem", stars.mayhem, over && !stars.mayhem);
+  set("star", stars.star, over && !stars.star);
+  // Found but not yet earned: it only counts once he cracks.
+  const starChip = document.querySelector<HTMLElement>("#objectives [data-star=\"star\"]");
+  starChip?.classList.toggle("found", current.starFound && !stars.star);
+  const starText = stars.star ? "The hidden star" : current.starFound ? "Star found! Now crack him" : "A hidden star";
+  const starState = $("#star-state");
+  if (starState.textContent !== starText) starState.textContent = starText;
   const shown = $("#mayhem-now");
   const total = current.mayhem.total.toLocaleString("en-GB");
   if (shown.textContent !== total) shown.textContent = total;
@@ -835,7 +876,7 @@ $("#hud-bottom").addEventListener("click", (event) => {
 });
 
 $("#fire-button").addEventListener("click", () => fire());
-const greatChip = $("#objectives [data-star=\"great\"]");
+const greatChip = $("#objectives [data-info=\"fall\"]");
 greatChip.addEventListener("pointerenter", () => { plumbHover = true; });
 greatChip.addEventListener("pointerleave", () => { plumbHover = false; });
 $("#verse-go").addEventListener("click", () => {
@@ -974,6 +1015,14 @@ function handle(event: GameEvent): void {
       }
       break;
     case "cue":
+      if (event.cue === "wind") {
+        audio.gust();
+        if (live) {
+          toast("A gale!", true, "The wind machine is blowing");
+          later(1.5, () => cue("gale", 1, 0));
+        }
+        break;
+      }
       audio.gong();
       if (live) {
         audio.laugh();
@@ -981,6 +1030,28 @@ function handle(event: GameEvent): void {
         later(0.4, () => cue("lunch", 1, 0));
         later(3, () => cue("lunchQueen", 1, 0));
       }
+      break;
+    case "chest": {
+      audio.chest();
+      if (live) {
+        const gained = (Object.entries(event.gained) as Array<[StockKind, number]>).map(([kind, count]) => `+${count} ${AMMO[kind].name.toLowerCase()}`).join(" · ");
+        toast("Treasure!", true, gained);
+        later(0.6, () => cue("chest", 1, 0));
+        renderTray();
+      }
+      break;
+    }
+    case "star":
+      audio.starChime();
+      if (live) {
+        audio.gasp();
+        toast("A hidden star!", true, "It's yours if he cracks");
+        later(1.2, () => cue("star", 1, 0));
+      }
+      break;
+    case "bounce":
+      audio.sproing();
+      if (live) cue("bounce", 0.6, 5);
       break;
     case "cut":
       audio.chop();
@@ -1064,6 +1135,7 @@ function playAmbience(current: Game, realDt: number): void {
     }
   }
   if (current.ratView?.mode === "creep" || current.ratView?.mode === "flee") audio.scurry();
+  if (current.windy) audio.gust();
   for (const fuse of current.fuses) audio.fizz(1 - fuse.left / BOMB_FUSE);
 }
 
@@ -1124,6 +1196,12 @@ function attract(realDt: number): void {
 }
 
 function tick(realDt: number): void {
+  if (replaying && !replaying.ready) {
+    // Rewinding: the stage holds still while the tape winds back.
+    rewindReplay(replaying);
+    view.frame(0, realDt);
+    return;
+  }
   const current = game;
   if (!current) return;
   let scale = 1;

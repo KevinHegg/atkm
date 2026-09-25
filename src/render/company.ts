@@ -45,6 +45,7 @@ export class Company {
       buildStagehand(kit, this.root, "none", V(12.6, 0, -7.75), -120),
     ];
     this.mopper = buildStagehand(kit, this.root, "none", V(17, 0, 0), -90);
+    this.mopper.root.name = "mopper";
     this.mop = kit.group("mop", this.mopper.armR, V(0, -0.55, 0.05));
     kit.primitive("mop-pole", "cylinder", this.mop, V(0, 0.15, 0.1), { x: 0.04, y: 1.6, z: 0.04 }, kit.material("oak-light", palette.oakLight, 0.2), V(20, 0, 0), false);
     kit.primitive("mop-head", "cylinder", this.mop, V(0, -0.62, 0.38), { x: 0.3, y: 0.18, z: 0.3 }, kit.material("mop-strands", palette.cream, 0.1), V(20, 0, 0), false);

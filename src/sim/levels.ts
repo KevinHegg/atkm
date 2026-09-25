@@ -9,6 +9,7 @@ function view(overrides: Partial<ViewDef> = {}): ViewDef {
 function satOnAWall(): LevelDef {
   const m = new Mason();
   const top = m.wall("oak", 0, -1, 6, 6);
+  m.chest(-5, -3.2, { yaw: 0.3 });
   return {
     id: "sat-on-a-wall",
     title: "Sat on a Wall",
@@ -16,7 +17,8 @@ function satOnAWall(): LevelDef {
     hint: "Aim at anything and fire. A cannonball won’t break him — only a fall will.",
     ammo: { shot: 4 },
     greatFall: 3,
-    mayhem: 550,
+    mayhem: 700,
+    star: { curio: "cow" },
     humpty: perchAt(0, top, -1),
     pieces: m.pieces,
     crews: [],
@@ -32,6 +34,7 @@ function hadAGreatFall(): LevelDef {
   for (const x of [0.75, 2.05, 3.35]) {
     for (const z of [-3.4, -4.25, -5.1, -5.95, -6.8, -7.65]) m.hay(x, z);
   }
+  m.chest(-4.6, -2.4, { yaw: -0.2 });
   return {
     id: "had-a-great-fall",
     title: "Had a Great Fall",
@@ -39,7 +42,8 @@ function hadAGreatFall(): LevelDef {
     hint: "Hay covers only one side. Wait for him to swing round to the bare side, or shoot the arm to spin it.",
     ammo: { shot: 4 },
     greatFall: 4,
-    mayhem: 600,
+    mayhem: 775,
+    star: { curio: "cuckoo" },
     humpty: perchAt(seat.x, seat.y, seat.z),
     pieces: m.pieces,
     crews: [],
@@ -68,6 +72,7 @@ function allTheKingsMen(): LevelDef {
     { id: "guard-3", kind: "guard", home: { x: 1.3, y: 0, z: 2.6 }, yaw: 0 },
     { id: "guard-4", kind: "guard", home: { x: 2.4, y: 0, z: 2.4 }, yaw: 0 },
   ];
+  m.chest(-6.4, -6.6, { yaw: 0.4 });
   return {
     id: "all-the-kings-men",
     title: "All the King's Men",
@@ -75,7 +80,8 @@ function allTheKingsMen(): LevelDef {
     hint: "The stretcher crew will run to catch him. Time your shot while they're far away, or bowl them over first.",
     ammo: { shot: 4, grape: 1 },
     greatFall: 4,
-    mayhem: 625,
+    mayhem: 775,
+    star: { crew: "guard-2" },
     humpty: perchAt(0, top, -1.5),
     pieces: m.pieces,
     crews,
@@ -91,6 +97,8 @@ function overTheWall(): LevelDef {
   for (const x of [-3.8, 3.8]) m.pillar("brick", x, -2.6, 4, { size: 0.9, height: 0.75 });
   m.hay(-2.1, -4.4);
   m.hay(2.1, -4.4);
+  // Behind the wall: a shell or nothing.
+  m.chest(-3.8, -4.6);
   return {
     id: "over-the-wall",
     title: "Over the Wall",
@@ -98,7 +106,8 @@ function overTheWall(): LevelDef {
     hint: "Round shot can't clear this wall. Mortar shells go up and over, then burst: press 2.",
     ammo: { shell: 2, shot: 3 },
     greatFall: 4,
-    mayhem: 650,
+    mayhem: 925,
+    star: { crew: "litter-b" },
     humpty: perchAt(0, top, -2.6),
     pieces: m.pieces,
     crews: [
@@ -127,6 +136,7 @@ function thePowderRoom(): LevelDef {
   for (const x of [-2.1, -0.7, 0.7, 2.1]) m.hay(x, -3.4);
   m.keg(-6.5, 0.6);
   m.keg(6.5, 0.6);
+  m.chest(6.8, -3.2, { yaw: -0.3 });
   return {
     id: "the-powder-room",
     title: "The Powder Room",
@@ -134,7 +144,8 @@ function thePowderRoom(): LevelDef {
     hint: "Powder kegs go off when they're struck hard. One good blast can take the whole tower.",
     ammo: { shot: 3 },
     greatFall: 3.8,
-    mayhem: 600,
+    mayhem: 750,
+    star: { crew: "litter-c" },
     humpty: perchAt(0, top, -1.4),
     pieces: m.pieces,
     crews: [
@@ -163,7 +174,8 @@ function allTheKingsHorses(): LevelDef {
   m.keg(5, -7.6);
   m.keg(0.95, -2.55);
   // A stage weight hangs over the cart road: push it and it swings like a wrecking ball.
-  m.sandbag(4.2, 1.2, -3.4);
+  m.sandbag(3.3, 1.2, -2.8);
+  m.chest(-7.4, -2.2, { yaw: 0.3 });
   return {
     id: "all-the-kings-horses",
     title: "All the King's Horses",
@@ -171,7 +183,8 @@ function allTheKingsHorses(): LevelDef {
     hint: "The horse cart catches everything. Scatter it — grapeshot, or a keg as it passes — then knock Humpty off.",
     ammo: { grape: 2, shot: 3 },
     greatFall: 4.5,
-    mayhem: 650,
+    mayhem: 800,
+    star: { crew: "cart" },
     humpty: perchAt(0, top, -1.6),
     pieces: m.pieces,
     crews: [
@@ -207,6 +220,7 @@ function chainOfCommand(): LevelDef {
     yaw,
     zone: { minX: -9, maxX: 9, minZ: -8.5, maxZ: -0.4 },
   });
+  m.chest(-6.2, -1.4, { yaw: 0.2 });
   return {
     id: "chain-of-command",
     title: "Chain of Command",
@@ -214,7 +228,8 @@ function chainOfCommand(): LevelDef {
     hint: "Only chain shot can cut down his maypole. But four stretcher crews stand guard: ring the dinner gong first, and they'll all go to lunch.",
     ammo: { chain: 2, shot: 2 },
     greatFall: 5,
-    mayhem: 700,
+    mayhem: 875,
+    star: { crew: "litter-d3" },
     humpty: perchAt(0, top, -1.8),
     pieces: m.pieces,
     crews: [guard("litter-d1", -1.6, -1.9, 0), guard("litter-d2", 1.6, -1.9, 0), guard("litter-d3", -2.3, -6.9, Math.PI / 2), guard("litter-d4", 2.3, -6.9, Math.PI / 2)],
@@ -235,6 +250,8 @@ function theKeep(): LevelDef {
   y = m.slab("plank", 0, y, -2.2, 3.4, 1.4, 0.16);
   const top = m.tower("oak", 0, -2.2, 5, { y });
   for (const x of [-3, -1.6, 1.6, 3]) m.hay(x, -5.2);
+  // Tucked in the corner, stage left, behind the rampart.
+  m.chest(-8.6, -2.2, { yaw: 0.4 });
   return {
     id: "the-keep",
     title: "The Keep",
@@ -242,7 +259,8 @@ function theKeep(): LevelDef {
     hint: "Everything you've learned, all at once. There's more than one way in.",
     ammo: { shot: 3, shell: 2, grape: 1, chain: 1, bomb: 1 },
     greatFall: 5,
-    mayhem: 700,
+    mayhem: 850,
+    star: { crew: "guard-e3" },
     humpty: perchAt(0, top, -2.2),
     pieces: m.pieces,
     crews: [
@@ -294,6 +312,7 @@ function theEncore(): LevelDef {
   for (const x of [-2.2, -0.8, 0.8, 2.2]) m.hay(x, -5.6);
   for (const x of [-7.2, 7.2]) m.hay(x, -0.2);
   m.sandbag(-3.4, 1.2, -3.3);
+  m.chest(8.6, -4.8, { yaw: -0.4 });
   return {
     id: "the-encore",
     title: "The Encore",
@@ -302,6 +321,7 @@ function theEncore(): LevelDef {
     ammo: { shot: 5, shell: 2, grape: 3, chain: 2, bomb: 2 },
     greatFall: 4.6,
     mayhem: 1000,
+    star: { rat: true },
     humpty: perchAt(0, y, -2.4),
     pieces: m.pieces,
     crews: [
@@ -343,6 +363,7 @@ function hangingByAThread(): LevelDef {
   // A royal swing on four ropes. Round shot only rocks it; chain shot cuts rope.
   const { seat } = m.swing(0, 4.4, -2.2, { width: 1.3, beam: 8 });
   for (const x of [-4.6, 4.6]) m.hay(x, -2.2);
+  m.chest(5.6, -5, { yaw: -0.3 });
   return {
     id: "hanging-by-a-thread",
     title: "Hanging by a Thread",
@@ -350,7 +371,8 @@ function hangingByAThread(): LevelDef {
     hint: "Chain shot cuts rope. Cut the ropes on one side to tip him out, or all four to drop him.",
     ammo: { chain: 2, shot: 3 },
     greatFall: 4,
-    mayhem: 675,
+    mayhem: 850,
+    star: { crew: "guard-h1" },
     humpty: perchAt(seat.x, seat.y, seat.z),
     pieces: m.pieces,
     crews: [
@@ -378,6 +400,7 @@ function seeSawMargeryDaw(): LevelDef {
   const plinth = m.pillar("stone", tray.x + 0.3, -0.3, 6, { size: 0.8, height: 0.8 });
   m.block("anvil", tray.x + 0.3, plinth, -0.58, 0.62, 0.42, 0.52);
   for (const x of [-6.2, -7.5]) m.hay(x, -1.8, 0, Math.PI / 2);
+  m.chest(4.6, -4.4, { yaw: -0.2 });
   return {
     id: "see-saw-margery-daw",
     title: "See-Saw Margery Daw",
@@ -385,7 +408,8 @@ function seeSawMargeryDaw(): LevelDef {
     hint: "Knock the anvil onto the high end of the see-saw. And mind the rat: grab the blunderbuss (6) when it creeps in.",
     ammo: { shot: 4, grape: 1 },
     greatFall: 3.2,
-    mayhem: 575,
+    mayhem: 750,
+    star: { rat: true },
     humpty: perchAt(bucket.x, bucket.y, bucket.z),
     pieces: m.pieces,
     crews: [
@@ -418,6 +442,8 @@ function theQueensBilliards(): LevelDef {
     for (const z of [-3.9, -4.75, -5.6]) m.hay(x, z);
   }
   m.hedge(-5, -5.6, 3.2, 1.6);
+  // Hidden behind the screen: bank a shot to reach it.
+  m.chest(-1.6, -5.2);
   return {
     id: "the-queens-billiards",
     title: "The Queen's Billiards",
@@ -425,7 +451,8 @@ function theQueensBilliards(): LevelDef {
     hint: "The screen stops round shot, but the bronze bumpers bounce it. Bank your shot — and drag to look behind the screen first.",
     ammo: { shot: 4 },
     greatFall: 4.5,
-    mayhem: 625,
+    mayhem: 800,
+    star: { curio: "duke" },
     humpty: perchAt(0, top, -3),
     pieces: m.pieces,
     crews: [],
@@ -445,6 +472,7 @@ function rememberRemember(): LevelDef {
   // Area railings in front of the cellar door: flat shot can't get through them.
   m.railing(0, z + 2.4, 3.4);
   m.paintPot(2.75, 0.15);
+  m.chest(0, -6.2);
   return {
     id: "remember-remember",
     title: "Remember, Remember",
@@ -452,7 +480,8 @@ function rememberRemember(): LevelDef {
     hint: "The parapet stops round shot and the canopy stops shells. But there's powder in the cellar: lob a fizzing bomb (5) over the railings to the cellar door.",
     ammo: { bomb: 2, shot: 3 },
     greatFall: 7,
-    mayhem: 1350,
+    mayhem: 1500,
+    star: { curio: "king" },
     humpty: perchAt(0, roof, z),
     pieces: m.pieces,
     crews: [
@@ -471,15 +500,86 @@ function rememberRemember(): LevelDef {
   };
 }
 
+function heyDiddleDiddle(): LevelDef {
+  const m = new Mason();
+  // A low garden wall: a tumble off it is nothing. Behind it, the Queen's bouncy four-poster.
+  const top = m.wall("brick", 0, -1.4, 3, 3, { brick: { x: 1, y: 0.5, z: 0.6 } });
+  m.bouncyBed(0, -3.7);
+  for (const x of [-3.3, 3.3]) m.hay(x, -3.7, 0, Math.PI / 2);
+  m.chest(6.4, -1.6, { yaw: -0.3 });
+  return {
+    id: "hey-diddle-diddle",
+    title: "Hey Diddle Diddle",
+    verse: ["Hey diddle diddle, a bed with a spring in the middle;", "the egg jumped over the moon."],
+    hint: "A tumble off this little wall won't hurt him. Knock him back onto the royal bed and it will throw him sky-high.",
+    ammo: { shot: 4 },
+    greatFall: 5,
+    mayhem: 950,
+    star: { curio: "moon" },
+    humpty: perchAt(0, top, -1.4),
+    pieces: m.pieces,
+    crews: [
+      {
+        id: "litter-hd",
+        kind: "litter",
+        home: { x: -5, y: 0, z: -7.4 },
+        yaw: Math.PI / 2,
+        zone: { minX: -10, maxX: 10, minZ: -8.6, maxZ: -5.2 },
+        patrol: [{ x: -5.5, y: 0, z: -7.4 }, { x: 5.5, y: 0, z: -7.4 }],
+      },
+    ],
+    view: view({ pitch: -24, distance: 21, target: { x: 0, y: 2.4, z: -3 } }),
+  };
+}
+
+function rockABye(): LevelDef {
+  const m = new Mason();
+  // Rock-a-bye baby, on the tree top: a cradle on two lines from a painted bough.
+  const seat = m.cradle(0.6, 4.4, -2.4, { bough: 7.9, trunkX: -4.6 });
+  // A haystack right under him: cut the lines on a still day and he lands soft.
+  for (const x of [-0.05, 1.25]) {
+    for (const z of [-1.95, -2.8]) m.hay(x, z, m.hay(x, z));
+  }
+  // The stagehands' wind machine: strike it and a gale rocks the cradle out over the boards.
+  m.windMachine(-7.6, 0.4, Math.PI / 2);
+  m.chest(6.6, -5.2, { yaw: -0.3 });
+  return {
+    id: "rock-a-bye-baby",
+    title: "Rock-a-bye Baby",
+    verse: ["Rock-a-bye baby, the wind's on its way;", "when the lines break, the egg falls today."],
+    hint: "Cut the lines now and he drops in the hay. Strike the wind machine first: when the cradle swings out over the boards, cut it down.",
+    ammo: { chain: 2, shot: 3 },
+    greatFall: 4.5,
+    mayhem: 1025,
+    star: { curio: "spider" },
+    humpty: perchAt(seat.x, seat.y, seat.z),
+    pieces: m.pieces,
+    crews: [
+      {
+        id: "litter-rb",
+        kind: "litter",
+        home: { x: 5, y: 0, z: -6.4 },
+        yaw: -Math.PI / 2,
+        zone: { minX: -10, maxX: 10, minZ: -8.6, maxZ: 1 },
+        patrol: [{ x: 5.5, y: 0, z: -6.4 }, { x: -5.5, y: 0, z: -6.4 }],
+      },
+    ],
+    view: view({ pitch: -17, distance: 22, target: { x: 0, y: 3.6, z: -2 } }),
+    perch: "swing",
+  };
+}
+
 export const LEVELS: readonly LevelDef[] = [
   satOnAWall(),
   hadAGreatFall(),
   allTheKingsMen(),
   overTheWall(),
   thePowderRoom(),
+  heyDiddleDiddle(),
   allTheKingsHorses(),
   chainOfCommand(),
   hangingByAThread(),
+  rockABye(),
   seeSawMargeryDaw(),
   theQueensBilliards(),
   rememberRemember(),

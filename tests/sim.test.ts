@@ -16,6 +16,7 @@ function arena(build: (mason: Mason) => { x: number; y: number; z: number }, ext
     ammo: { shot: 3 },
     greatFall: 3,
     mayhem: 0,
+    star: { crew: "nobody" },
     humpty,
     pieces: mason.pieces,
     crews: [],
@@ -294,7 +295,7 @@ test("the dinner gong sends every crew to lunch, and they come back", async () =
   }, {
     crews: [
       { id: "litter", kind: "litter", home: { x: -1.5, y: 0, z: -3 }, yaw: Math.PI / 2, zone: { minX: -9, maxX: 9, minZ: -8, maxZ: 0 } },
-      { id: "guard", kind: "guard", home: { x: 2, y: 0, z: 2 }, yaw: 0 },
+      { id: "guard", kind: "guard", home: { x: -2.5, y: 0, z: 2 }, yaw: 0 },
     ],
   }));
   await stepUntilReady(game);
@@ -306,7 +307,7 @@ test("the dinner gong sends every crew to lunch, and they come back", async () =
   await run(game, LUNCH_BREAK + 10);
   assert.equal(game.lunchLeft, 0);
   for (const crew of game.crewViews) {
-    const home = crew.id === "litter" ? { x: -1.5, z: -3 } : { x: 2, z: 2 };
+    const home = crew.id === "litter" ? { x: -1.5, z: -3 } : { x: -2.5, z: 2 };
     assert.ok(Math.hypot(crew.x - home.x, crew.z - home.z) < 0.3, `${crew.id} is back at their post`);
   }
   game.destroy();
@@ -348,9 +349,11 @@ test("a stone wall keeps a blast from setting off the powder behind it", async (
 });
 
 test("mayhem is tallied until the crack and not a moment after", async () => {
-  const game = await Game.create(arena(() => perchAt(0, 3, 0)));
-  wake(game);
-  const events = await run(game, 3, (event) => event.type === "crack");
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1)));
+  await stepUntilReady(game);
+  const h = game.humptyPosition!;
+  assert.ok(game.fire({ x: h.x, y: h.y + 0.2, z: h.z }));
+  const events = await run(game, 6, (event) => event.type === "crack");
   assert.ok(events.some((event) => event.type === "crack"));
   const atCrack = game.mayhem.total;
   assert.ok(atCrack >= 300, "the crack itself is worth something");
@@ -443,4 +446,96 @@ test("replaying the shot log reproduces the verse exactly", async () => {
   assert.deepEqual(replay.humptyPosition, live.humptyPosition);
   live.destroy();
   replay.destroy();
+});
+
+test("any munition that reaches a chest forces it open and tops up the battery", async () => {
+  for (const ammo of ["shot", "grape"] as const) {
+    const game = await Game.create(arena((mason) => {
+      mason.chest(-4, -2);
+      return perchAt(3, mason.wall("stone", 3, -1, 2, 5), -1);
+    }, { ammo: { [ammo]: 2 } }));
+    await stepUntilReady(game);
+    game.select(ammo);
+    const chest = { ...game.bodies.find((body) => body.kind === "chest")!.position };
+    assert.ok(game.fire(chest));
+    const events = await run(game, 2);
+    const opened = events.find((event) => event.type === "chest");
+    assert.ok(opened && opened.type === "chest" && opened.gained[ammo] === 1, `${ammo} should force the chest`);
+    assert.equal(game.ammo[ammo], 2, "one spent, one gained");
+    assert.equal(game.issued[ammo], 3);
+    game.destroy();
+  }
+});
+
+test("the hidden star comes out of its figure, and counts only when he cracks", async () => {
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("stone", 0, -1, 2, 6), -1), {
+    ammo: { shot: 3 },
+    star: { crew: "guard" },
+    crews: [{ id: "guard", kind: "guard", home: { x: 3, y: 0, z: 1 }, yaw: 0 }],
+  }));
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: 3, y: 1, z: 1 }));
+  const events = await run(game, 3);
+  assert.ok(events.some((event) => event.type === "star"), "bowling the guard releases the star");
+  assert.ok(game.starFound);
+  assert.equal(game.stars().star, false, "not yet: he hasn't cracked");
+  await stepUntilReady(game);
+  const h = game.humptyPosition!;
+  assert.ok(game.fire({ x: h.x, y: h.y + 0.2, z: h.z }));
+  await run(game, 6, (event) => event.type === "crack");
+  assert.ok(game.cracked);
+  assert.equal(game.stars().star, true);
+  game.destroy();
+});
+
+test("nothing scores before the Queen's first shot", async () => {
+  const game = await Game.create(arena(() => perchAt(0, 3, 0)));
+  wake(game);
+  await run(game, 3);
+  assert.ok(game.cracked, "he falls off by himself");
+  assert.equal(game.mayhem.total, 0);
+  game.destroy();
+});
+
+test("the royal bed throws him back up and never breaks him itself", async () => {
+  const game = await Game.create(arena((mason) => {
+    mason.bouncyBed(0, 0);
+    return perchAt(0, 3.5, 0);
+  }));
+  wake(game);
+  let peak = 0;
+  let bounced = false;
+  let cracked = false;
+  for (let step = 0; step < 60 * 2.5; step += 1) {
+    game.step();
+    for (const event of game.drainEvents()) {
+      if (event.type === "bounce") bounced = true;
+      if (event.type === "crack") cracked = true;
+    }
+    if (bounced) peak = Math.max(peak, game.humptyPosition?.y ?? 0);
+  }
+  assert.ok(bounced, "he lands on the bed and bounces");
+  assert.ok(peak > 4.5, `the bed throws him high (peak ${peak.toFixed(1)} m)`);
+  assert.ok(!cracked, "the bed itself never cracks him");
+  game.destroy();
+});
+
+test("the wind machine rocks the cradle harder and harder", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("rock-a-bye-baby")!);
+  await stepUntilReady(game);
+  const rest = game.bodies.find((body) => body.material === "cradle")!.position.x;
+  const machine = { ...game.bodies.find((body) => body.material === "windmachine")!.position };
+  assert.ok(game.fire(machine));
+  const events = await run(game, 1.5);
+  assert.ok(events.some((event) => event.type === "cue" && event.cue === "wind"));
+  assert.ok(game.windy);
+  let reach = 0;
+  for (let step = 0; step < 60 * 8; step += 1) {
+    game.step();
+    reach = Math.max(reach, Math.abs(game.bodies.find((body) => body.material === "cradle")!.position.x - 0.6));
+  }
+  assert.ok(Math.abs(rest - 0.6) < 0.5);
+  assert.ok(reach > 2, `the cradle swings out over the boards (${reach.toFixed(1)} m)`);
+  game.destroy();
 });

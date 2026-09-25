@@ -4,6 +4,7 @@ import { CREW_SPECS, callLunch, createCrewState, crownWithBucket, formation, slo
 import { eggHullPoints } from "./egg.js";
 import {
   BUCKET_SIZE,
+  CHEST_SIZE,
   HAY_SIZE,
   HUMPTY_BASE,
   KEG_HALF_HEIGHT,
@@ -14,6 +15,7 @@ import {
   SEESAW_FLOOR,
   TURNTABLE_SEAT,
   type FixtureDef,
+  type ChestDef,
   type LevelDef,
   type SandbagDef,
   type SeesawDef,
@@ -65,6 +67,16 @@ export const CRACK_SPEED = 6.6;
 export const HUMPTY_MASS = 90;
 /** Largest blow (N·s) the chain of a chain shot deals to one body in one pass. */
 const CHAIN_BLOW = 420;
+/** Height of the rail round the music box's seat. */
+const TURNTABLE_RAIL = 0.1;
+/** Structural bodies that are rides, not masonry. */
+const RIDES = new Set(["seat", "seesaw", "cradle"]);
+/** How tall the sides of the rock-a-bye basket are. */
+const CRADLE_SIDE = 0.34;
+/** How long the wind machine blows, how hard it pumps a swinging load, and when it stops pushing. */
+const WIND_TIME = 9;
+const WIND_PUSH = 2.4;
+const WIND_TOP_SPEED = 6.5;
 /** The push a cut maypole top gets: enough to topple it, gently, like a felled tree. */
 const MAYPOLE_NUDGE = 110;
 /** Lowest surface the stagehands will use as a perch. Above the "landed low" line (1.65 m centre). */
@@ -120,6 +132,12 @@ interface Entity {
   /** A stage cue fixture, and when it was last called. */
   cue?: CueKind;
   cuedAt?: number;
+  /** A springy bed's launch speed. */
+  spring?: number;
+  /** A treasure chest's contents. */
+  contents?: Partial<Record<StockKind, number>>;
+  /** Rocked by the wind machine. */
+  windy?: boolean;
 }
 
 export interface RopeView {
@@ -137,9 +155,10 @@ export interface RatView {
 
 export interface Stars {
   cracked: boolean;
-  great: boolean;
   /** Enough mayhem before he cracked. */
   mayhem: boolean;
+  /** The verse's hidden star was knocked out of its figure before he cracked. */
+  star: boolean;
   count: number;
 }
 
@@ -204,6 +223,12 @@ export class Game {
   readonly log: Array<{ step: number; ammo: AmmoKind; at: Vec3 }> = [];
   /** Fixed steps taken so far. */
   steps = 0;
+  /** The verse's hidden star has been knocked loose. */
+  starFound = false;
+  /** Shot issued so far, per kind: the verse's stock plus whatever the chests held. */
+  readonly issued: Record<StockKind, number>;
+  /** Until when the wind machine is blowing. */
+  windUntil = -1;
   humptyMood: HumptyMood = "calm";
   humptyAirborne = false;
   humptyDrop = 0;
@@ -248,6 +273,8 @@ export class Game {
   private readonly toppled = new Set<number>();
   private rat: { state: RatState; entity: Entity } | undefined;
   private readonly startPositions = new Map<number, Vec3>();
+  private lastBounce = -10;
+  private bounceStreak = 0;
 
   private constructor(level: LevelDef, seed: number) {
     this.level = level;
@@ -257,6 +284,7 @@ export class Game {
     this.world.numSolverIterations = 8;
     this.queue = new RAPIER.EventQueue(true);
     this.ammo = { shot: 0, shell: 0, grape: 0, chain: 0, bomb: 0, ...level.ammo };
+    this.issued = { ...this.ammo };
     this.selected = STOCK.find((kind) => this.ammo[kind] > 0) ?? "shot";
     this.lastStock = this.selected;
     this.perch = { ...level.humpty };
@@ -270,6 +298,7 @@ export class Game {
       else if (piece.kind === "fixture") fixtures.push(this.addFixture(piece));
       else if (piece.kind === "bucket") this.addBucket(piece.pos);
       else if (piece.kind === "sandbag") this.addSandbag(piece);
+      else if (piece.kind === "chest") this.addChest(piece);
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -318,6 +347,25 @@ export class Game {
   /** How far he would fall if he dropped straight down to the boards from where he sits. */
   get humptyHeight(): number {
     return this.humpty ? Math.max(0, this.humpty.view.position.y - HUMPTY_REST) : 0;
+  }
+
+  /** Is the wind machine blowing? */
+  get windy(): boolean {
+    return this.time < this.windUntil;
+  }
+
+  /** Where the hidden star is right now (while still hidden), for a glint now and then. */
+  get starAt(): Vec3 | undefined {
+    if (this.starFound) return undefined;
+    const holder = this.level.star;
+    if ("crew" in holder) {
+      const crew = this.crews.find((item) => item.id === holder.crew);
+      const man = crew?.slots.map((id) => this.entities.get(id)).find((entity) => entity?.role === "man" || entity?.role === "horse");
+      return man ? { x: man.view.position.x, y: man.view.position.y + 1.1, z: man.view.position.z } : undefined;
+    }
+    if ("curio" in holder) return CURIOS.find((curio) => curio.id === holder.curio)?.at;
+    const rat = this.rat;
+    return rat && rat.state.mode !== "off" ? { x: rat.state.x, y: 0.9, z: rat.state.z } : undefined;
   }
 
   /** Seconds until the King's men are back from lunch (0 if nobody is at lunch). */
@@ -379,11 +427,12 @@ export class Game {
     return true;
   }
 
+  /** Stars count only once he cracks; until then they are only promises. */
   stars(): Stars {
     const cracked = this.cracked;
-    const great = cracked && this.stats.fall >= this.level.greatFall;
     const mayhem = cracked && this.mayhem.total >= this.level.mayhem;
-    return { cracked, great, mayhem, count: Number(cracked) + Number(great) + Number(mayhem) };
+    const star = cracked && this.starFound;
+    return { cracked, mayhem, star, count: Number(cracked) + Number(mayhem) + Number(star) };
   }
 
   drainEvents(): GameEvent[] {
@@ -590,6 +639,7 @@ export class Game {
     this.updateTurntable();
     this.updateRat();
     this.updateHoist();
+    this.blow();
     if (this.humpty) {
       const v = this.humpty.body.linvel();
       this.humptyVelocity = { x: v.x, y: v.y, z: v.z };
@@ -716,7 +766,7 @@ export class Game {
       .setFriction(def.look === "hedge" ? 1.1 : 0.7)
       .setRestitution(def.bounce ?? 0.05)
       .setCollisionGroups(GROUPS.static);
-    if (def.cue !== undefined) desc = desc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    if (def.cue !== undefined || def.spring !== undefined) desc = desc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     if (def.bounce !== undefined) {
       // Polished bronze: a clean mirror bounce, so the preview arc tells the truth.
       desc = desc
@@ -730,6 +780,7 @@ export class Game {
       look: def.look,
       ...(def.bounce !== undefined ? { bounce: def.bounce } : {}),
       ...(def.cue !== undefined ? { cue: def.cue } : {}),
+      ...(def.spring !== undefined ? { spring: def.spring } : {}),
       softness: def.soft ?? 1,
     });
   }
@@ -742,6 +793,11 @@ export class Game {
       RAPIER.ColliderDesc.cylinder(0.08, def.radius).setTranslation(0, -0.08, 0),
       RAPIER.ColliderDesc.cuboid(def.arm / 2, 0.06, 0.13).setTranslation(def.arm / 2, 0.06, 0),
       RAPIER.ColliderDesc.cuboid(0.46, 0.05, 0.46).setTranslation(def.arm, TURNTABLE_SEAT - 0.05, 0),
+      // A low gilt rail round the outside of the seat stops him creeping off as it turns;
+      // any shot still knocks him clean over it.
+      RAPIER.ColliderDesc.cuboid(0.03, TURNTABLE_RAIL / 2, 0.46).setTranslation(def.arm + 0.43, TURNTABLE_SEAT + TURNTABLE_RAIL / 2, 0),
+      RAPIER.ColliderDesc.cuboid(0.46, TURNTABLE_RAIL / 2, 0.03).setTranslation(def.arm, TURNTABLE_SEAT + TURNTABLE_RAIL / 2, 0.43),
+      RAPIER.ColliderDesc.cuboid(0.46, TURNTABLE_RAIL / 2, 0.03).setTranslation(def.arm, TURNTABLE_SEAT + TURNTABLE_RAIL / 2, -0.43),
       RAPIER.ColliderDesc.cuboid(0.3, 0.14, 0.3).setTranslation(-def.arm * 0.55, 0.14, 0),
     ].map((desc) => this.world.createCollider(
       desc.setFriction(0.95).setCollisionGroups(GROUPS.block).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
@@ -785,7 +841,52 @@ export class Game {
     this.events.push({ type: "spin", at: { x: p.x, y: p.y, z: p.z }, speed: turntable.omega });
   }
 
+  /** Rock-a-bye: a deep wooden cradle on two lines from a bough, free to swing side to side. */
+  private addCradle(def: SwingDef, fixtures: Entity[]): void {
+    const bough = fixtures.find((fixture) => fixture.look === "bough" && Math.abs(fixture.view.position.x - def.pos.x) < fixture.view.size.x / 2 + 0.1 && Math.abs(fixture.view.position.z - def.pos.z) < 0.5);
+    if (!bough) throw new Error("A cradle needs a bough fixture above it.");
+    // Roomy enough for an egg a metre across, so he sits in it rather than being wedged.
+    const depth = 1.3;
+    const width = Math.max(def.width, 1.3);
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(def.pos.x, def.pos.y, def.pos.z)
+        .setLinearDamping(0.12)
+        .setAngularDamping(0.9)
+        .setCcdEnabled(true),
+    );
+    const wood = (desc: RAPIER.ColliderDesc): RAPIER.Collider =>
+      this.world.createCollider(desc.setDensity(500).setFriction(0.9).setCollisionGroups(GROUPS.block), body);
+    // A blanket-lined basket with low sides: soft to land in, but a big enough swing throws him out.
+    const side = CRADLE_SIDE;
+    const colliders = [
+      wood(RAPIER.ColliderDesc.cuboid(width / 2, 0.06, depth / 2).setTranslation(0, -0.06, 0)),
+      wood(RAPIER.ColliderDesc.cuboid(width / 2, side / 2, 0.05).setTranslation(0, side / 2, -depth / 2 + 0.05)),
+      wood(RAPIER.ColliderDesc.cuboid(width / 2, side / 2, 0.05).setTranslation(0, side / 2, depth / 2 - 0.05)),
+      wood(RAPIER.ColliderDesc.cuboid(0.05, side / 2, depth / 2).setTranslation(-width / 2 + 0.05, side / 2, 0)),
+      wood(RAPIER.ColliderDesc.cuboid(0.05, side / 2, depth / 2).setTranslation(width / 2 - 0.05, side / 2, 0)),
+    ];
+    const seat = this.register("block", "cradle", { x: width, y: 0.12, z: depth }, body, colliders, { structural: true, windy: true, softness: 0.7 });
+    this.swing = { seat, def };
+    const boughAt = bough.view.position;
+    for (const lz of [-depth / 2 + 0.08, depth / 2 - 0.08]) {
+      const top = { x: def.pos.x, y: def.beam - bough.view.size.y / 2, z: def.pos.z + lz };
+      const local = { x: 0, y: CRADLE_SIDE + 0.3, z: lz };
+      const joint = this.world.createImpulseJoint(
+        RAPIER.JointData.rope(top.y - def.pos.y - local.y, { x: top.x - boughAt.x, y: top.y - boughAt.y, z: top.z - boughAt.z }, local),
+        bough.body,
+        body,
+        true,
+      );
+      this.ropes.push({ joint, seat, local, top, cut: false });
+    }
+  }
+
   private addSwing(def: SwingDef, fixtures: Entity[]): void {
+    if (def.cradle) {
+      this.addCradle(def, fixtures);
+      return;
+    }
     const beam = fixtures.find((fixture) => fixture.look === "beam" && Math.abs(fixture.view.position.x - def.pos.x) < 0.5 && Math.abs(fixture.view.position.z - def.pos.z) < 0.5);
     if (!beam) throw new Error("A swing needs a beam fixture above it.");
     const depth = 0.85;
@@ -1000,6 +1101,68 @@ export class Game {
     ];
   }
 
+  private addChest(def: ChestDef): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, def.pos.y, def.pos.z).setRotation(yawQuat(def.yaw)),
+    );
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(CHEST_SIZE.x / 2, CHEST_SIZE.y / 2, CHEST_SIZE.z / 2)
+        .setFriction(0.8)
+        .setRestitution(0.1)
+        .setCollisionGroups(GROUPS.static)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+      body,
+    );
+    const stocked = (Object.keys(this.level.ammo) as StockKind[]).filter((kind) => (this.level.ammo[kind] ?? 0) > 0);
+    const contents = def.ammo ?? Object.fromEntries(stocked.map((kind) => [kind, 1]));
+    this.register("chest", "chest", { ...CHEST_SIZE }, body, [collider], { contents });
+  }
+
+  /** Forced open: the powder and shot inside go straight to the Queen's battery. */
+  private openChest(chest: Entity): void {
+    if (chest.view.open || this.cracked || this.phase === "lost") return;
+    chest.view.open = true;
+    const gained: Partial<Record<StockKind, number>> = {};
+    for (const [kind, count] of Object.entries(chest.contents ?? {}) as Array<[StockKind, number]>) {
+      if (!count) continue;
+      this.ammo[kind] += count;
+      this.issued[kind] += count;
+      gained[kind] = count;
+    }
+    const at = { ...chest.view.position };
+    this.events.push({ type: "chest", at, gained });
+    this.score("chest", { x: at.x, y: at.y + 0.5, z: at.z });
+  }
+
+  /** Humpty lands on the royal bed: back up he goes, a little less each time in a row. */
+  private bounceHumpty(bed: Entity): void {
+    const humpty = this.humpty;
+    if (!humpty || this.cracked || this.hoist) return;
+    // The contact has already stopped him this step: judge the landing by how he arrived.
+    const v = this.humptyVelocity;
+    if (v.y > -0.3) return;
+    this.bounceStreak = this.time - this.lastBounce < 3 ? this.bounceStreak + 1 : 0;
+    this.lastBounce = this.time;
+    const launch = (bed.spring ?? 10) * Math.pow(0.78, this.bounceStreak);
+    humpty.body.setLinvel({ x: v.x * 0.85, y: launch, z: v.z * 0.85 }, true);
+    const p = humpty.body.translation();
+    this.events.push({ type: "bounce", at: { x: p.x, y: p.y, z: p.z }, speed: launch });
+    if (this.bounceStreak < 3) this.score("bounce", { x: p.x, y: p.y, z: p.z });
+  }
+
+  /** The wind machine: while it blows, anything that swings on a line is rocked harder and harder. */
+  private blow(): void {
+    if (!this.windy) return;
+    for (const entity of this.entities.values()) {
+      if (!entity.windy || entity.view.removed || !entity.body.isDynamic()) continue;
+      const v = entity.body.linvel();
+      // Push with the swing, like a child pumping on a swing, until it is going like the clappers.
+      if (Math.abs(v.x) > WIND_TOP_SPEED) continue;
+      const push = Math.abs(v.x) < 0.3 ? 1 : Math.sign(v.x);
+      entity.body.applyImpulse({ x: push * entity.mass * WIND_PUSH * STEP, y: 0, z: 0 }, true);
+    }
+  }
+
   /** Split a maypole at height y: a fixed stump stays; the top, crown and all, comes loose. */
   private cutMaypole(pole: Entity, y: number): Entity | undefined {
     const base = pole.view.position.y - pole.view.size.y / 2;
@@ -1076,7 +1239,8 @@ export class Game {
     const collider = this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(0.32, 0.3, 0.7)
         .setTranslation(0, 0.32, 0)
-        .setCollisionGroups(GROUPS.crew)
+        // Only shot can touch the rat: he never shoves the King's masonry about on his way in.
+        .setCollisionGroups(groups(G.CREW, G.PROJ))
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
       body,
     );
@@ -1129,6 +1293,7 @@ export class Game {
     if (!rat || !scareRat(rat.state, this.time)) return;
     this.events.push({ type: "rat", action: "scared", at: { x: rat.state.x, y: 0.4, z: rat.state.z } });
     this.score("rat", { x: rat.state.x, y: 1, z: rat.state.z });
+    if ("rat" in this.level.star) this.releaseStar({ x: rat.state.x, y: 1.2, z: rat.state.z });
   }
 
   private addBlock(material: string, pos: Vec3, size: Vec3, yaw: number): Entity {
@@ -1305,11 +1470,24 @@ export class Game {
     this.stats.bowled += 1;
     this.events.push({ type: "bowled", at: { ...at }, crewId: crew.id });
     this.score("bowled", { x: at.x, y: 1.6, z: at.z });
+    const holder = this.level.star;
+    if ("crew" in holder && holder.crew === crew.id) this.releaseStar({ x: at.x, y: 2, z: at.z });
+  }
+
+  /** The hidden star pops out of whatever it was hiding in. It counts if he cracks later. */
+  private releaseStar(at: Vec3): void {
+    if (this.starFound || this.cracked || !this.log.length) return;
+    this.starFound = true;
+    this.events.push({ type: "star", at: { ...at } });
+    this.score("star", at);
   }
 
   /** Put something on the King's bill, unless the curtain is already down. */
   private score(kind: MayhemKind, at: Vec3, points?: number): void {
-    if (this.cracked && kind !== "crack") return;
+    // The crack and its great-fall bonus are the last things on the bill.
+    if (this.cracked && kind !== "crack" && kind !== "great") return;
+    // The bill starts with the Queen's first shot: nothing that happens on its own counts.
+    if (!this.log.length) return;
     const earned = this.mayhem.add(kind, points);
     this.events.push({ type: "mayhem", kind, points: earned, at: { ...at } });
   }
@@ -1325,6 +1503,8 @@ export class Game {
       const moved = distance(p, start);
       const upright = 1 - 2 * (r.x * r.x + r.z * r.z);
       const kind = entity.view.kind;
+      // Rides (swing seats, see-saws, cradles) are meant to move; they aren't wreckage.
+      if (RIDES.has(entity.view.material)) continue;
       if (kind === "hay" ? moved > 0.8 : kind === "block" && (moved > 0.5 || upright < 0.82)) {
         this.toppled.add(id);
         this.score(kind === "hay" ? "hay" : "masonry", { ...p });
@@ -1357,21 +1537,30 @@ export class Game {
     for (const [first, second] of touches) {
       for (const [mine, other] of [[first, second], [second, first]] as const) {
         const shot = this.byCollider.get(mine);
+        if (shot?.spring && this.humpty && this.byCollider.get(other) === this.humpty) this.bounceHumpty(shot);
         if (!shot?.ammo || shot.view.removed) continue;
         if (shot.view.kind === "bomb" && shot.fuseAt === undefined && !this.curios.has(other)) shot.fuseAt = this.time + BOMB_FUSE;
         const curio = this.curios.get(other);
+        // The Queen's blunderbuss is free and for vermin only: it earns nothing but a scared rat.
+        const free = shot.ammo === "blunderbuss";
         if (curio && this.time - curio.last > 1.2) {
           curio.last = this.time;
           this.events.push({ type: "curio", id: curio.id, at: curio.at });
+          if (free) continue;
           // Each piece of scenery pays out once: explore, don't farm.
           if (!curio.scored) {
             curio.scored = true;
             this.score(curio.id === "king" ? "royal" : curio.id === "duke" ? "duke" : "curio", curio.at);
           }
+          const holder = this.level.star;
+          if ("curio" in holder && holder.curio === curio.id) this.releaseStar(curio.at);
           continue;
         }
         const owner = this.byCollider.get(other);
         if (!owner) continue;
+        if (owner.view.kind === "chest" && !free) this.openChest(owner);
+        // A shot that strikes one of the King's men fair and square bowls his crew over.
+        if (owner.crew && owner.role !== "bed" && !free && lengthOf(shot.lastVelocity ?? shot.body.linvel()) > 4) this.stun(owner.crew, owner.view.position);
         if (owner.bounce && owner.look) {
           const v = shot.lastVelocity ?? shot.body.linvel();
           const p = shot.body.translation();
@@ -1394,9 +1583,10 @@ export class Game {
     if (!cue || this.time - (fixture.cuedAt ?? -10) < 2) return;
     fixture.cuedAt = this.time;
     if (cue === "lunch") for (const crew of this.crews) callLunch(crew, this.time);
+    if (cue === "wind") this.windUntil = this.time + WIND_TIME;
     const p = shot.body.translation();
     this.events.push({ type: "cue", cue, at: { x: p.x, y: p.y, z: p.z } });
-    this.score("gong", { x: p.x, y: p.y, z: p.z });
+    this.score(cue === "wind" ? "wind" : "gong", { x: p.x, y: p.y, z: p.z });
   }
 
   private handleForces(): void {
@@ -1418,7 +1608,7 @@ export class Game {
             v.y,
             v.z - Math.cos(me.crew.heading) * crewSpeed,
           );
-          const hit = other.ammo ? relative > 2 : relative > 3.4;
+          const hit = other.ammo ? relative > 2 && other.ammo !== "blunderbuss" : relative > 3.4;
           if (hit && other !== this.humpty) this.stun(me.crew, me.view.position);
         }
         if (me.view.kind === "keg" && me.fuseAt === undefined && (force * STEP) / me.mass > 25) {
@@ -1434,6 +1624,8 @@ export class Game {
       return;
     }
     if (other.view.kind === "shard" || other.view.kind === "crown") return;
+    // The royal bed is all springs: it throws him back up and never breaks him.
+    if (other.spring) return;
     const humpty = this.humpty!;
     const speed = ((force * STEP) / humpty.mass) * other.softness;
     // A fall is a sudden change in his own velocity; being squeezed or pinned is not.
@@ -1496,6 +1688,7 @@ export class Game {
           continue;
         }
         if (entity.view.kind === "rat" || entity.view.kind === "turntable") continue;
+        if (entity.view.kind === "chest" && gap < 2) this.openChest(entity);
         if (!entity.body.isDynamic()) continue;
         if (this.shielded(blast.at, entity)) continue;
         if (entity.view.kind === "keg" && entity.fuseAt === undefined) {
@@ -1558,6 +1751,7 @@ export class Game {
     this.humptyMood = "cracked";
     this.events.push({ type: "crack", at, fall: this.stats.fall, speed });
     this.score("crack", at, 300 + Math.round(this.stats.fall * FALL_POINTS));
+    if (this.stats.fall >= this.level.greatFall) this.score("great", at);
     const rotation = humpty.body.rotation();
     this.remove(humpty);
     this.humpty = undefined;
@@ -1774,10 +1968,10 @@ export class Game {
     if (mode === "turntable") seat = this.turntableSeat();
     else if (mode === "seesaw") seat = this.seesawBucket();
     else if (mode === "swing" && this.swing && !this.swing.seat.view.removed) {
-      const intact = this.ropes.filter((rope) => !rope.cut).length;
+      const seatRopes = this.ropes.filter((rope) => rope.seat === this.swing?.seat);
       const r = this.swing.seat.body.rotation();
       const level = Math.abs(r.w) > Math.cos(0.08);
-      if (intact === this.ropes.length && level) {
+      if (seatRopes.every((rope) => !rope.cut) && level) {
         const t = this.swing.seat.body.translation();
         seat = { x: t.x, y: t.y, z: t.z };
       }

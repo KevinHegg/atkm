@@ -20,10 +20,13 @@ export type StockKind = Exclude<AmmoKind, "blunderbuss">;
 export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole";
 
 /** Static scenery in the playing area: it stops shots but never moves. */
-export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder";
+export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough";
 
 /** Stage cues: strike one and the theatre does something that helps the Queen. */
-export type CueKind = "lunch";
+export type CueKind = "lunch" | "wind";
+
+/** Where a verse hides its star: in one of the King's crews, a curio, or the rat. */
+export type StarHolder = { crew: string } | { curio: CurioId } | { rat: true };
 
 /** Nursery-rhyme curios hidden in the scenery; striking one only does something silly. */
 export type CurioId = "cow" | "moon" | "jack-and-jill" | "cuckoo" | "well" | "spider" | "king" | "duke";
@@ -49,7 +52,8 @@ export type BodyKind =
   | "rat"
   | "pellet"
   | "bucket"
-  | "sandbag";
+  | "sandbag"
+  | "chest";
 
 export type Phase = "aim" | "flight" | "hoist" | "won" | "lost";
 
@@ -76,6 +80,9 @@ export type GameEvent =
   | { type: "curio"; id: CurioId; at: Vec3 }
   | { type: "cue"; cue: CueKind; at: Vec3 }
   | { type: "cut"; at: Vec3 }
+  | { type: "chest"; at: Vec3; gained: Partial<Record<StockKind, number>> }
+  | { type: "star"; at: Vec3 }
+  | { type: "bounce"; at: Vec3; speed: number }
   | MayhemEvent
   | { type: "spin"; at: Vec3; speed: number }
   | { type: "rat"; action: "enter" | "gnaw" | "steal" | "scared" | "gone"; at: Vec3; stole?: StockKind };
@@ -94,6 +101,8 @@ export interface BodyView {
   link?: number;
   /** Seconds left on a bomb's fuse. */
   fuse?: number;
+  /** A treasure chest that has been forced open. */
+  open?: boolean;
 }
 
 export const vec = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });

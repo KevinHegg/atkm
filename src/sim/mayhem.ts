@@ -18,6 +18,11 @@ export type MayhemKind =
   | "maypole"
   | "rat"
   | "gong"
+  | "chest"
+  | "bounce"
+  | "wind"
+  | "star"
+  | "great"
   | "crack";
 
 export interface MayhemRule {
@@ -42,6 +47,11 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   maypole: { points: 40, bill: "Maypoles felled", shout: "Timber!" },
   rat: { points: 40, bill: "Rats routed", shout: "Shoo!" },
   gong: { points: 50, bill: "Lunches called", shout: "Luncheon!" },
+  chest: { points: 50, bill: "Treasure chests forced", shout: "Treasure!" },
+  bounce: { points: 25, bill: "Bounces on the royal bed", shout: "Boing!" },
+  wind: { points: 40, bill: "Gales raised", shout: "Whoosh!" },
+  star: { points: 100, bill: "A hidden star, found", shout: "A star!" },
+  great: { points: 150, bill: "A great fall", shout: "A great fall!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };
 

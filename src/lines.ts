@@ -28,7 +28,11 @@ export type Cue =
   | "kingCheer"
   | "kingSulk"
   | "kingLaugh"
-  | "bucket";
+  | "bucket"
+  | "chest"
+  | "star"
+  | "bounce"
+  | "gale";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -167,6 +171,22 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   kingLaugh: {
     speaker: "king",
     lines: ["Ho ho! Clumsy oafs.", "Get up, you great puddings!", "Ha! Down like ninepins."],
+  },
+  chest: {
+    speaker: "queen",
+    lines: ["Spare powder! Somebody's been saving.", "Finders keepers.", "Ooh, a little something for the battery."],
+  },
+  star: {
+    speaker: "humpty",
+    lines: ["Was that a star? Put it back at once!", "That was MY star. I was keeping it.", "Oh, now you've found the star. Show-off."],
+  },
+  bounce: {
+    speaker: "humpty",
+    lines: ["Wheeeee— I mean, stop that.", "This bed is FAR too bouncy!", "Up I go! And, er, down?"],
+  },
+  gale: {
+    speaker: "humpty",
+    lines: ["Rock-a-bye ME? I am not a baby!", "Somebody turn that wind off!", "I'm going to be sick. Majestically."],
   },
   bucket: {
     speaker: "queen",

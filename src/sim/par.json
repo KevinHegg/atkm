@@ -19,7 +19,7 @@
         "z": 0
       },
       "relativeToHumpty": true,
-      "wait": 7
+      "wait": 4
     }
   ],
   "all-the-kings-men": [
@@ -38,7 +38,7 @@
       "ammo": "shell",
       "at": {
         "x": 0,
-        "y": 2.63,
+        "y": 1.88,
         "z": -2.6
       },
       "wait": 0
@@ -150,6 +150,38 @@
         "z": -2.6
       },
       "wait": 0
+    }
+  ],
+  "hey-diddle-diddle": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": -3.72,
+        "y": 0.8,
+        "z": -7.4
+      },
+      "wait": 0
+    },
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0.38,
+        "y": 0.1,
+        "z": 0
+      },
+      "relativeToHumpty": true
+    }
+  ],
+  "rock-a-bye-baby": [
+    {
+      "ammo": "chain",
+      "at": {
+        "x": 0.38,
+        "y": 0.1,
+        "z": 0
+      },
+      "relativeToHumpty": true,
+      "wait": 2.5
     }
   ]
 }

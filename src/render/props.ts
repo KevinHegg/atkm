@@ -366,6 +366,7 @@ export function buildBlock(kit: Kit, parent: pc.Entity, material: string, size: 
   if (material === "canopy") return buildCanopy(kit, root, size);
   if (material === "maypole") return buildMaypole(kit, root, size.y, true);
   if (material === "seat") return buildSwingSeat(kit, root, size);
+  if (material === "cradle") return buildCradle(kit, root, size);
   if (material === "seesaw") return buildSeesaw(kit, root, size);
   if (material === "anvil") {
     const iron = new pc.Color(0.16, 0.17, 0.18);
@@ -585,6 +586,53 @@ function buildGong(kit: Kit, root: pc.Entity, size: { x: number; y: number; z: n
   return root;
 }
 
+/** Rock-a-bye: a wicker basket lined with a crimson blanket. */
+function buildCradle(kit: Kit, root: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const w = size.x;
+  const d = size.z;
+  const wicker = new pc.Color(0.72, 0.56, 0.3);
+  const weave = new pc.Color(0.58, 0.43, 0.2);
+  const parts: Box[] = [
+    { center: [0, -0.06, 0], size: [w, 0.12, d], color: wicker },
+    { center: [0, 0.02, 0], size: [w - 0.12, 0.04, d - 0.12], color: palette.king },
+  ];
+  for (const side of [-1, 1]) {
+    parts.push({ center: [0, 0.17, side * (d / 2 - 0.05)], size: [w, 0.34, 0.1], color: wicker });
+    parts.push({ center: [side * (w / 2 - 0.05), 0.17, 0], size: [0.1, 0.34, d], color: wicker });
+    for (const k of [0.1, 0.24]) {
+      parts.push({ center: [0, k, side * (d / 2 - 0.0)], size: [w + 0.01, 0.03, 0.02], color: weave });
+      parts.push({ center: [side * (w / 2), k, 0], size: [0.02, 0.03, d + 0.01], color: weave });
+    }
+    parts.push({ center: [side * (w / 2 - 0.2), 0.34, 0], size: [0.3, 0.06, d - 0.1], color: palette.cream });
+  }
+  kit.meshEntity("cradle", kit.boxes(`cradle-${w.toFixed(2)}x${d.toFixed(2)}`, parts), kit.paintMaterial(0.2), root);
+  return root;
+}
+
+/** An iron-bound chest of spare powder and shot. The lid swings up when it is forced. */
+export function buildChest(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): { root: pc.Entity; lid: pc.Entity; hoard: pc.Entity } {
+  const root = kit.group("chest", parent);
+  const { x, y, z } = size;
+  const wood = palette.oakDark;
+  const iron = new pc.Color(0.16, 0.17, 0.18);
+  const gold = palette.gold;
+  const body = y * 0.66;
+  const parts: Box[] = [{ center: [0, -y / 2 + body / 2, 0], size: [x, body, z], color: wood }];
+  for (const k of [-0.36, 0, 0.36]) parts.push({ center: [k * x, -y / 2 + body / 2, 0], size: [0.06, body + 0.01, z + 0.02], color: iron });
+  parts.push({ center: [0, -y / 2 + body - 0.08, z / 2 + 0.01], size: [0.14, 0.16, 0.03], color: gold });
+  kit.meshEntity("chest-body", kit.boxes(`chest-${x.toFixed(2)}`, parts), kit.paintMaterial(0.35), root);
+  // The hoard inside: a heap of shot and a glint of gold, seen once the lid is up.
+  const hoard = kit.group("chest-hoard", root, V(0, -y / 2 + body - 0.02, 0));
+  const shot = kit.material("shot-iron", palette.iron, 0.62, 0.76);
+  for (const [dx, dz] of [[-0.2, 0], [0, 0.06], [0.2, -0.04], [-0.08, -0.1], [0.12, 0.12]] as const) kit.primitive("hoard-ball", "sphere", hoard, V(dx * x, 0.02, dz * z * 2), { x: 0.16, y: 0.16, z: 0.16 }, shot, pc.Vec3.ZERO, false);
+  kit.primitive("hoard-gold", "box", hoard, V(0.26 * x, 0.04, -0.12), { x: 0.14, y: 0.06, z: 0.1 }, kit.material("gold", gold, 0.72, 0.55), V(0, 30, 0), false);
+  const lid = kit.group("chest-lid", root, V(0, -y / 2 + body, -z / 2));
+  const lidParts: Box[] = [{ center: [0, (y - body) / 2, z / 2], size: [x + 0.02, y - body, z + 0.02], color: shade(wood, 1.15) }];
+  for (const k of [-0.36, 0, 0.36]) lidParts.push({ center: [k * x, (y - body) / 2, z / 2], size: [0.06, y - body + 0.02, z + 0.04], color: iron });
+  kit.meshEntity("chest-lid", kit.boxes(`chest-lid-${x.toFixed(2)}`, lidParts), kit.paintMaterial(0.35), lid);
+  return { root, lid, hoard };
+}
+
 /** A tin paint pot, full to the brim with royal whitewash. */
 export function buildBucket(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }, upsideDown = false): pc.Entity {
   const root = kit.group("paint-pot", parent);
@@ -668,6 +716,58 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
   }
   if (look === "maypole" || look === "stump") return buildMaypole(kit, root, y, look === "maypole");
   if (look === "gong") return buildGong(kit, root, size);
+  if (look === "bed") {
+    // The Queen's four-poster, all springs: a fat mattress, a quilt and a gilt frame.
+    const parts: Box[] = [
+      { center: [0, -y / 2 + 0.16, 0], size: [x, 0.32, z], color: palette.oakDark },
+      { center: [0, y / 2 - 0.2, 0], size: [x - 0.08, 0.4, z - 0.08], color: palette.cream },
+      { center: [0, y / 2 - 0.02, 0.2], size: [x - 0.04, 0.06, z * 0.7], color: palette.king },
+      { center: [0, y / 2 + 0.04, -z / 2 + 0.35], size: [x * 0.7, 0.14, 0.4], color: new pc.Color(0.95, 0.94, 0.9) },
+    ];
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) parts.push({ center: [sx * (x / 2 - 0.06), 0.9, sz * (z / 2 - 0.06)], size: [0.12, y + 1.8, 0.12], color: palette.oak });
+      parts.push({ center: [sx * (x / 2 - 0.06), y / 2 + 1.72, 0], size: [0.1, 0.1, z], color: palette.gold });
+      parts.push({ center: [0, y / 2 + 1.72, sx * (z / 2 - 0.06)], size: [x, 0.1, 0.1], color: palette.gold });
+    }
+    for (let coil = 0; coil < 6; coil += 1) parts.push({ center: [-x / 2 + 0.3 + coil * ((x - 0.6) / 5), -y / 2 + 0.36, z / 2 + 0.01], size: [0.12, 0.12, 0.02], color: new pc.Color(0.55, 0.56, 0.58) });
+    kit.meshEntity("bed", kit.boxes(`bed-${x.toFixed(2)}x${z.toFixed(2)}`, parts), kit.paintMaterial(0.25), root);
+    return root;
+  }
+  if (look === "windmachine") {
+    // A slatted drum under a canvas sheet, turned by a crank: the theatre's gale.
+    const oak = kit.material("oak-dark", palette.oakDark, 0.16);
+    for (const side of [-1, 1]) kit.primitive("wind-frame", "box", root, V(side * (x / 2 - 0.05), -0.1, 0), { x: 0.1, y: y - 0.2, z: z * 0.8 }, oak);
+    kit.primitive("wind-foot", "box", root, V(0, -y / 2 + 0.05, 0), { x: x, y: 0.1, z: z }, oak);
+    const drum = kit.group("wind-drum", root, V(0, 0.15, 0));
+    const slat = kit.material("oak-light", palette.oakLight, 0.2);
+    for (let index = 0; index < 8; index += 1) {
+      const angle = (index / 8) * 360;
+      const arm = kit.group("slat-arm", drum, V(), V(angle, 0, 0));
+      kit.primitive("slat", "box", arm, V(0, 0.42, 0), { x: x - 0.3, y: 0.05, z: 0.16 }, slat);
+    }
+    kit.primitive("wind-axle", "cylinder", drum, V(), { x: 0.08, y: x - 0.1, z: 0.08 }, kit.material("iron", palette.iron, 0.55, 0.68), V(0, 0, 90));
+    kit.primitive("wind-canvas", "box", root, V(0, 0.62, -0.08), { x: x - 0.25, y: 0.04, z: z * 0.7 }, kit.material("sign-cream", palette.cream, 0.3), V(-12, 0, 0));
+    kit.primitive("wind-crank", "box", root, V(x / 2 + 0.12, 0.15, 0.2), { x: 0.06, y: 0.06, z: 0.5 }, kit.material("iron", palette.iron, 0.55, 0.68));
+    drum.name = "wind-drum";
+    return root;
+  }
+  if (look === "trunk") {
+    const bark = kit.material("bark", new pc.Color(0.24, 0.15, 0.08), 0.08);
+    kit.primitive("trunk", "cylinder", root, V(), { x, y, z }, bark);
+    const leaves = [new pc.Color(0.12, 0.26, 0.12), new pc.Color(0.16, 0.32, 0.14)];
+    for (const [dx, dy, r, i] of [[0, 1.2, 3.2, 0], [-0.9, 0.5, 2.2, 1], [1.1, 0.7, 2.4, 1], [0.2, 2.1, 2.2, 0]] as const) {
+      kit.primitive("leaves", "sphere", root, V(dx, y / 2 + dy - 0.6, 0), { x: r, y: r * 0.75, z: r * 0.7 }, kit.material(`tree-leaf-${i}`, leaves[i]!, 0.06));
+    }
+    return root;
+  }
+  if (look === "bough") {
+    const bark = kit.material("bark", new pc.Color(0.24, 0.15, 0.08), 0.08);
+    kit.primitive("bough", "cylinder", root, V(), { x: y, y: x, z: y }, bark, V(0, 0, 90));
+    for (const [dx, r] of [[0.3, 1.1], [0.46, 0.9]] as const) {
+      kit.primitive("bough-leaves", "sphere", root, V(dx * x, 0.3, 0.1), { x: r * 1.4, y: r, z: r }, kit.material("tree-leaf-1", new pc.Color(0.16, 0.32, 0.14), 0.06));
+    }
+    return root;
+  }
   if (look === "ladder") {
     // A painter's stepladder, spattered with whitewash.
     const splash = new pc.Color(0.92, 0.92, 0.87);
@@ -720,6 +820,8 @@ export function buildTurntable(kit: Kit, parent: pc.Entity, radius: number, arm:
   }
   kit.primitive("arm", "box", root, V(arm / 2, 0.06, 0), { x: arm, y: 0.12, z: 0.26 }, gold);
   kit.primitive("seat", "box", root, V(arm, 0.13, 0), { x: 0.92, y: 0.1, z: 0.92 }, kit.material("velvet-seat", palette.king, 0.3));
+  kit.primitive("seat-rail", "box", root, V(arm + 0.43, 0.23, 0), { x: 0.06, y: 0.1, z: 0.92 }, gold, pc.Vec3.ZERO, false);
+  for (const side of [-1, 1]) kit.primitive("seat-rail", "box", root, V(arm, 0.23, side * 0.43), { x: 0.92, y: 0.1, z: 0.06 }, gold, pc.Vec3.ZERO, false);
   kit.primitive("seat-tassel", "sphere", root, V(arm + 0.46, 0.1, 0.46), { x: 0.1, y: 0.1, z: 0.1 }, gold);
   kit.primitive("seat-tassel", "sphere", root, V(arm + 0.46, 0.1, -0.46), { x: 0.1, y: 0.1, z: 0.1 }, gold);
   kit.primitive("counterweight", "box", root, V(-arm * 0.55, 0.14, 0), { x: 0.6, y: 0.28, z: 0.6 }, kit.material("iron", palette.iron, 0.55, 0.68));

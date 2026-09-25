@@ -42,8 +42,16 @@ unlock every verse.
 - **The verse ends when he cracks.** Until then, everything you break, bowl over, ring or
   startle counts as **mayhem**, and the King sends you the bill. Each verse has a spare
   round shot for exploring: spend it on mischief, but save enough to finish the job.
-- **Stars:** crack him; crack him with a drop of at least the verse's *great fall* height;
-  crack him after causing the verse's target of mayhem. Your best mayhem per verse is kept.
+- **Stars:** crack him; reach the verse's target of mayhem; and find the **hidden star**.
+  Every verse hides a star inside one figure (always the same one: a guard, a stretcher
+  crew, the horse cart, the rat, or a curio such as the cow or Old King Cole). Knock that
+  figure down with a munition and the star floats up off the stage. Like the others, it
+  only counts if he cracks. Watch for the occasional glint. Your best mayhem per verse is kept.
+- **A great fall** (at least the verse's height, shown by the surveyor's line) earns a
+  mayhem bonus on top of the crack.
+- **Treasure chests.** Every verse has an iron-bound chest of spare powder somewhere on
+  stage. Any munition that reaches it forces it open: one more of every kind of shot the
+  verse stocks.
 - **Reviews and replays.** After the curtain the morning papers review the performance,
   and **Replay** shows the final shot again in slow motion. The simulation is
   deterministic, so the replay is exact.
@@ -65,9 +73,12 @@ unlock every verse.
   ropes that only chain shot can cut. His see-saw is a trebuchet: drop the anvil on
   the short end. His maypole is planted in the stage, and nothing moves it but chain
   shot, which cuts it down like a tree. A royal canopy takes a mortar blast for him.
+  The Queen's four-poster bed is all springs: knock him onto it and it throws him
+  sky-high. His rock-a-bye cradle hangs from a bough on two lines, soft to land in.
 - **Stage cues.** Some verses hide a small puzzle that sets the stage. Ring the dinner
   gong and every one of the King's men downs tools for lunch (a timer at the top says
-  when they'll be back).
+  when they'll be back). Strike the stagehands' wind machine and a gale rocks anything
+  hanging on a line, harder and harder, for a few seconds. It never bends your shot.
 - **Bumpers and screens.** Bronze bumpers bounce round shot cleanly. Painted screens
   and hedges hide what's behind them, including hay.
 - **The rat.** In later verses a giant rat creeps out of the wings to gnaw the Queen's
@@ -114,8 +125,8 @@ src/sim/      rules and physics, headless, no rendering
   geometry.ts   small vector helpers for ropes and rides
   level.ts      level format and the Mason builder (walls, towers, pillars, hay, kegs,
                 fixtures, bumpers, hedges, turntables, swings, see-saws, canopies,
-                maypoles, gongs, railings, houses)
-  levels.ts     the thirteen verses
+                maypoles, gongs, railings, houses, chests, beds, wind machines, cradles)
+  levels.ts     the fifteen verses
   ballistics.ts ammunition and launch solutions
   autoplay.ts   headless play-through used by tests and the solver
   par.json      one recorded winning line per verse

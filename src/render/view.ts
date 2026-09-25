@@ -6,6 +6,7 @@ import { Kit, palette } from "./kit.js";
 import {
   buildBlock,
   buildBucket,
+  buildChest,
   buildCannon,
   buildCartBed,
   buildCrown,
@@ -39,6 +40,8 @@ const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
 const DEG = 180 / Math.PI;
 /** Bodies that last the whole verse: worth batching. Shots and debris come and go too often. */
 const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag"]);
+const STAR_RISE = 3.2;
+const UNBATCHED = new Set(["daze", "sandwich", "mopper"]);
 /** The Queen stands on a podium stage-left of her battery. */
 const QUEEN_SPOT = { x: -4.4, y: 0.42, z: 7.4 };
 
@@ -52,6 +55,20 @@ interface BodyVisual {
   key?: pc.Entity;
   /** A paint pot worn as a hat, for a man who has had one dropped on him. */
   hat?: pc.Entity;
+  /** A treasure chest's lid and the hoard inside. */
+  lid?: pc.Entity;
+  hoard?: pc.Entity;
+  /** The wind machine's slatted drum. */
+  drum?: pc.Entity;
+  /** How far the chest lid has opened, 0 to 1. */
+  opened?: number;
+}
+
+/** A released star, floating up off the stage. */
+interface RisingStar {
+  root: pc.Entity;
+  from: pc.Vec3;
+  age: number;
 }
 
 interface Puff {
@@ -288,6 +305,9 @@ export class StageView {
     this.lastSelected = game.selected;
     this.swap = 0;
     this.company.reset();
+    for (const star of this.risingStars) star.root.destroy();
+    this.risingStars.length = 0;
+    this.nextGlint = this.elapsed + 6;
     this.sync(0);
   }
 
@@ -444,6 +464,18 @@ export class StageView {
       for (let index = 0; index < 6; index += 1) {
         this.spark(V(event.at.x, event.at.y, event.at.z), V((Math.random() - 0.5) * 6, 2 + Math.random() * 3, (Math.random() - 0.5) * 6), palette.gold);
       }
+    } else if (event.type === "chest") {
+      this.flash({ x: event.at.x, y: event.at.y + 0.3, z: event.at.z }, 0.7);
+      for (let index = 0; index < 14; index += 1) {
+        this.spark(V(event.at.x, event.at.y + 0.3, event.at.z), V((Math.random() - 0.5) * 3, 3 + Math.random() * 3, (Math.random() - 0.5) * 3), palette.gold);
+      }
+    } else if (event.type === "star") {
+      this.releaseStar(event.at);
+    } else if (event.type === "bounce") {
+      this.bedBounceAt = this.elapsed;
+      for (let index = 0; index < 5; index += 1) {
+        this.puff(V(event.at.x, event.at.y - 0.6, event.at.z), V((Math.random() - 0.5) * 2, 0.5, (Math.random() - 0.5) * 2), 0.3, 0.6, 0, palette.cream);
+      }
     } else if (event.type === "cue") {
       this.flash(event.at, 0.8);
       this.shockwave(event.at);
@@ -521,6 +553,17 @@ export class StageView {
       }
       placeSegment(chain, a.root.getPosition(), b.root.getPosition(), 0.05);
     }
+    for (const visual of this.visuals.values()) {
+      if (visual.lid && visual.view.open && (visual.opened ?? 0) < 1) {
+        visual.opened = Math.min(1, (visual.opened ?? 0) + 0.06);
+        visual.lid.setLocalEulerAngles(-visual.opened * 110, 0, 0);
+      }
+      if (visual.drum) visual.drum.rotateLocal(game.windy ? 14 : 0.4, 0, 0);
+      if (visual.view.material === "bed") {
+        const squash = Math.max(0, 1 - (this.elapsed - this.bedBounceAt) * 4);
+        visual.root.setLocalScale(1 + squash * 0.06, 1 - squash * 0.22, 1 + squash * 0.06);
+      }
+    }
     for (const [id, visual] of this.visuals) {
       const crew = crews.get(id);
       if (crew) this.animateCrew(visual, crew, crew.slots.find((slot) => this.visuals.get(slot)?.man) === id);
@@ -540,6 +583,7 @@ export class StageView {
     this.animateRat();
     this.animateBlunderbuss(realDt);
     this.animateBombs(dt);
+    this.animateStars(realDt);
     this.curios.update(this.elapsed);
     this.company.update(this.elapsed, Boolean(this.game?.hoisting));
     this.animateEffects(dt);
@@ -593,9 +637,18 @@ export class StageView {
         if (view.material === "cart") visual.wheels = buildCartBed(this.kit, root, view.size).wheels;
         else buildLitterBed(this.kit, root, view.size);
         break;
-      case "fixture":
-        buildFixture(this.kit, root, view.material, view.size);
+      case "fixture": {
+        const fixture = buildFixture(this.kit, root, view.material, view.size);
+        if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
         break;
+      }
+      case "chest": {
+        const chest = buildChest(this.kit, root, view.size);
+        visual.lid = chest.lid;
+        visual.hoard = chest.hoard;
+        visual.opened = 0;
+        break;
+      }
       case "turntable": {
         const def = this.game?.level.pieces.find((piece) => piece.kind === "turntable");
         const arm = def && def.kind === "turntable" ? def.arm : 1.5;
@@ -617,12 +670,18 @@ export class StageView {
       default:
         break;
     }
-    if (BATCHED.has(view.kind)) this.batch(root);
+    // Things that animate inside (the wind drum, a chest lid) stay out of the batch.
+    if (BATCHED.has(view.kind) && !visual.drum) this.batch(root);
     return visual;
   }
 
-  /** Put every mesh under this visual into the actors' dynamic batch group. */
+  /**
+   * Put every mesh under this visual into the actors' dynamic batch group. Parts that are
+   * switched on and off (dazed stars, a sandwich, the mop stagehand) stay out: toggling a
+   * batched mesh rebuilds the whole group, which would stutter at the big moments.
+   */
   private batch(node: pc.GraphNode): void {
+    if (UNBATCHED.has(node.name)) return;
     const entity = node as pc.Entity;
     if (entity.render) entity.render.batchGroupId = this.actorBatch;
     for (const child of node.children) this.batch(child);
@@ -1007,6 +1066,10 @@ export class StageView {
   }
 
   private fizzTimer = 0;
+  private bedBounceAt = -10;
+  private readonly risingStars: RisingStar[] = [];
+  private nextGlint = 6;
+  private windPuffAt = 0;
 
   /** Lit bombs spit sparks from their fuses and swell as the fuse runs out. */
   private animateBombs(dt: number): void {
@@ -1023,6 +1086,69 @@ export class StageView {
       const up = visual.root.up.clone().mulScalar(0.36);
       top.add(up);
       this.spark(top, V((Math.random() - 0.5) * 2, 1.5 + Math.random() * 1.5, (Math.random() - 0.5) * 2), palette.gold);
+    }
+  }
+
+  /** A five-pointed gold star, bright enough to see across the stage. */
+  private buildStar(parent: pc.Entity): pc.Entity {
+    const root = this.kit.group("hidden-star", parent);
+    const gold = this.kit.material("star-gold", palette.gold, 0.9, 0.4, { emissive: new pc.Color(0.95, 0.7, 0.15) });
+    for (let point = 0; point < 5; point += 1) {
+      const arm = this.kit.group("star-arm", root, V(), V(0, 0, point * 72));
+      this.kit.primitive("star-point", "cone", arm, V(0, 0.32, 0), { x: 0.3, y: 0.52, z: 0.12 }, gold, pc.Vec3.ZERO, false);
+    }
+    this.kit.primitive("star-heart", "cylinder", root, V(), { x: 0.36, y: 0.12, z: 0.36 }, gold, V(90, 0, 0), false);
+    return root;
+  }
+
+  private releaseStar(at: Vec3): void {
+    const root = this.buildStar(this.effects);
+    root.setPosition(at.x, at.y, at.z);
+    this.risingStars.push({ root, from: V(at.x, at.y, at.z), age: 0 });
+    this.flash(at, 1.1);
+    for (let index = 0; index < 18; index += 1) {
+      const angle = (index / 18) * Math.PI * 2;
+      this.spark(V(at.x, at.y, at.z), V(Math.cos(angle) * 4, 2 + Math.random() * 3, Math.sin(angle) * 4), palette.gold);
+    }
+  }
+
+  /** Released stars rise, spinning and twinkling, and leave the stage. The hidden one glints now and then. */
+  private animateStars(dt: number): void {
+    for (let index = this.risingStars.length - 1; index >= 0; index -= 1) {
+      const star = this.risingStars[index]!;
+      star.age += dt;
+      const k = star.age / STAR_RISE;
+      if (k >= 1) {
+        star.root.destroy();
+        this.risingStars.splice(index, 1);
+        continue;
+      }
+      const lift = k < 0.35 ? (k / 0.35) * 2.2 : 2.2 + Math.pow((k - 0.35) / 0.65, 2) * 12;
+      star.root.setPosition(star.from.x + Math.sin(star.age * 3) * 0.3, star.from.y + lift, star.from.z);
+      star.root.lookAt(this.camera.getPosition());
+      star.root.rotateLocal(0, 0, star.age * 220);
+      const pulse = (k < 0.1 ? k / 0.1 : 1) * (1.4 + Math.sin(star.age * 18) * 0.15);
+      star.root.setLocalScale(pulse, pulse, pulse);
+      if (Math.random() < 0.45) {
+        const p = star.root.getPosition();
+        this.spark(V(p.x + (Math.random() - 0.5) * 0.6, p.y, p.z + (Math.random() - 0.5) * 0.6), V((Math.random() - 0.5) * 1.5, -1 - Math.random(), (Math.random() - 0.5) * 1.5), palette.gold);
+      }
+    }
+    // Wherever the star is hiding, a glint now and then: a clue, not a signpost.
+    const game = this.game;
+    if (game && this.elapsed > this.nextGlint) {
+      this.nextGlint = this.elapsed + 9 + Math.random() * 5;
+      const at = game.starAt;
+      if (at && !game.cracked) {
+        for (let index = 0; index < 4; index += 1) {
+          this.spark(V(at.x + (Math.random() - 0.5) * 0.4, at.y + 0.2, at.z), V((Math.random() - 0.5) * 1.2, 1 + Math.random(), (Math.random() - 0.5) * 1.2), palette.gold);
+        }
+      }
+    }
+    // The wind machine's gale: streaks blown across the stage.
+    if (game?.windy && this.elapsed > this.windPuffAt) {
+      this.windPuffAt = this.elapsed + 0.08;
+      this.puff(V(-12 + Math.random() * 4, 1 + Math.random() * 6, -6 + Math.random() * 8), V(9 + Math.random() * 4, 0, 0), 0.18, 1.6, 0, palette.cream);
     }
   }
 
@@ -1106,8 +1232,10 @@ export class StageView {
       const p = cloud.getLocalPosition();
       cloud.setLocalPosition(p.x + Math.sin(t * 0.1 + index) * 0.002, p.y, p.z);
     });
+    const gale = this.game?.windy ? 1 : 0;
     for (const [index, pennant] of this.stage.pennants.entries()) {
-      pennant.setLocalEulerAngles(0, Math.sin(t * 1.3 + index) * 18, Math.sin(t * 2.1 + index) * 4);
+      // In the wind machine's gale the pennants stream out and snap.
+      pennant.setLocalEulerAngles(0, gale ? -8 + Math.sin(t * 14 + index) * 10 : Math.sin(t * 1.3 + index) * 18, Math.sin(t * (gale ? 11 : 2.1) + index) * (gale ? 9 : 4));
     }
   }
 

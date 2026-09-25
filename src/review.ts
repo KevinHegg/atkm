@@ -9,6 +9,8 @@ export interface ReviewInput {
   tally: ReadonlyMap<MayhemKind, MayhemEntry>;
   shots: number;
   title: string;
+  /** Who was hiding the star, if it was found. */
+  starFrom?: string;
 }
 
 export interface Review {
@@ -36,7 +38,11 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   }
   // The headline goes to the most memorable thing that happened.
   const stories: Array<[boolean, number, () => string]> = [
+    [count("star") > 0, 95, () => `STAR FOUND HIDING IN ${(input.starFrom ?? "the scenery").toUpperCase()}`],
     [count("royal") > 0, 90, () => "KING COLE OUTRAGED IN HIS OWN BOX"],
+    [count("bounce") >= 2, 58, () => "EGG BOUNCES ON ROYAL BED; SPRINGS CONFISCATED"],
+    [count("wind") > 0, 57, () => "GALE BLOWS THROUGH THEATRE; CRADLE ROCKED"],
+    [count("chest") > 0, 52, () => "QUEEN RAIDS ROYAL POWDER CHEST"],
     [count("bucket") > 0, 85, () => (count("bucket") > 1 ? `${count("bucket")} GUARDS BLUNDER ABOUT IN PAINT POTS` : "GUARD BLUNDERS ABOUT IN PAINT POT")],
     [count("gong") > 0, 80, () => "KING'S MEN ABANDON POST FOR SOUP"],
     [count("duke") > 0, 75, () => "DUKE OF YORK'S MEN FLATTENED HALFWAY UP HILL"],

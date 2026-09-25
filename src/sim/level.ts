@@ -1,4 +1,4 @@
-import type { BlockMaterial, CueKind, FixtureLook, StockKind, Vec3 } from "./types.js";
+import type { BlockMaterial, CueKind, FixtureLook, StarHolder, StockKind, Vec3 } from "./types.js";
 
 export interface BlockDef {
   kind: "block";
@@ -32,6 +32,8 @@ export interface FixtureDef {
   soft?: number;
   /** A stage cue: any shot that strikes this fixture calls it. */
   cue?: CueKind;
+  /** A springy bed: Humpty landing on it is thrown back up at this speed (m/s). */
+  spring?: number;
 }
 
 /** A clockwork turntable on an iron column; Humpty rides a seat at the end of its arm. */
@@ -55,6 +57,8 @@ export interface SwingDef {
   width: number;
   /** Height of the frame's cross-beam. */
   beam: number;
+  /** A cradle: two lines from a bough, deep sides, and the wind can rock it. */
+  cradle?: boolean;
 }
 
 /** A see-saw on a fixed fulcrum with a bucket for Humpty at the low (-x) end. */
@@ -85,7 +89,17 @@ export interface SandbagDef {
   top: number;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef;
+/** An iron-bound chest of the Queen's powder. Any shot that reaches it forces it open. */
+export interface ChestDef {
+  kind: "chest";
+  /** Centre of the chest. */
+  pos: Vec3;
+  yaw: number;
+  /** What's inside; by default one more of every kind of shot the verse stocks. */
+  ammo?: Partial<Record<StockKind, number>>;
+}
+
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef;
 
 /** A giant rat that creeps out of the wings to gnaw the Queen's powder. */
 export interface RatDef {
@@ -134,6 +148,8 @@ export interface LevelDef {
   crews: CrewDef[];
   view: ViewDef;
   rat?: RatDef;
+  /** Which figure hides this verse's star. */
+  star: StarHolder;
   /** Where the stagehands return him after a safe landing: the highest nearby perch, or his ride. */
   perch?: "highest" | "turntable" | "swing" | "seesaw";
 }
@@ -156,6 +172,7 @@ export const MAYPOLE_WIDTH = 0.3;
 export const MAYPOLE_CROWN = { radius: 0.48, height: 0.12 };
 export const BUCKET_SIZE = { radius: 0.2, height: 0.36 };
 export const SANDBAG_SIZE = { radius: 0.32, height: 0.7 };
+export const CHEST_SIZE = { x: 0.9, y: 0.62, z: 0.6 };
 
 /** Small builder so level layouts read as masonry rather than coordinates. */
 export class Mason {
@@ -240,7 +257,7 @@ export class Mason {
     return this.block("canopy", x, y + height + GAP, z, roof, 0.12, roof);
   }
 
-  fixture(look: FixtureLook, x: number, y: number, z: number, sx: number, sy: number, sz: number, opts: { yaw?: number; bounce?: number; soft?: number; cue?: CueKind } = {}): number {
+  fixture(look: FixtureLook, x: number, y: number, z: number, sx: number, sy: number, sz: number, opts: { yaw?: number; bounce?: number; soft?: number; cue?: CueKind; spring?: number } = {}): number {
     this.pieces.push({
       kind: "fixture",
       look,
@@ -250,6 +267,7 @@ export class Mason {
       ...(opts.bounce !== undefined ? { bounce: opts.bounce } : {}),
       ...(opts.soft !== undefined ? { soft: opts.soft } : {}),
       ...(opts.cue !== undefined ? { cue: opts.cue } : {}),
+      ...(opts.spring !== undefined ? { spring: opts.spring } : {}),
     });
     return y + sy;
   }
@@ -313,6 +331,39 @@ export class Mason {
     const pos = { x, y: height + BUCKET_SIZE.height / 2 + GAP, z };
     this.pieces.push({ kind: "bucket", pos });
     return pos;
+  }
+
+  /** A treasure chest of spare powder and shot. */
+  chest(x: number, z: number, opts: { y?: number; yaw?: number; ammo?: Partial<Record<StockKind, number>> } = {}): void {
+    this.pieces.push({
+      kind: "chest",
+      pos: { x, y: (opts.y ?? 0) + CHEST_SIZE.y / 2 + GAP, z },
+      yaw: opts.yaw ?? 0,
+      ...(opts.ammo ? { ammo: opts.ammo } : {}),
+    });
+  }
+
+  /** The Queen's bouncy four-poster: anything landing on it goes straight back up. Returns the mattress top. */
+  bouncyBed(x: number, z: number, opts: { yaw?: number; spring?: number; width?: number; length?: number } = {}): number {
+    return this.fixture("bed", x, 0, z, opts.width ?? 2.2, 0.75, opts.length ?? 2.8, { yaw: opts.yaw ?? 0, spring: opts.spring ?? 10.5, soft: 0.15 });
+  }
+
+  /** A stagehand's wind machine: strike it and a gale blows across the stage for a while. */
+  windMachine(x: number, z: number, yaw = 0): void {
+    this.fixture("windmachine", x, 0, z, 1.3, 1.6, 1.1, { yaw, cue: "wind" });
+  }
+
+  /**
+   * A painted tree with a cradle hung from its bough on two lines. The wind rocks it;
+   * chain shot cuts the lines. Returns the cradle floor, where Humpty sits.
+   */
+  cradle(x: number, y: number, z: number, opts: { bough?: number; trunkX?: number } = {}): Vec3 {
+    const bough = opts.bough ?? y + 3.2;
+    const trunkX = opts.trunkX ?? x - 2.6;
+    this.fixture("trunk", trunkX, 0, z, 0.7, bough + 0.9, 0.7);
+    this.fixture("bough", (trunkX + x + 1.2) / 2, bough - 0.12, z, Math.abs(x + 1.2 - trunkX), 0.26, 0.4);
+    this.pieces.push({ kind: "swing", pos: { x, y, z }, width: 1.3, beam: bough - 0.12, cradle: true });
+    return { x, y, z };
   }
 
   /** A sandbag hanging from the flies on a single line. Only chain shot cuts the line. */

@@ -15,16 +15,27 @@ Core promises:
 - The aim arc is honest: it is the real launch solution, and it stops at the first
   collider the shot will touch. Off a bumper it continues with the true bounce.
 - Only chain shot cuts rope and maypoles; nothing else moves a maypole. Curios never
-  affect a verse. The rat never steals the last charge, and the blunderbuss never spends
+  change a verse's physics (they pay mayhem once and may hide its star). The rat never steals the last charge, and the blunderbuss never spends
   a verse's shot.
 - A bomb's fuse is lit when it first lands. Stone and brick between a blast and a powder
   keg keep the keg from going off (the blast still pushes things).
 - Stage cues (the dinner gong) are fixtures any stock shot can strike; lunch lasts
   `LUNCH_BREAK` seconds and nothing, not even a falling egg, interrupts it.
 - The verse ends when Humpty cracks. Mayhem (`src/sim/mayhem.ts`) is scored in the
-  simulation, frozen at the crack; each curio pays once. Stars: crack, great fall,
-  mayhem target (`LevelDef.mayhem`). Set targets with `npm run solve -- --mayhem`: about
-  the par line's mayhem plus one good exploring shot.
+  simulation, frozen at the crack (the crack and its great-fall bonus are the last
+  entries); each curio pays once. Stars, all registered only if he cracks: crack, mayhem
+  target (`LevelDef.mayhem`), and the hidden star (`LevelDef.star`: a crew id, a curio,
+  or the rat; released when a munition knocks that figure down). Set mayhem targets with
+  `npm run solve -- --mayhem`: about the par line's mayhem plus one good exploring shot.
+- Every verse has one treasure chest (`Mason.chest`): any munition that reaches it, or a
+  blast within 2 m, opens it for one more of each stocked kind (`Game.issued` tracks the
+  totals for the tray). Nothing opens after the crack.
+- A shot that strikes one of the King's men fair and square bowls his crew over, as well
+  as the contact-force rule for things falling on them.
+- Nothing scores and no star is released before the Queen's first shot, and the free
+  blunderbuss earns nothing but a scared rat (no chests, no bowled crews, no curios).
+  Every verse must sit a full minute untouched without cracking, scoring or releasing its
+  star (tests check this).
 - Every shot is logged by step (`Game.log`); replays re-fire the log on a fresh game.
   Anything that makes the simulation depend on wall-clock time or `Math.random` breaks
   replays and the solver.

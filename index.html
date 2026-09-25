@@ -30,8 +30,9 @@
         <div class="hud-notes">
           <ol id="objectives" aria-label="Stars for this verse">
             <li data-star="cracked"><i></i><span>Crack him</span></li>
-            <li data-star="great" title="Measured from where he falls from to where he lands"><i></i><span>A fall of <b id="great-fall">3</b> m <em id="height-now"></em></span></li>
             <li data-star="mayhem" title="Everything you break, bowl, ring or startle before he cracks"><i></i><span>Mayhem <b id="mayhem-now">0</b> / <b id="mayhem-target">500</b></span></li>
+            <li data-star="star" title="A star is hidden in one of the figures on stage. Knock it loose, then crack him to keep it."><i></i><span id="star-state">A hidden star</span></li>
+            <li data-info="fall" title="A great fall earns a mayhem bonus. Measured from where he falls from to where he lands."><b class="ruler" aria-hidden="true"></b><span>Great fall <b id="great-fall">3</b> m <em id="height-now"></em></span></li>
           </ol>
           <p id="hint"></p>
           <p id="status" hidden></p>
@@ -63,6 +64,7 @@
         <p class="couplet" id="verse-lines"></p>
         <p class="hint" id="verse-hint"></p>
         <p class="ammo-list" id="verse-ammo"></p>
+        <p class="secrets">A star is hidden in one of the figures on stage, and a chest of spare shot is somewhere about.</p>
         <button type="button" id="verse-go">Begin</button>
       </section>
 
