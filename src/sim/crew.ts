@@ -3,7 +3,12 @@ import type { CrewDef, Zone } from "./level.js";
 import type { Vec3 } from "./types.js";
 
 export type CrewKind = CrewDef["kind"];
-export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer";
+export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer" | "lunch";
+
+/** How long the King's men are away when the dinner gong goes. */
+export const LUNCH_BREAK = 13;
+/** Where they eat: just past the wings. */
+const CANTEEN_X = 18.5;
 
 export interface CrewSpec {
   walk: number;
@@ -62,6 +67,9 @@ export interface CrewState {
   /** Entity ids per formation slot. */
   slots: number[];
   toppled: number;
+  /** Which wing they go to for lunch (-1 or 1), and when they're due back. */
+  canteen: number;
+  lunchUntil: number;
 }
 
 export function createCrewState(def: CrewDef): CrewState {
@@ -81,7 +89,23 @@ export function createCrewState(def: CrewDef): CrewState {
     target: undefined,
     slots: [],
     toppled: 0,
+    canteen: def.home.x < 0 ? -1 : 1,
+    lunchUntil: -1,
   };
+}
+
+/** The gong: off they go to the nearest wing. Anyone knocked flat follows once he's up. */
+export function callLunch(crew: CrewState, time: number): void {
+  crew.canteen = crew.x < 0 ? -1 : 1;
+  crew.lunchUntil = time + LUNCH_BREAK;
+  crew.threatSince = -1;
+  if (crew.mode !== "stunned" && crew.mode !== "recover") crew.mode = "lunch";
+}
+
+/** What a crew goes back to doing: lunch if it isn't over, otherwise their post. */
+function resume(crew: CrewState, time: number): CrewMode {
+  if (time < crew.lunchUntil) return "lunch";
+  return crew.def.patrol?.length ? "patrol" : "idle";
 }
 
 export interface Threat {
@@ -131,13 +155,13 @@ export function steerCrew(crew: CrewState, dt: number, time: number, threat: Thr
     crew.speed = 0;
     if (time >= crew.modeUntil) {
       crew.toppled = 0;
-      crew.mode = crew.def.patrol?.length ? "patrol" : "idle";
+      crew.mode = resume(crew, time);
     }
     return;
   }
   if (crew.mode === "cheer") {
     crew.speed = 0;
-    if (time >= crew.modeUntil) crew.mode = crew.def.patrol?.length ? "patrol" : "idle";
+    if (time >= crew.modeUntil) crew.mode = resume(crew, time);
     return;
   }
 
@@ -145,7 +169,14 @@ export function steerCrew(crew: CrewState, dt: number, time: number, threat: Thr
   let pace = spec.walk;
   const canCatch = spec.run > 0;
 
-  if (canCatch && threat) {
+  if (crew.mode === "lunch") {
+    // Nothing comes between the King's men and their lunch. Not even a falling egg.
+    if (time >= crew.lunchUntil) crew.mode = resume(crew, time);
+    else {
+      goal = { x: crew.canteen * CANTEEN_X, z: crew.z };
+      pace = Math.max(spec.walk * 2.2, spec.run * 0.6);
+    }
+  } else if (canCatch && threat) {
     if (crew.threatSince < 0) crew.threatSince = time;
     if (time - crew.threatSince >= spec.reaction) {
       const landing = predictLanding(threat, spec.bedTop + humptyCatchOffset);
@@ -204,9 +235,7 @@ export function steerCrew(crew: CrewState, dt: number, time: number, threat: Thr
   const travel = Math.min(gap, crew.speed * dt * (crew.kind === "cart" ? Math.max(0.2, aligned) : 1));
   crew.x += (dx / gap) * travel;
   crew.z += (dz / gap) * travel;
-  const clamped = clampToZone(crew.x, crew.z, crew.def.zone ?? undefined);
-  crew.x = clamped.x;
-  crew.z = clamped.z;
+  // Goals are already inside the zone; a crew back from lunch walks in from the wings.
   crew.stride += travel;
 }
 

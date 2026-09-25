@@ -12,10 +12,16 @@ test("verse ids are unique", () => {
 
 for (const level of LEVELS) {
   test(`${level.id}: stands still until the first shot`, async () => {
-    const { drift, cracked, humptyDrift } = await settleDrift(level, 5);
+    const { drift, cracked, humptyDrift, humptyDrop } = await settleDrift(level, 5);
     assert.ok(!cracked, "Humpty cracked with nobody touching him");
-    assert.ok(humptyDrift < 0.12, `Humpty drifted ${humptyDrift.toFixed(3)} m`);
-    assert.ok(drift < 0.15, `the masonry drifted ${drift.toFixed(3)} m`);
+    const ride = level.perch && level.perch !== "highest";
+    if (ride) {
+      // On a turntable or swing he moves, but he must stay aboard.
+      assert.ok(humptyDrop < 0.3, `Humpty sank ${humptyDrop.toFixed(3)} m on his ride`);
+    } else {
+      assert.ok(humptyDrift < 0.12, `Humpty drifted ${humptyDrift.toFixed(3)} m`);
+      assert.ok(drift < 0.15, `the masonry drifted ${drift.toFixed(3)} m`);
+    }
   });
 
   test(`${level.id}: the recorded par solution still cracks Humpty`, async () => {

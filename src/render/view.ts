@@ -1,7 +1,7 @@
 import * as pc from "playcanvas";
 import { AMMO } from "../sim/ballistics.js";
-import { CANNON_PIVOT, MORTAR_PIVOT, type AimPreview, type CrewView, type Game } from "../sim/game.js";
-import type { BodyView, GameEvent, Vec3 } from "../sim/types.js";
+import { CANNON_PIVOT, MORTAR_PIVOT, QUEEN_GUN, type AimPreview, type CrewView, type Game } from "../sim/game.js";
+import type { AmmoKind, BodyView, GameEvent, StockKind, Vec3 } from "../sim/types.js";
 import { Kit, palette } from "./kit.js";
 import {
   buildBlock,
@@ -13,11 +13,16 @@ import {
   buildHumpty,
   buildKeg,
   buildLitterBed,
+  buildLoad,
   buildMan,
   buildMortar,
   buildProjectile,
   buildQueen,
   buildShellPiece,
+  buildFixture,
+  buildRat,
+  buildTurntable,
+  type RatRig,
   type GunRig,
   type HorseRig,
   type HumptyRig,
@@ -25,6 +30,7 @@ import {
   type QueenRig,
 } from "./props.js";
 import { buildStage, type StageSet } from "./stage.js";
+import { Curios } from "./curios.js";
 
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
 const DEG = 180 / Math.PI;
@@ -37,6 +43,8 @@ interface BodyVisual {
   man?: ManRig;
   horse?: HorseRig;
   wheels?: pc.Entity[];
+  rat?: RatRig;
+  key?: pc.Entity;
 }
 
 interface Puff {
@@ -48,6 +56,10 @@ interface Puff {
   grow: number;
   gravity: number;
   spin: number;
+  /** Keep this shape rather than shrinking to a cube (confetti). */
+  shape?: pc.Vec3;
+  /** An expanding ring (the gong's shimmer): grows to `size` instead of blooming. */
+  ring?: boolean;
 }
 
 interface Splat {
@@ -73,9 +85,19 @@ export class StageView {
   private readonly actors: pc.Entity;
   private readonly effects: pc.Entity;
   private readonly stage: StageSet;
+  private readonly curios: Curios;
+  private readonly ropePool: pc.Entity[] = [];
+  private readonly blunderbuss: pc.Entity;
+  private blunderRecoil = 0;
   private readonly queen: QueenRig;
   private readonly cannon: GunRig;
   private readonly mortar: GunRig;
+  /** What is loaded in each gun's mouth, by ammunition. */
+  private readonly loads = new Map<AmmoKind, pc.Entity>();
+  /** A gold ring on the rug under whichever gun the selected shot fires from. */
+  private readonly gunMarker: pc.Entity;
+  private lastSelected: AmmoKind | undefined;
+  private swap = 0;
   private readonly visuals = new Map<number, BodyVisual>();
   private readonly chains = new Map<number, pc.Entity>();
   private readonly puffs: Puff[] = [];
@@ -83,7 +105,10 @@ export class StageView {
   private readonly arcDots: pc.Entity[] = [];
   private readonly reticle: pc.Entity;
   private readonly reticleHot: pc.Entity;
+  /** Chain shot's sweep: a bar across the reticle as wide as the chain. */
+  private readonly chainSpan: pc.Entity;
   private readonly hintMarker: pc.Entity;
+  private readonly hintLock: pc.Entity;
   private hintAt: Vec3 | undefined;
   private readonly rope: pc.Entity;
   private readonly hook: pc.Entity;
@@ -137,6 +162,7 @@ export class StageView {
     this.camera = this.createCamera();
     this.createLights();
     this.stage = buildStage(this.kit, this.world);
+    this.curios = new Curios(this.kit, this.world, this.stage.moon);
     this.batchScenery();
     this.cannon = buildCannon(this.kit, this.world);
     this.cannon.root.setLocalPosition(CANNON_PIVOT.x, 0.12, CANNON_PIVOT.z);
@@ -144,9 +170,31 @@ export class StageView {
     this.mortar = buildMortar(this.kit, this.world);
     this.mortar.root.setLocalPosition(MORTAR_PIVOT.x, 0.12, MORTAR_PIVOT.z);
     this.mortar.pitch.setLocalPosition(0, MORTAR_PIVOT.y - 0.12, 0);
+    for (const kind of ["shot", "grape", "chain"] as const) {
+      const load = buildLoad(this.kit, this.cannon.recoil, kind);
+      load.setLocalPosition(0, 0, -1.56);
+      load.enabled = false;
+      this.loads.set(kind, load);
+    }
+    for (const kind of ["shell", "bomb"] as const) {
+      const load = buildLoad(this.kit, this.mortar.recoil, kind);
+      load.setLocalPosition(0, 0, -0.62);
+      load.enabled = false;
+      this.loads.set(kind, load);
+    }
+    const markerGold = this.kit.material("gun-marker", palette.gold, 0.4, 0, { emissive: new pc.Color(0.45, 0.3, 0.03) });
+    this.gunMarker = this.kit.group("gun-marker", this.world);
+    this.kit.meshEntity("gun-marker-ring", this.kit.torus(1.05, 0.05, 36, 5), markerGold, this.gunMarker, false);
+    this.gunMarker.enabled = false;
     this.queen = buildQueen(this.kit, this.world);
     this.queen.root.setLocalPosition(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
     this.queen.root.setLocalEulerAngles(0, 150, 0);
+    // Her blunderbuss leans on the podium until vermin appear.
+    this.blunderbuss = this.kit.group("blunderbuss", this.world, V(QUEEN_GUN.x, QUEEN_GUN.y, QUEEN_GUN.z));
+    this.kit.primitive("stock", "box", this.blunderbuss, V(0, 0, 0.35), { x: 0.12, y: 0.14, z: 0.55 }, this.kit.material("oak-dark", palette.oakDark, 0.16));
+    this.kit.primitive("barrel", "cylinder", this.blunderbuss, V(0, 0.04, -0.2), { x: 0.1, y: 0.7, z: 0.1 }, this.kit.material("bronze-barrel", palette.bronze, 0.66, 0.58), V(90, 0, 0));
+    this.kit.primitive("bell-mouth", "cone", this.blunderbuss, V(0, 0.04, -0.6), { x: 0.24, y: 0.2, z: 0.24 }, this.kit.material("bronze-barrel", palette.bronze, 0.66, 0.58), V(-90, 0, 0));
+    this.blunderbuss.enabled = false;
 
     const dot = this.kit.material("aim-dot", palette.gold, 0.4, 0, { emissive: new pc.Color(0.55, 0.36, 0.04) });
     for (let index = 0; index < 90; index += 1) {
@@ -158,6 +206,10 @@ export class StageView {
     this.kit.meshEntity("reticle-ring", this.kit.torus(0.42, 0.04, 28, 6), dot, this.reticle, false);
     this.kit.primitive("reticle-dot", "sphere", this.reticle, V(), { x: 0.12, y: 0.12, z: 0.12 }, dot, pc.Vec3.ZERO, false);
     this.reticle.enabled = false;
+    this.chainSpan = this.kit.group("chain-span", this.effects);
+    this.kit.primitive("chain-span-bar", "box", this.chainSpan, V(), { x: 1.25, y: 0.03, z: 0.03 }, dot, pc.Vec3.ZERO, false);
+    for (const side of [-1, 1]) this.kit.primitive("chain-span-ball", "sphere", this.chainSpan, V(side * 0.62, 0, 0), { x: 0.16, y: 0.16, z: 0.16 }, dot, pc.Vec3.ZERO, false);
+    this.chainSpan.enabled = false;
     const hot = this.kit.material("aim-hot", new pc.Color(0.9, 0.1, 0.05), 0.4, 0, { emissive: new pc.Color(0.7, 0.05, 0.02) });
     this.reticleHot = this.kit.group("reticle-hot", this.effects);
     this.kit.meshEntity("reticle-ring-hot", this.kit.torus(0.62, 0.05, 28, 6), hot, this.reticleHot, false);
@@ -169,6 +221,8 @@ export class StageView {
     for (let index = 0; index < 4; index += 1) {
       this.kit.primitive("hint-tick", "box", this.hintMarker, V(Math.cos((index * Math.PI) / 2) * 0.75, 0, Math.sin((index * Math.PI) / 2) * 0.75), { x: 0.3, y: 0.05, z: 0.08 }, tip, V(0, -index * 90, 0), false);
     }
+    this.hintLock = this.kit.primitive("hint-lock", "cylinder", this.hintMarker, V(), { x: 0.8, y: 0.02, z: 0.8 }, tip, pc.Vec3.ZERO, false);
+    this.hintLock.enabled = false;
     this.hintMarker.enabled = false;
 
     const rope = this.kit.material("rope", palette.rope, 0.12);
@@ -211,6 +265,13 @@ export class StageView {
     this.userYaw = 0;
     this.userPitch = 0;
     this.userZoom = 0;
+    // Only the guns this verse has powder for are wheeled out.
+    const stocked = (Object.keys(game.level.ammo) as StockKind[]).filter((kind) => (game.level.ammo[kind] ?? 0) > 0);
+    const mortar = stocked.some((kind) => AMMO[kind].gun === "mortar");
+    this.mortar.root.enabled = mortar;
+    this.cannon.root.enabled = !mortar || stocked.some((kind) => AMMO[kind].gun === "cannon");
+    this.lastSelected = game.selected;
+    this.swap = 0;
     this.sync(0);
   }
 
@@ -231,6 +292,11 @@ export class StageView {
     this.userPitch = pc.math.clamp(this.userPitch - dy * 0.15, -22, 12);
   }
 
+  /** Turn the view round the set by whole steps, for the look buttons and arrow keys. */
+  look(degrees: number): void {
+    this.userYaw = pc.math.clamp(this.userYaw + degrees, -40, 40);
+  }
+
   zoom(delta: number): void {
     this.userZoom = pc.math.clamp(this.userZoom + delta, -8, 8);
   }
@@ -248,6 +314,11 @@ export class StageView {
   /** A gentle marker where a known winning shot lands. */
   setHint(point: Vec3 | undefined): void {
     this.hintAt = point;
+  }
+
+  /** The player's aim is inside the hint ring: fill it in so they know their hand is guided. */
+  setHintLocked(locked: boolean): void {
+    this.hintLock.enabled = locked;
   }
 
   /** Ray from the camera through a point on the canvas (CSS pixels). */
@@ -286,6 +357,7 @@ export class StageView {
       const spec = AMMO[event.ammo];
       const muzzle = event.from;
       if (spec.gun === "mortar") this.recoil.mortar = 1;
+      else if (spec.gun === "queen") this.blunderRecoil = 1;
       else this.recoil.cannon = 1;
       this.flash(muzzle, 0.9);
       const forward = new pc.Vec3(event.velocity.x, event.velocity.y, event.velocity.z).normalize();
@@ -329,6 +401,7 @@ export class StageView {
       if (event.strength > 0.6) this.shake = Math.max(this.shake, event.strength * 0.18);
     } else if (event.type === "crack") {
       this.crackAt = V(event.at.x, event.at.y, event.at.z);
+      this.confetti(event.at);
       this.shake = 0.9;
       this.queenCheer = 1;
       this.splat(event.at);
@@ -338,6 +411,34 @@ export class StageView {
       }
     } else if (event.type === "caught") {
       this.queenSulk = 1;
+    } else if (event.type === "curio") {
+      this.curios.trigger(event.id, this.elapsed);
+      this.flash(event.at, 0.5);
+    } else if (event.type === "ricochet") {
+      for (let index = 0; index < 6; index += 1) {
+        this.spark(V(event.at.x, event.at.y, event.at.z), V((Math.random() - 0.5) * 6, 2 + Math.random() * 3, (Math.random() - 0.5) * 6), palette.gold);
+      }
+    } else if (event.type === "cue") {
+      this.flash(event.at, 0.8);
+      this.shockwave(event.at);
+      for (let index = 0; index < 8; index += 1) {
+        this.spark(V(event.at.x, event.at.y, event.at.z), V((Math.random() - 0.5) * 5, 1 + Math.random() * 3, (Math.random() - 0.5) * 5), palette.gold);
+      }
+    } else if (event.type === "cut") {
+      for (let index = 0; index < 10; index += 1) {
+        this.puff(V(event.at.x, event.at.y, event.at.z), V((Math.random() - 0.5) * 4, Math.random() * 2, (Math.random() - 0.5) * 4), 0.18, 0.7, 4, palette.oakLight);
+      }
+      this.shake = Math.max(this.shake, 0.2);
+    } else if (event.type === "rope-cut") {
+      for (let index = 0; index < 5; index += 1) {
+        this.puff(V(event.at.x, event.at.y, event.at.z), V((Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5) * 2), 0.25, 0.6, 0, palette.rope);
+      }
+    } else if (event.type === "rat") {
+      if (event.action === "scared" || event.action === "steal") {
+        for (let index = 0; index < 5; index += 1) {
+          this.puff(V(event.at.x, 0.3, event.at.z), V((Math.random() - 0.5) * 2, 0.8, (Math.random() - 0.5) * 2), 0.35, 0.7);
+        }
+      }
     } else if (event.type === "bowled") {
       for (let index = 0; index < 4; index += 1) {
         this.puff(V(event.at.x, 0.2, event.at.z), V((Math.random() - 0.5) * 2, 0.6, (Math.random() - 0.5) * 2), 0.4, 0.8);
@@ -396,6 +497,7 @@ export class StageView {
     for (const [id, visual] of this.visuals) {
       const crew = crews.get(id);
       if (crew) this.animateCrew(visual, crew);
+      if (visual.key) visual.key.setLocalEulerAngles(0, this.elapsed * -120, 0);
     }
   }
 
@@ -407,6 +509,11 @@ export class StageView {
     this.animateAim();
     this.animateHint();
     this.animateHoist();
+    this.animateRopes();
+    this.animateRat();
+    this.animateBlunderbuss(realDt);
+    this.animateBombs(dt);
+    this.curios.update(this.elapsed);
     this.animateEffects(dt);
     this.animateScenery();
     this.updateCamera(realDt);
@@ -433,6 +540,7 @@ export class StageView {
         break;
       case "shot":
       case "shell":
+      case "bomb":
       case "grape":
       case "chain":
         buildProjectile(this.kit, root, view.kind, view.size);
@@ -456,6 +564,21 @@ export class StageView {
       case "litter":
         if (view.material === "cart") visual.wheels = buildCartBed(this.kit, root, view.size).wheels;
         else buildLitterBed(this.kit, root, view.size);
+        break;
+      case "fixture":
+        buildFixture(this.kit, root, view.material, view.size);
+        break;
+      case "turntable": {
+        const def = this.game?.level.pieces.find((piece) => piece.kind === "turntable");
+        const arm = def && def.kind === "turntable" ? def.arm : 1.5;
+        visual.key = buildTurntable(this.kit, root, view.size.x / 2, arm).key;
+        break;
+      }
+      case "rat":
+        visual.rat = buildRat(this.kit, root);
+        break;
+      case "pellet":
+        buildProjectile(this.kit, root, "grape", view.size);
         break;
       default:
         break;
@@ -608,23 +731,59 @@ export class StageView {
     const game = this.game;
     this.recoil.cannon = Math.max(0, this.recoil.cannon - dt * 2.2);
     this.recoil.mortar = Math.max(0, this.recoil.mortar - dt * 2.8);
+    this.swap = Math.max(0, this.swap - dt * 2.5);
+    const selected = game?.selected;
+    const gun = selected ? AMMO[selected].gun : undefined;
+    if (game && selected !== this.lastSelected) {
+      // A change of shot: the crew unloads and rams home the new charge, and the Queen points.
+      this.lastSelected = selected;
+      if (gun !== "queen") {
+        this.swap = 1;
+        this.queenPoint = Math.max(this.queenPoint, 0.6);
+      }
+    }
     if (game && this.aim) {
-      const spec = AMMO[game.selected];
       const v = this.aim.velocity;
       const yaw = Math.atan2(-v.x, -v.z) * DEG;
       const pitch = Math.atan2(v.y, Math.hypot(v.x, v.z)) * DEG;
-      const target = spec.gun === "mortar" ? this.mortarAim : this.cannonAim;
-      target.yaw += (yaw - target.yaw) * Math.min(1, dt * 10);
-      target.pitch += (pitch - target.pitch) * Math.min(1, dt * 10);
+      const target = gun === "mortar" ? this.mortarAim : gun === "cannon" ? this.cannonAim : undefined;
+      if (target) {
+        target.yaw += (yaw - target.yaw) * Math.min(1, dt * 10);
+        target.pitch += (pitch - target.pitch) * Math.min(1, dt * 10);
+      }
     }
+    // The idle gun settles back to rest, so it is plain which one is manned.
+    const rest = (aim: { yaw: number; pitch: number }, pitch: number): void => {
+      aim.yaw += (0 - aim.yaw) * Math.min(1, dt * 3);
+      aim.pitch += (pitch - aim.pitch) * Math.min(1, dt * 3);
+    };
+    if (gun !== "cannon") rest(this.cannonAim, -4);
+    if (gun !== "mortar") rest(this.mortarAim, 35);
     const kick = (amount: number): number => Math.sin(Math.min(1, amount) * Math.PI) * amount;
+    const loading = Math.sin(this.swap * Math.PI) * this.swap;
+    const cannonLoad = gun === "cannon" ? loading : 0;
+    const mortarLoad = gun === "mortar" ? loading : 0;
     this.cannon.yaw.setLocalEulerAngles(0, this.cannonAim.yaw, 0);
-    this.cannon.pitch.setLocalEulerAngles(this.cannonAim.pitch, 0, 0);
-    this.cannon.recoil.setLocalPosition(0, 0, kick(this.recoil.cannon) * 0.55);
+    this.cannon.pitch.setLocalEulerAngles(this.cannonAim.pitch - cannonLoad * 10, 0, 0);
+    this.cannon.recoil.setLocalPosition(0, 0, kick(this.recoil.cannon) * 0.55 + cannonLoad * 0.35);
     for (const wheel of this.cannon.wheels) wheel.setLocalEulerAngles(this.recoil.cannon * 40, 0, 90);
     this.mortar.yaw.setLocalEulerAngles(0, this.mortarAim.yaw, 0);
-    this.mortar.pitch.setLocalEulerAngles(this.mortarAim.pitch, 0, 0);
-    this.mortar.recoil.setLocalPosition(0, -kick(this.recoil.mortar) * 0.12, kick(this.recoil.mortar) * 0.2);
+    this.mortar.pitch.setLocalEulerAngles(this.mortarAim.pitch - mortarLoad * 15, 0, 0);
+    this.mortar.recoil.setLocalPosition(0, -kick(this.recoil.mortar) * 0.12, kick(this.recoil.mortar) * 0.2 + mortarLoad * 0.15);
+    // Show the charge in the mouth of the gun that will fire it, once it is loaded.
+    const ready = Boolean(game && game.phase === "aim" && game.reload <= 0 && this.swap < 0.5);
+    for (const [kind, load] of this.loads) {
+      load.enabled = ready && kind === selected && (game?.ammo[kind as StockKind] ?? 0) > 0;
+      if (load.enabled && kind === "chain") load.setLocalEulerAngles(Math.sin(this.elapsed * 2.4) * 6, 0, 0);
+    }
+    const live = game && game.phase !== "won" && game.phase !== "lost" && (gun === "cannon" || gun === "mortar");
+    this.gunMarker.enabled = Boolean(live);
+    if (live) {
+      const at = gun === "mortar" ? MORTAR_PIVOT : CANNON_PIVOT;
+      const pulse = 1 + Math.sin(this.elapsed * 3) * 0.04 + this.swap * 0.25;
+      this.gunMarker.setPosition(at.x, 0.16, at.z + (gun === "cannon" ? 0.2 : 0));
+      this.gunMarker.setLocalScale(pulse * (gun === "mortar" ? 0.85 : 1.15), 1, pulse * (gun === "mortar" ? 0.85 : 1.15));
+    }
   }
 
   private animateAim(): void {
@@ -635,7 +794,17 @@ export class StageView {
       for (const dot of this.arcDots) dot.enabled = false;
       this.reticle.enabled = false;
       this.reticleHot.enabled = false;
+      this.chainSpan.enabled = false;
       return;
+    }
+    // Chain shot sweeps a chain's width, level and across the line of flight.
+    const chain = game?.selected === "chain" && aim.hit;
+    this.chainSpan.enabled = Boolean(chain);
+    if (chain && aim.hit) {
+      const last = aim.points[Math.max(0, aim.points.length - 2)]!;
+      const heading = Math.atan2(aim.hit.x - last.x, aim.hit.z - last.z) * DEG;
+      this.chainSpan.setPosition(aim.hit.x, aim.hit.y, aim.hit.z);
+      this.chainSpan.setEulerAngles(0, heading, Math.sin(this.elapsed * 5) * 8);
     }
     const spacing = 0.42;
     const offset = (this.elapsed * 1.6) % spacing;
@@ -694,6 +863,51 @@ export class StageView {
     this.hintMarker.setLocalScale(pulse, pulse, pulse);
   }
 
+  private animateRopes(): void {
+    const ropes = this.game?.ropeViews ?? [];
+    while (this.ropePool.length < ropes.length) {
+      this.ropePool.push(this.kit.primitive("swing-rope", "cylinder", this.effects, V(), { x: 0.05, y: 1, z: 0.05 }, this.kit.material("rope", palette.rope, 0.12), pc.Vec3.ZERO, false));
+    }
+    this.ropePool.forEach((segment, index) => {
+      const rope = ropes[index];
+      if (!rope) {
+        segment.enabled = false;
+        return;
+      }
+      placeSegment(segment, V(rope.bottom.x, rope.bottom.y, rope.bottom.z), V(rope.top.x, rope.top.y, rope.top.z), 0.055);
+    });
+  }
+
+  private animateRat(): void {
+    const rat = this.game?.ratView;
+    if (!rat) return;
+    const visual = this.visuals.get(rat.id);
+    const rig = visual?.rat;
+    if (!rig) return;
+    const scurry = rat.stride * 7;
+    rig.legs.forEach((leg, index) => leg.setLocalEulerAngles(Math.sin(scurry + (index % 2 ? Math.PI : 0) + (index > 1 ? 0.8 : 0)) * 40, 0, 0));
+    rig.tail.forEach((joint, index) => joint.setLocalEulerAngles(-8, Math.sin(this.elapsed * 6 + index * 0.8) * 18, 0));
+    rig.head.setLocalEulerAngles(rat.mode === "gnaw" ? Math.sin(this.elapsed * 30) * 12 + 18 : Math.sin(scurry * 0.5) * 5, 0, 0);
+    rig.body.setLocalEulerAngles(0, 0, rat.flip * 180);
+    rig.body.setLocalPosition(0, rat.flip * 0.75 + (rat.mode === "creep" ? Math.abs(Math.sin(scurry)) * 0.05 : 0), 0);
+    rig.bag.enabled = rat.carrying;
+  }
+
+  private animateBlunderbuss(dt: number): void {
+    const game = this.game;
+    const show = Boolean(game && (game.vermin || game.selected === "blunderbuss" || this.blunderRecoil > 0));
+    this.blunderbuss.enabled = show;
+    if (!show) return;
+    this.blunderRecoil = Math.max(0, this.blunderRecoil - dt * 3);
+    const aim = game?.selected === "blunderbuss" ? this.aim : undefined;
+    if (aim) {
+      const v = aim.velocity;
+      this.blunderbuss.setEulerAngles((Math.atan2(v.y, Math.hypot(v.x, v.z)) * 180) / Math.PI, (Math.atan2(-v.x, -v.z) * 180) / Math.PI, 0);
+    }
+    const kick = Math.sin(Math.min(1, this.blunderRecoil) * Math.PI) * this.blunderRecoil * 0.25;
+    this.blunderbuss.setPosition(QUEEN_GUN.x, QUEEN_GUN.y + kick * 0.3, QUEEN_GUN.z + kick);
+  }
+
   private animateHoist(): void {
     const game = this.game;
     const rig = this.humpty;
@@ -726,6 +940,48 @@ export class StageView {
     const material = this.kit.material(`spark-${color.r.toFixed(2)}-${color.g.toFixed(2)}`, color, 0.3, 0, { emissive: new pc.Color(color.r * 0.8, color.g * 0.6, color.b * 0.3) });
     const entity = this.kit.primitive("spark", "box", this.effects, position.clone(), { x: 0.08, y: 0.08, z: 0.08 }, material, pc.Vec3.ZERO, false);
     this.puffs.push({ entity, velocity, age: 0, life: 0.7 + Math.random() * 0.4, size: 0.1, grow: 0, gravity: 12, spin: 400 });
+  }
+
+  /** The flies let loose a shower of paper confetti over the wreckage. */
+  private confetti(at: Vec3): void {
+    const colours = [palette.king, palette.gold, palette.queen, palette.cream, new pc.Color(0.25, 0.4, 0.8)];
+    for (let index = 0; index < 70; index += 1) {
+      const colour = colours[index % colours.length]!;
+      const material = this.kit.material(`confetti-${index % colours.length}`, colour, 0.4, 0, { emissive: new pc.Color(colour.r * 0.25, colour.g * 0.25, colour.b * 0.25), doubleSided: true });
+      const entity = this.kit.primitive("confetti", "box", this.effects, V(at.x + (Math.random() - 0.5) * 10, 10 + Math.random() * 4, at.z + (Math.random() - 0.5) * 6), { x: 0.16, y: 0.02, z: 0.1 }, material, V(Math.random() * 360, Math.random() * 360, 0), false);
+      this.puffs.push({ entity, velocity: V((Math.random() - 0.5) * 1.2, -0.6 - Math.random(), (Math.random() - 0.5) * 1.2), age: 0, life: 3.5 + Math.random() * 1.5, size: 1, grow: 0, gravity: 1.2, spin: 200 + Math.random() * 300, shape: V(0.16, 0.02, 0.1) });
+    }
+  }
+
+  private fizzTimer = 0;
+
+  /** Lit bombs spit sparks from their fuses and swell as the fuse runs out. */
+  private animateBombs(dt: number): void {
+    this.fizzTimer += dt;
+    const emit = this.fizzTimer > 0.05;
+    if (emit) this.fizzTimer = 0;
+    for (const visual of this.visuals.values()) {
+      if (visual.view.kind !== "bomb") continue;
+      const left = visual.view.fuse ?? 3;
+      const swell = left < 0.8 ? 1 + Math.abs(Math.sin(this.elapsed * 30)) * (0.8 - left) * 0.35 : 1;
+      visual.root.setLocalScale(swell, swell, swell);
+      if (!emit) continue;
+      const top = visual.root.getPosition().clone();
+      const up = visual.root.up.clone().mulScalar(0.36);
+      top.add(up);
+      this.spark(top, V((Math.random() - 0.5) * 2, 1.5 + Math.random() * 1.5, (Math.random() - 0.5) * 2), palette.gold);
+    }
+  }
+
+  /** Rings of gold spreading from a struck gong. */
+  private shockwave(at: Vec3): void {
+    const material = this.kit.material("shimmer", palette.gold, 0.4, 0, { emissive: new pc.Color(0.6, 0.4, 0.05) });
+    for (let index = 0; index < 3; index += 1) {
+      const entity = this.kit.group("shimmer", this.effects, V(at.x, at.y, at.z));
+      this.kit.meshEntity("shimmer-ring", this.kit.torus(0.5, 0.03, 32, 5), material, this.kit.group("shimmer-tilt", entity, V(), V(90, 0, 0)), false);
+      entity.lookAt(this.camera.getPosition());
+      this.puffs.push({ entity, velocity: V(), age: -index * 0.18, life: 0.9, size: 2.4 + index * 0.6, grow: 0, gravity: 0, spin: 0, ring: true });
+    }
   }
 
   private flash(at: Vec3, size: number): void {
@@ -761,10 +1017,18 @@ export class StageView {
       if (puff.gravity === 0) puff.velocity.y += dt * 0.8;
       const p = puff.entity.getPosition();
       puff.entity.setPosition(p.x + puff.velocity.x * dt, Math.max(0.03, p.y + puff.velocity.y * dt), p.z + puff.velocity.z * dt);
-      if (puff.grow > 0) {
+      if (puff.ring) {
+        // Staggered rings wait their turn with a negative age.
+        puff.entity.enabled = k >= 0;
+        const s = puff.size * (0.25 + Math.max(0, k) * 0.75);
+        puff.entity.setLocalScale(s, s, Math.max(0.01, s * (1 - k)));
+      } else if (puff.grow > 0) {
         const bloom = 1 - Math.pow(1 - Math.min(1, k * 3), 3);
         const s = puff.size * bloom * (1 - Math.pow(k, 4));
         puff.entity.setLocalScale(Math.max(0.01, s), Math.max(0.01, s * 0.9), Math.max(0.01, s));
+      } else if (puff.shape) {
+        const fade = k < 0.8 ? 1 : (1 - k) / 0.2;
+        puff.entity.setLocalScale(puff.shape.x * fade, puff.shape.y * fade, puff.shape.z * fade);
       } else {
         const s = puff.size * (1 - k);
         puff.entity.setLocalScale(s, s, s);
@@ -797,7 +1061,7 @@ export class StageView {
   /** The theatre never moves (bar a few flickering flames), so merge it into static batches. */
   private batchScenery(): void {
     const group = this.app.batcher.addGroup("scenery", false, 200);
-    const animated = new Set<pc.Entity>([...this.stage.footlights, ...this.stage.clouds, ...this.stage.pennants]);
+    const animated = new Set<pc.Entity>([...this.stage.footlights, ...this.stage.clouds, ...this.stage.pennants, this.stage.moon]);
     const visit = (node: pc.GraphNode): void => {
       if (animated.has(node as pc.Entity)) return;
       const entity = node as pc.Entity;
@@ -854,7 +1118,9 @@ export class StageView {
     const level = game?.level.view ?? { yaw: 0, pitch: -14, distance: 20, target: { x: 0, y: 2.2, z: -1 } };
     let yaw = level.yaw + this.userYaw;
     let pitch = level.pitch + this.userPitch;
-    let distance = level.distance + this.userZoom;
+    // A tall phone screen is narrow: stand further back so the whole set fits across.
+    const portrait = this.host.clientWidth / Math.max(1, this.host.clientHeight) < 0.8;
+    let distance = level.distance * (portrait ? 1.45 : 1) + this.userZoom;
     const target = V(level.target.x, level.target.y, level.target.z);
     if (this.cameraMode === "title") {
       yaw = Math.sin(this.elapsed * 0.12) * 16;

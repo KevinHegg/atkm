@@ -363,7 +363,29 @@ export function buildBlock(kit: Kit, parent: pc.Entity, material: string, size: 
   const { x, y, z } = size;
   const boxes: Box[] = [];
   let gloss = 0.17;
-  if (material === "stone") {
+  if (material === "canopy") return buildCanopy(kit, root, size);
+  if (material === "maypole") return buildMaypole(kit, root, size.y, true);
+  if (material === "seat") return buildSwingSeat(kit, root, size);
+  if (material === "seesaw") return buildSeesaw(kit, root, size);
+  if (material === "anvil") {
+    const iron = new pc.Color(0.16, 0.17, 0.18);
+    const edge = new pc.Color(0.3, 0.31, 0.32);
+    boxes.push({ center: [0, -y * 0.38, 0], size: [x * 0.8, y * 0.24, z * 0.9], color: iron });
+    boxes.push({ center: [0, -y * 0.08, 0], size: [x * 0.42, y * 0.4, z * 0.56], color: iron });
+    boxes.push({ center: [0, y * 0.3, 0], size: [x * 0.78, y * 0.4, z], color: iron });
+    boxes.push({ center: [x * 0.44, y * 0.34, 0], size: [x * 0.22, y * 0.24, z * 0.6], color: iron });
+    boxes.push({ center: [0, y * 0.505, 0], size: [x * 0.74, 0.012, z * 0.94], color: edge });
+    kit.meshEntity("anvil", kit.boxes(`anvil-${x.toFixed(2)}`, boxes), kit.paintMaterial(0.55), root);
+    return root;
+  }
+  if (material === "post") {
+    gloss = 0.6;
+    boxes.push({ center: [0, 0, 0], size: [x, y, z], color: shade(palette.gold, 0.85) });
+    for (const band of [-0.3, 0, 0.3]) {
+      boxes.push({ center: [0, band * y, 0], size: [x * 1.15, 0.08, z * 1.15], color: palette.king });
+    }
+    boxes.push({ center: [0, y / 2 - 0.03, 0], size: [x * 1.6, 0.06, z * 1.6], color: palette.gold });
+  } else if (material === "stone") {
     gloss = 0.07;
     const color = new pc.Color(0.38 + tone * 0.025, 0.37 + tone * 0.022, 0.33 + tone * 0.018);
     boxes.push({ center: [0, 0, 0], size: [x * 0.985, y * 0.97, z * 0.985], color });
@@ -411,6 +433,315 @@ export function buildBlock(kit: Kit, parent: pc.Entity, material: string, size: 
   }
   kit.meshEntity("block", kit.boxes(key, boxes), kit.paintMaterial(gloss), root);
   return root;
+}
+
+/** A royal pavilion: cloth roof with gold trim and a scalloped valance, a peaked top and a finial. */
+function buildCanopy(kit: Kit, root: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const { x, y, z } = size;
+  const crimson = palette.king;
+  const gold = palette.gold;
+  const boxes: Box[] = [{ center: [0, 0, 0], size: [x, y, z], color: crimson }];
+  for (const side of [-1, 1]) {
+    boxes.push({ center: [0, y / 2, side * z / 2], size: [x + 0.04, 0.05, 0.05], color: gold });
+    boxes.push({ center: [side * x / 2, y / 2, 0], size: [0.05, 0.05, z + 0.04], color: gold });
+  }
+  const tabs = 9;
+  for (let index = 0; index < tabs; index += 1) {
+    const along = -x / 2 + (index + 0.5) * (x / tabs);
+    const color = index % 2 === 0 ? crimson : gold;
+    for (const side of [-1, 1]) {
+      boxes.push({ center: [along, -y / 2 - 0.1, side * (z / 2 + 0.01)], size: [x / tabs - 0.03, 0.22, 0.03], color });
+      boxes.push({ center: [side * (x / 2 + 0.01), -y / 2 - 0.1, along], size: [0.03, 0.22, x / tabs - 0.03], color });
+    }
+  }
+  kit.meshEntity("canopy-cloth", kit.boxes(`canopy-${x.toFixed(2)}x${z.toFixed(2)}`, boxes), kit.paintMaterial(0.2), root);
+  const cloth = kit.material("canopy-crimson", crimson, 0.25);
+  const trim = kit.material("gold", palette.gold, 0.72, 0.55);
+  kit.primitive("canopy-peak", "cone", root, V(0, y / 2 + 0.42, 0), { x: x * 1.02, y: 0.84, z: z * 1.02 }, cloth);
+  kit.primitive("canopy-peak-band", "cone", root, V(0, y / 2 + 0.72, 0), { x: x * 0.32, y: 0.26, z: z * 0.32 }, trim, pc.Vec3.ZERO, false);
+  kit.primitive("canopy-finial", "sphere", root, V(0, y / 2 + 0.95, 0), { x: 0.22, y: 0.22, z: 0.22 }, trim);
+  kit.primitive("canopy-pennant", "cone", root, V(0.22, y / 2 + 1.2, 0), { x: 0.3, y: 0.5, z: 0.02 }, kit.material("queen-green-flag", new pc.Color(0.035, 0.49, 0.29), 0.22), V(0, 0, -90), false);
+  return root;
+}
+
+/** A royal swing seat: plank, back and arms, gilded and upholstered. */
+function buildSwingSeat(kit: Kit, root: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const w = size.x;
+  const d = size.z;
+  const wood = shade(palette.oakLight, 0.9);
+  const red = palette.king;
+  const gold = palette.gold;
+  const boxes: Box[] = [
+    { center: [0, -0.06, 0], size: [w, 0.12, d], color: wood },
+    { center: [0, 0.015, 0.02], size: [w - 0.16, 0.05, d - 0.14], color: red },
+    { center: [0, 0.42, -d / 2 + 0.05], size: [w, 0.84, 0.1], color: wood },
+    { center: [0, 0.45, -d / 2 + 0.11], size: [w - 0.2, 0.62, 0.03], color: red },
+    { center: [0, 0.86, -d / 2 + 0.05], size: [w + 0.06, 0.06, 0.14], color: gold },
+  ];
+  for (const side of [-1, 1]) {
+    boxes.push({ center: [side * (w / 2 - 0.05), 0.3, 0], size: [0.1, 0.6, d], color: wood });
+    boxes.push({ center: [side * (w / 2 - 0.05), 0.62, 0.02], size: [0.14, 0.05, d - 0.04], color: gold });
+  }
+
+  kit.meshEntity("swing-seat", kit.boxes(`swing-seat-${w.toFixed(2)}`, boxes), kit.paintMaterial(0.3), root);
+  return root;
+}
+
+/** The see-saw: a long plank with a bucket on the throwing arm and a lipped tray on the short one. */
+function buildSeesaw(kit: Kit, root: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const half = size.x / 2;
+  const plank = palette.oakLight;
+  const dark = palette.oakDark;
+  const red = palette.king;
+  const bucket = -half + 0.62;
+  const boxes: Box[] = [
+    { center: [0, 0, 0], size: [size.x, 0.16, 0.9], color: plank },
+    { center: [0, 0.085, 0], size: [size.x - 0.2, 0.01, 0.06], color: dark },
+    // Bucket, painted royal red.
+    { center: [-half + 0.05, 0.36, 0], size: [0.1, 0.56, 1.24], color: red },
+    { center: [bucket + 0.62, 0.36, 0], size: [0.1, 0.56, 1.24], color: red },
+    { center: [bucket, 0.36, 0.6], size: [1.24, 0.56, 0.1], color: red },
+    { center: [bucket, 0.36, -0.6], size: [1.24, 0.56, 0.1], color: red },
+    { center: [bucket, 0.66, 0.6], size: [1.3, 0.05, 0.14], color: palette.gold },
+    { center: [bucket, 0.66, -0.6], size: [1.3, 0.05, 0.14], color: palette.gold },
+    // The tray on the short arm.
+    { center: [half - 0.65, 0.1, 0], size: [1.3, 0.12, 1.6], color: dark },
+    { center: [half - 0.65, 0.3, 0.78], size: [1.3, 0.28, 0.08], color: plank },
+    { center: [half - 0.65, 0.3, -0.78], size: [1.3, 0.28, 0.08], color: plank },
+    { center: [half - 0.02, 0.3, 0], size: [0.08, 0.28, 1.6], color: plank },
+  ];
+  kit.meshEntity("seesaw", kit.boxes(`seesaw-${size.x.toFixed(2)}`, boxes), kit.paintMaterial(0.2), root);
+  return root;
+}
+
+/**
+ * A maypole: a striped shaft with a gilt crown to sit on and ribbons hanging from it.
+ * `crowned` false gives the stump left behind when chain shot cuts it, splintered on top.
+ */
+export function buildMaypole(kit: Kit, root: pc.Entity, height: number, crowned: boolean): pc.Entity {
+  const crown = crowned ? 0.12 : 0;
+  const shaft = height - crown;
+  const cream = kit.material("maypole-cream", palette.cream, 0.35);
+  const red = kit.material("maypole-red", palette.king, 0.35);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  const bands = Math.max(1, Math.round(shaft / 0.34));
+  const band = shaft / bands;
+  for (let index = 0; index < bands; index += 1) {
+    const y = -height / 2 + band * (index + 0.5);
+    kit.primitive("maypole-band", "cylinder", root, V(0, y, 0), { x: 0.3, y: band + 0.002, z: 0.3 }, index % 2 ? red : cream, pc.Vec3.ZERO, index % 3 === 0);
+  }
+  if (!crowned) {
+    const wood = kit.material("oak-light", palette.oakLight, 0.2);
+    for (const [dx, dz, h] of [[0.06, 0.02, 0.2], [-0.07, 0.05, 0.14], [0.01, -0.08, 0.17]] as const) {
+      kit.primitive("splinter", "cone", root, V(dx, height / 2 + h / 2 - 0.01, dz), { x: 0.1, y: h, z: 0.1 }, wood, pc.Vec3.ZERO, false);
+    }
+    return root;
+  }
+  const top = height / 2 - crown / 2;
+  kit.primitive("maypole-crown", "cylinder", root, V(0, top, 0), { x: 0.96, y: crown, z: 0.96 }, gold);
+  kit.primitive("maypole-rim", "cylinder", root, V(0, top - 0.04, 0), { x: 1.02, y: 0.05, z: 1.02 }, red, pc.Vec3.ZERO, false);
+  const ribbons = [palette.king, palette.gold, palette.queen, palette.cream, palette.king, palette.queen];
+  ribbons.forEach((color, index) => {
+    const angle = (index / ribbons.length) * 360 + 15;
+    const arm = kit.group("ribbon", root, V(0, top - 0.06, 0), V(0, angle, 0));
+    const ribbon = kit.material(`ribbon-${index % 4}`, color, 0.3, 0, { doubleSided: true });
+    kit.primitive("ribbon-strip", "box", arm, V(0.47, -0.8, 0), { x: 0.02, y: 1.6, z: 0.09 }, ribbon, V(0, 0, 8), false);
+  });
+  for (let index = 0; index < 10; index += 1) {
+    const angle = (index / 10) * Math.PI * 2;
+    kit.primitive("garland", "sphere", root, V(Math.cos(angle) * 0.49, top, Math.sin(angle) * 0.49), { x: 0.11, y: 0.11, z: 0.11 }, index % 2 ? cream : red, pc.Vec3.ZERO, false);
+  }
+  return root;
+}
+
+/** The dinner gong: bronze on an oak frame, with a painted knife-and-fork sign. Faces +z. */
+function buildGong(kit: Kit, root: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const oak = kit.material("oak-dark", palette.oakDark, 0.16);
+  const bronze = kit.material("gong-bronze", new pc.Color(0.72, 0.47, 0.17), 0.85, 0.8);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  const rope = kit.material("rope", palette.rope, 0.12);
+  const radius = size.x / 2 - 0.04;
+  const floor = -size.y / 2 - 0.35;
+  const beam = size.y / 2 + 0.22;
+  for (const side of [-1, 1]) {
+    kit.primitive("gong-post", "box", root, V(side * (radius + 0.2), (floor + beam) / 2, 0), { x: 0.14, y: beam - floor, z: 0.14 }, oak);
+    kit.primitive("gong-foot", "box", root, V(side * (radius + 0.2), floor + 0.05, 0), { x: 0.2, y: 0.1, z: 0.8 }, oak);
+    kit.primitive("gong-cord", "cylinder", root, V(side * 0.3, (beam + radius * 0.8) / 2, 0), { x: 0.03, y: beam - radius * 0.8, z: 0.03 }, rope, pc.Vec3.ZERO, false);
+  }
+  kit.primitive("gong-beam", "box", root, V(0, beam, 0), { x: radius * 2 + 0.6, y: 0.14, z: 0.16 }, oak);
+  kit.primitive("gong-disc", "cylinder", root, V(0, 0, 0), { x: radius * 2, y: 0.06, z: radius * 2 }, bronze, V(90, 0, 0));
+  kit.primitive("gong-rim", "cylinder", root, V(0, 0, 0.01), { x: radius * 2 + 0.06, y: 0.03, z: radius * 2 + 0.06 }, gold, V(90, 0, 0), false);
+  kit.primitive("gong-boss", "sphere", root, V(0, 0, 0.04), { x: 0.36, y: 0.36, z: 0.12 }, gold, pc.Vec3.ZERO, false);
+  // The sign: a cream board with a crossed knife and fork.
+  const sign = kit.group("gong-sign", root, V(0, beam + 0.32, 0.02));
+  kit.primitive("sign-board", "box", sign, V(), { x: 0.72, y: 0.46, z: 0.05 }, kit.material("sign-cream", palette.cream, 0.3));
+  const ink = kit.material("ink", palette.ink, 0.42);
+  kit.primitive("sign-knife", "box", sign, V(0, 0, 0.03), { x: 0.05, y: 0.36, z: 0.01 }, ink, V(0, 0, 32), false);
+  kit.primitive("sign-fork", "box", sign, V(0, 0, 0.03), { x: 0.05, y: 0.36, z: 0.01 }, ink, V(0, 0, -32), false);
+  kit.primitive("sign-plate", "cylinder", sign, V(0, 0, 0.035), { x: 0.22, y: 0.01, z: 0.22 }, kit.material("sign-plate", palette.gold, 0.5), V(90, 0, 0), false);
+  // The beater, hung on its peg.
+  kit.primitive("beater-stick", "cylinder", root, V(radius + 0.32, 0.1, 0.12), { x: 0.05, y: 0.7, z: 0.05 }, oak, V(0, 0, 12), false);
+  kit.primitive("beater-head", "sphere", root, V(radius + 0.39, -0.24, 0.12), { x: 0.18, y: 0.18, z: 0.18 }, kit.material("beater-felt", palette.king, 0.2), pc.Vec3.ZERO, false);
+  return root;
+}
+
+/** Immovable scenery in the playing area. */
+export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { x: number; y: number; z: number }): pc.Entity {
+  const root = kit.group(`fixture-${look}`, parent);
+  const { x, y, z } = size;
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  if (look === "bumper") {
+    const bronze = kit.material("bumper-bronze", new pc.Color(0.7, 0.45, 0.16), 0.85, 0.8);
+    kit.primitive("plate", "box", root, V(), { x, y, z }, bronze);
+    kit.primitive("rim-top", "box", root, V(0, y / 2, 0), { x: x + 0.08, y: 0.08, z: z + 0.06 }, gold);
+    kit.primitive("rim-bottom", "box", root, V(0, -y / 2, 0), { x: x + 0.08, y: 0.08, z: z + 0.06 }, gold);
+    kit.primitive("boss", "sphere", root, V(0, 0, z / 2), { x: 0.4, y: 0.4, z: 0.14 }, gold);
+    kit.primitive("boss-back", "sphere", root, V(0, 0, -z / 2), { x: 0.4, y: 0.4, z: 0.14 }, gold);
+    return root;
+  }
+  if (look === "column") {
+    const iron = kit.material("column-iron", new pc.Color(0.13, 0.14, 0.15), 0.5, 0.7);
+    kit.primitive("shaft", "cylinder", root, V(), { x: x * 0.7, y, z: z * 0.7 }, iron);
+    for (const k of [-0.5, -0.2, 0.2, 0.5]) kit.primitive("band", "cylinder", root, V(0, k * y, 0), { x: x * 0.82, y: 0.08, z: z * 0.82 }, gold);
+    kit.primitive("base", "cylinder", root, V(0, -y / 2 + 0.1, 0), { x: x * 1.2, y: 0.2, z: z * 1.2 }, iron);
+    kit.primitive("capital", "cylinder", root, V(0, y / 2 - 0.08, 0), { x: x * 1.05, y: 0.16, z: z * 1.05 }, gold);
+    return root;
+  }
+  if (look === "hedge") {
+    const leaf = kit.material("hedge-leaf", new pc.Color(0.13, 0.3, 0.13), 0.08);
+    const dark = kit.material("hedge-dark", new pc.Color(0.09, 0.22, 0.1), 0.08);
+    kit.primitive("hedge", "box", root, V(0, -0.1, 0), { x, y: y - 0.2, z }, leaf);
+    const tufts = Math.max(2, Math.round(x / 0.6));
+    for (let index = 0; index < tufts; index += 1) {
+      const tx = -x / 2 + (index + 0.5) * (x / tufts);
+      kit.primitive("tuft", "sphere", root, V(tx, y / 2 - 0.15, 0), { x: x / tufts + 0.1, y: 0.5, z: z + 0.05 }, index % 2 ? dark : leaf);
+    }
+    return root;
+  }
+  if (look === "screen") {
+    // A painted scenery flat: a castle wall on canvas, framed in timber.
+    const canvas = kit.material("screen-canvas", new pc.Color(0.55, 0.5, 0.42), 0.05);
+    const paint = kit.material("screen-stones", new pc.Color(0.42, 0.38, 0.32), 0.05);
+    const frame = kit.material("oak-dark", palette.oakDark, 0.16);
+    kit.primitive("canvas", "box", root, V(), { x, y, z }, canvas);
+    for (let row = 0; row < 8; row += 1) {
+      const sy = -y / 2 + 0.5 + row * (y / 8.4);
+      kit.primitive("painted-course", "box", root, V(0, sy, z / 2 + 0.005), { x: x - 0.2, y: 0.04, z: 0.01 }, paint, pc.Vec3.ZERO, false);
+    }
+    for (const side of [-1, 1]) kit.primitive("brace", "box", root, V(side * (x / 2 - 0.05), 0, -z / 2 - 0.1), { x: 0.12, y, z: 0.12 }, frame);
+    for (let index = 0; index < 5; index += 1) {
+      kit.primitive("crenel", "box", root, V(-x / 2 + 0.55 + index * ((x - 1.1) / 4), y / 2 + 0.25, 0), { x: 0.55, y: 0.5, z }, canvas);
+    }
+    return root;
+  }
+  if (look === "fulcrum") {
+    const stone = kit.material("stone-2", new pc.Color(0.43, 0.414, 0.366), 0.07);
+    kit.primitive("trestle", "box", root, V(), { x, y, z }, stone);
+    kit.primitive("cap", "box", root, V(0, y / 2 - 0.04, 0), { x: x + 0.1, y: 0.08, z: z + 0.1 }, kit.material("iron", palette.iron, 0.55, 0.68));
+    return root;
+  }
+  if (look === "maypole" || look === "stump") return buildMaypole(kit, root, y, look === "maypole");
+  if (look === "gong") return buildGong(kit, root, size);
+  if (look === "railing") {
+    const iron = kit.material("railing-iron", new pc.Color(0.09, 0.1, 0.1), 0.5, 0.6);
+    const bars = Math.max(3, Math.round(x / 0.22));
+    for (let index = 0; index <= bars; index += 1) {
+      const bx = -x / 2 + (index * x) / bars;
+      kit.primitive("rail-bar", "cylinder", root, V(bx, 0, 0), { x: 0.05, y, z: 0.05 }, iron, pc.Vec3.ZERO, index % 2 === 0);
+      kit.primitive("rail-spike", "cone", root, V(bx, y / 2 + 0.08, 0), { x: 0.09, y: 0.16, z: 0.09 }, gold, pc.Vec3.ZERO, false);
+    }
+    for (const k of [-0.42, 0.3]) kit.primitive("rail-rail", "box", root, V(0, k * y, 0), { x: x + 0.06, y: 0.06, z: 0.06 }, iron);
+    return root;
+  }
+  if (look === "drum") {
+    kit.primitive("drum", "cylinder", root, V(), { x, y, z }, kit.material("drum-red", palette.king, 0.4));
+    kit.primitive("skin", "cylinder", root, V(0, y / 2, 0), { x: x * 1.02, y: 0.04, z: z * 1.02 }, kit.material("drum-skin", palette.cream, 0.3));
+    return root;
+  }
+  const timber = kit.material(look === "beam" ? "oak-dark" : "oak", look === "beam" ? palette.oakDark : palette.oak, 0.18);
+  kit.primitive(look, "box", root, V(), { x, y, z }, timber);
+  if (look === "beam") for (const k of [-0.4, 0, 0.4]) kit.primitive("bracket", "box", root, V(k * x, -y / 2 - 0.02, 0), { x: 0.12, y: 0.06, z: z + 0.04 }, gold);
+  return root;
+}
+
+/** The Queen's music box: a painted disc on a brass collar, an arm and a velvet seat. */
+export function buildTurntable(kit: Kit, parent: pc.Entity, radius: number, arm: number): { root: pc.Entity; key: pc.Entity } {
+  const root = kit.group("turntable", parent);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  const lacquer = kit.material("music-box-lacquer", new pc.Color(0.05, 0.3, 0.22), 0.6);
+  const cream = kit.material("music-box-cream", palette.cream, 0.4);
+  kit.primitive("disc", "cylinder", root, V(0, -0.08, 0), { x: radius * 2, y: 0.16, z: radius * 2 }, lacquer);
+  kit.primitive("disc-rim", "cylinder", root, V(0, -0.02, 0), { x: radius * 2 + 0.06, y: 0.05, z: radius * 2 + 0.06 }, gold);
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (index / 8) * Math.PI * 2;
+    kit.primitive("pip", "sphere", root, V(Math.cos(angle) * radius * 0.75, 0.01, Math.sin(angle) * radius * 0.75), { x: 0.12, y: 0.06, z: 0.12 }, cream, pc.Vec3.ZERO, false);
+  }
+  kit.primitive("arm", "box", root, V(arm / 2, 0.06, 0), { x: arm, y: 0.12, z: 0.26 }, gold);
+  kit.primitive("seat", "box", root, V(arm, 0.13, 0), { x: 0.92, y: 0.1, z: 0.92 }, kit.material("velvet-seat", palette.king, 0.3));
+  kit.primitive("seat-tassel", "sphere", root, V(arm + 0.46, 0.1, 0.46), { x: 0.1, y: 0.1, z: 0.1 }, gold);
+  kit.primitive("seat-tassel", "sphere", root, V(arm + 0.46, 0.1, -0.46), { x: 0.1, y: 0.1, z: 0.1 }, gold);
+  kit.primitive("counterweight", "box", root, V(-arm * 0.55, 0.14, 0), { x: 0.6, y: 0.28, z: 0.6 }, kit.material("iron", palette.iron, 0.55, 0.68));
+  kit.primitive("ballerina-post", "cylinder", root, V(0, 0.25, 0), { x: 0.08, y: 0.5, z: 0.08 }, gold);
+  kit.primitive("finial", "sphere", root, V(0, 0.52, 0), { x: 0.22, y: 0.22, z: 0.22 }, gold);
+  const key = kit.group("wind-up-key", root, V(-arm * 0.55, 0.5, 0));
+  kit.primitive("key-stem", "cylinder", key, V(0, 0.1, 0), { x: 0.06, y: 0.25, z: 0.06 }, gold);
+  kit.primitive("key-bow", "box", key, V(0, 0.28, 0), { x: 0.42, y: 0.18, z: 0.05 }, gold);
+  return { root, key };
+}
+
+export interface RatRig {
+  root: pc.Entity;
+  body: pc.Entity;
+  legs: pc.Entity[];
+  tail: pc.Entity[];
+  bag: pc.Entity;
+  head: pc.Entity;
+}
+
+/** A giant medieval rat in a dented helmet, with a very long tail and no manners. */
+export function buildRat(kit: Kit, parent: pc.Entity): RatRig {
+  const root = kit.group("rat", parent);
+  const body = kit.group("rat-body", root, V(0, 0, 0));
+  const fur = kit.material("rat-fur", new pc.Color(0.34, 0.3, 0.27), 0.12);
+  const belly = kit.material("rat-belly", new pc.Color(0.52, 0.47, 0.42), 0.1);
+  const pink = kit.material("rat-pink", new pc.Color(0.86, 0.55, 0.55), 0.3);
+  const eye = kit.material("rat-eye", new pc.Color(0.8, 0.05, 0.04), 0.9, 0, { emissive: new pc.Color(0.5, 0.02, 0.01) });
+  const iron = kit.material("iron", palette.iron, 0.55, 0.68);
+  kit.primitive("torso", "sphere", body, V(0, 0.42, -0.1), { x: 0.62, y: 0.55, z: 1.1 }, fur);
+  kit.primitive("belly", "sphere", body, V(0, 0.34, -0.05), { x: 0.5, y: 0.4, z: 0.85 }, belly);
+  const head = kit.group("rat-head", body, V(0, 0.5, 0.5));
+  kit.primitive("skull", "sphere", head, V(), { x: 0.42, y: 0.38, z: 0.48 }, fur);
+  kit.primitive("snout", "cone", head, V(0, -0.04, 0.3), { x: 0.22, y: 0.36, z: 0.2 }, fur, V(90, 0, 0));
+  kit.primitive("nose", "sphere", head, V(0, -0.04, 0.48), { x: 0.09, y: 0.08, z: 0.08 }, pink);
+  for (const side of [-1, 1]) {
+    kit.primitive("ear", "sphere", head, V(side * 0.18, 0.24, -0.04), { x: 0.22, y: 0.24, z: 0.06 }, pink, V(0, side * 20, side * 20));
+    kit.primitive("eye", "sphere", head, V(side * 0.12, 0.08, 0.2), { x: 0.07, y: 0.07, z: 0.05 }, eye, pc.Vec3.ZERO, false);
+    for (const tilt of [-12, 6]) {
+      kit.primitive("whisker", "box", head, V(side * 0.2, -0.04, 0.36), { x: 0.36, y: 0.01, z: 0.01 }, kit.material("ink", palette.ink, 0.42), V(0, side * 15, tilt), false);
+    }
+  }
+  kit.primitive("tooth", "box", head, V(0, -0.14, 0.4), { x: 0.06, y: 0.07, z: 0.02 }, kit.material("rat-tooth", palette.cream, 0.5), pc.Vec3.ZERO, false);
+  kit.primitive("helmet", "sphere", head, V(0, 0.16, -0.02), { x: 0.44, y: 0.24, z: 0.46 }, iron);
+  kit.primitive("helmet-spike", "cone", head, V(0, 0.34, -0.02), { x: 0.07, y: 0.18, z: 0.07 }, iron, V(0, 0, 12));
+  const legs: pc.Entity[] = [];
+  for (const [x, z] of [[-0.2, 0.25], [0.2, 0.25], [-0.22, -0.4], [0.22, -0.4]] as const) {
+    const leg = kit.group("leg", body, V(x, 0.3, z));
+    kit.primitive("leg", "cylinder", leg, V(0, -0.14, 0), { x: 0.1, y: 0.3, z: 0.1 }, fur);
+    kit.primitive("paw", "sphere", leg, V(0, -0.29, 0.04), { x: 0.13, y: 0.06, z: 0.16 }, pink);
+    legs.push(leg);
+  }
+  const tail: pc.Entity[] = [];
+  let joint = kit.group("tail-0", body, V(0, 0.36, -0.62));
+  for (let index = 0; index < 5; index += 1) {
+    kit.primitive("tail-seg", "cylinder", joint, V(0, 0, -0.14), { x: 0.07 - index * 0.01, y: 0.3, z: 0.07 - index * 0.01 }, pink, V(90, 0, 0));
+    tail.push(joint);
+    joint = kit.group(`tail-${index + 1}`, joint, V(0, 0, -0.28));
+  }
+  const bag = kit.group("stolen-powder", head, V(0, -0.2, 0.46));
+  kit.primitive("bag", "sphere", bag, V(), { x: 0.26, y: 0.24, z: 0.24 }, kit.material("powder-bag", new pc.Color(0.6, 0.5, 0.32), 0.1));
+  kit.primitive("bag-tie", "cylinder", bag, V(0, 0.12, 0), { x: 0.08, y: 0.06, z: 0.08 }, kit.material("powder-red", new pc.Color(0.72, 0.08, 0.04), 0.3));
+  bag.enabled = false;
+  return { root, body, legs, tail, bag, head };
 }
 
 export function buildKeg(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
@@ -462,8 +793,56 @@ export function buildProjectile(kit: Kit, parent: pc.Entity, kind: string, size:
     kit.primitive("spark", "sphere", root, V(0, size.y * 0.55 + 0.12, 0), { x: 0.1, y: 0.1, z: 0.1 }, kit.material("spark", palette.gold, 0.4, 0, { emissive: new pc.Color(1, 0.6, 0.1) }), pc.Vec3.ZERO, false);
     return root;
   }
+  if (kind === "bomb") {
+    const bomb = kit.material("bomb-iron", new pc.Color(0.06, 0.065, 0.07), 0.55, 0.5);
+    kit.primitive("bomb", "sphere", root, V(), size, bomb);
+    kit.primitive("cap", "cylinder", root, V(0, size.y * 0.48, 0), { x: size.x * 0.4, y: 0.1, z: size.x * 0.4 }, kit.material("bronze", palette.bronze, 0.46, 0.5));
+    kit.primitive("fuse", "cylinder", root, V(0, size.y * 0.5 + 0.1, 0), { x: 0.035, y: 0.16, z: 0.035 }, kit.material("fuse", new pc.Color(0.88, 0.38, 0.055), 0.2));
+    kit.primitive("fuse-spark", "sphere", root, V(0, size.y * 0.5 + 0.2, 0), { x: 0.12, y: 0.12, z: 0.12 }, kit.material("spark", palette.gold, 0.4, 0, { emissive: new pc.Color(1, 0.6, 0.1) }), pc.Vec3.ZERO, false);
+    return root;
+  }
   kit.primitive("ball", "sphere", root, V(), size, iron);
   if (kind === "shot") kit.primitive("casting-mark", "cylinder", root, V(0, size.y * 0.48, 0), { x: 0.08, y: 0.025, z: 0.08 }, kit.material("bronze", palette.bronze, 0.46, 0.5));
+  return root;
+}
+
+/**
+ * The charge sitting in a gun's mouth, so the player can see what is loaded: a ball, a chain
+ * dangling from the muzzle, a bag of grape, a fused shell. Built facing -z at the muzzle.
+ */
+export function buildLoad(kit: Kit, parent: pc.Entity, kind: string): pc.Entity {
+  const root = kit.group(`load-${kind}`, parent);
+  const iron = kit.material("shot-iron", palette.iron, 0.62, 0.76);
+  const spark = kit.material("spark", palette.gold, 0.4, 0, { emissive: new pc.Color(1, 0.6, 0.1) });
+  if (kind === "chain") {
+    kit.primitive("ball", "sphere", root, V(0, 0, 0.02), { x: 0.3, y: 0.3, z: 0.3 }, iron);
+    const chain = kit.material("chain-iron", palette.iron, 0.5, 0.7);
+    for (let link = 0; link < 5; link += 1) {
+      kit.primitive("link", "box", root, V(0, -0.12 - link * 0.1, -0.08 - Math.sin(link * 0.7) * 0.06), { x: 0.05, y: 0.09, z: 0.05 }, chain, V(link % 2 ? 0 : 90, 0, 0), false);
+    }
+    kit.primitive("ball-dangling", "sphere", root, V(0, -0.72, -0.1), { x: 0.3, y: 0.3, z: 0.3 }, iron);
+    return root;
+  }
+  if (kind === "grape") {
+    kit.primitive("bag", "cylinder", root, V(0, 0, 0.05), { x: 0.34, y: 0.26, z: 0.34 }, kit.material("grape-bag", palette.cream, 0.2), V(90, 0, 0));
+    for (const [x, y] of [[-0.08, 0.06], [0.08, 0.05], [0, -0.08]] as const) kit.primitive("grape", "sphere", root, V(x, y, -0.1), { x: 0.13, y: 0.13, z: 0.13 }, iron);
+    kit.primitive("tie", "cylinder", root, V(0, 0, -0.03), { x: 0.36, y: 0.03, z: 0.36 }, kit.material("rope", palette.rope, 0.12), V(90, 0, 0), false);
+    return root;
+  }
+  if (kind === "bomb") {
+    kit.primitive("bomb", "sphere", root, V(), { x: 0.48, y: 0.48, z: 0.48 }, kit.material("bomb-iron", new pc.Color(0.06, 0.065, 0.07), 0.55, 0.5));
+    kit.primitive("cap", "cylinder", root, V(0, 0, -0.24), { x: 0.2, y: 0.08, z: 0.2 }, kit.material("bronze", palette.bronze, 0.46, 0.5), V(90, 0, 0));
+    kit.primitive("fuse", "cylinder", root, V(0, 0, -0.34), { x: 0.035, y: 0.16, z: 0.035 }, kit.material("fuse", new pc.Color(0.88, 0.38, 0.055), 0.2), V(90, 0, 0));
+    kit.primitive("fuse-spark", "sphere", root, V(0, 0, -0.44), { x: 0.13, y: 0.13, z: 0.13 }, spark, pc.Vec3.ZERO, false);
+    return root;
+  }
+  if (kind === "shell") {
+    kit.primitive("shell", "sphere", root, V(), { x: 0.5, y: 0.5, z: 0.5 }, kit.material("mortar-shell", new pc.Color(0.18, 0.19, 0.17), 0.35, 0.54));
+    kit.primitive("fuse", "cylinder", root, V(0, 0, -0.3), { x: 0.035, y: 0.16, z: 0.035 }, kit.material("fuse", new pc.Color(0.88, 0.38, 0.055), 0.2), V(90, 0, 0));
+    kit.primitive("fuse-spark", "sphere", root, V(0, 0, -0.4), { x: 0.1, y: 0.1, z: 0.1 }, spark, pc.Vec3.ZERO, false);
+    return root;
+  }
+  kit.primitive("ball", "sphere", root, V(), { x: 0.4, y: 0.4, z: 0.4 }, iron);
   return root;
 }
 

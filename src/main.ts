@@ -1,17 +1,20 @@
-import { createIcons, RotateCcw, Scan, ScrollText, Volume2, VolumeX } from "lucide";
+import { ChevronsLeft, ChevronsRight, createIcons, RotateCcw, Scan, ScrollText, Volume2, VolumeX } from "lucide";
 import { TheatreAudio } from "./audio.js";
-import { LINES, type Cue } from "./lines.js";
+import { CURIO_LINES, LINES, type Cue } from "./lines.js";
 import { StageView } from "./render/view.js";
 import { AMMO } from "./sim/ballistics.js";
-import { Game, STEP } from "./sim/game.js";
+import { BOMB_FUSE, Game, HUMPTY_REST, STEP } from "./sim/game.js";
+import { HUMPTY_BASE } from "./sim/level.js";
 import { LEVELS } from "./sim/levels.js";
 import parSolutions from "./sim/par.json" with { type: "json" };
 import type { PlannedShot } from "./sim/autoplay.js";
-import type { AmmoKind, GameEvent, Vec3 } from "./sim/types.js";
+import type { AmmoKind, CurioId, GameEvent, StockKind, Vec3 } from "./sim/types.js";
 
 const BASE = import.meta.env.BASE_URL;
-const AMMO_ORDER: AmmoKind[] = ["shot", "shell", "grape", "chain"];
-const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+/** Tray order and the number keys: 1 shot, 2 shell, 3 grape, 4 chain, 5 bomb, 6 the Queen's blunderbuss. */
+const AMMO_ORDER: AmmoKind[] = ["shot", "shell", "grape", "chain", "bomb", "blunderbuss"];
+const STOCK_ORDER: StockKind[] = ["shot", "shell", "grape", "chain", "bomb"];
+const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 const STORAGE_KEY = "great-fall:progress:v1";
 
 type Screen = "title" | "levels" | "play" | "result";
@@ -53,7 +56,7 @@ const unlockAll = new URLSearchParams(location.search).has("all");
 const audio = new TheatreAudio(BASE);
 audio.setMuted(progress.muted);
 document.documentElement.classList.toggle("muted", progress.muted);
-createIcons({ icons: { RotateCcw, Scan, ScrollText, Volume2, VolumeX } });
+createIcons({ icons: { ChevronsLeft, ChevronsRight, RotateCcw, Scan, ScrollText, Volume2, VolumeX } });
 
 const view = new StageView($("#stage"));
 const canvas = view.canvas;
@@ -83,6 +86,15 @@ const PAR = parSolutions as Record<string, PlannedShot[]>;
 /** Verses lost this session; after a loss the Court Astrologer marks a winning shot. */
 const losses = new Map<string, number>();
 let hintShot: PlannedShot | undefined;
+/** True while the pointer is inside the Astrologer's ring: the shot is then the recorded one. */
+let hintLocked = false;
+/** Until when the plumb line showing Humpty's height stays up (performance.now ms). */
+let plumbUntil = 0;
+let plumbHover = false;
+let lastHeight = "";
+let musicBox = 0;
+let musicNote = 0;
+let launchCued = false;
 
 // ------------------------------------------------------------------ speech
 
@@ -200,6 +212,8 @@ function show(next: Screen): void {
 
 function unlocked(index: number): boolean {
   if (unlockAll || index === 0) return true;
+  // A verse already won stays open, even if a new verse is added before it.
+  if ((progress.stars[LEVELS[index]?.id ?? ""] ?? 0) > 0) return true;
   const previous = LEVELS[index - 1];
   return Boolean(previous && (progress.stars[previous.id] ?? 0) > 0);
 }
@@ -267,13 +281,17 @@ async function startLevel(index: number): Promise<void> {
       $("#verse-lines").append(document.createTextNode(line));
     });
     $("#verse-hint").textContent = level.hint;
-    $("#verse-ammo").textContent = AMMO_ORDER.filter((kind) => (level.ammo[kind] ?? 0) > 0)
+    $("#verse-ammo").textContent = STOCK_ORDER.filter((kind) => (level.ammo[kind] ?? 0) > 0)
       .map((kind) => `${level.ammo[kind]} × ${AMMO[kind].name}`)
       .join("  ·  ");
     hintShot = (losses.get(level.id) ?? 0) > 0 ? PAR[level.id]?.[0] : undefined;
+    const timing = hintShot?.wait ? " Timing matters: the stars are fickle." : "";
     $("#hint").textContent = hintShot
-      ? `The Court Astrologer suggests ${AMMO[hintShot.ammo].name.toLowerCase()}, aimed at the green ring.`
+      ? `The Court Astrologer has marked a winning shot with a green ring. Aim anywhere inside it and he'll fire ${AMMO[hintShot.ammo].name.toLowerCase()} exactly where it should go.${timing}`
       : level.hint;
+    $("#hint").classList.toggle("astrologer", Boolean(hintShot));
+    launchCued = false;
+    plumbUntil = 0;
     $("#hint").classList.remove("faded");
     $("#fire-button").hidden = !touchDevice;
     verseOpen = true;
@@ -288,6 +306,9 @@ function closeVerse(): void {
   if (!verseOpen) return;
   verseOpen = false;
   $("#verse-card").hidden = true;
+  // Show how high he sits for a few seconds, so "a 5 m fall" means something.
+  plumbUntil = performance.now() + 6000;
+  if (hintShot) toast("The Astrologer", true, "has marked a winning shot in green");
   later(0.5, () => cue("start", 1, 0));
   later(3.6, () => !game?.cracked && cue("retort", 1, 0));
 }
@@ -308,7 +329,7 @@ function showResult(): void {
     : "He's still up there, smug as an egg. Try again — the Court Astrologer has a suggestion.";
   $("#result-stars").innerHTML = [0, 1, 2].map((star) => `<i class="star${star < stars.count ? " lit" : ""}"></i>`).join("");
   const stats: Array<[string, string]> = [
-    ["Fall", won ? `${current.stats.fall.toFixed(1)} m` : "—"],
+    ["Fall", won ? `${current.stats.fall.toFixed(1)} m<small>${stars.great ? "a great fall" : `${level.greatFall} m for a great fall`}</small>` : "—"],
     ["Shots", `${current.stats.shots}`],
     ["Men bowled", `${current.stats.bowled}`],
   ];
@@ -333,6 +354,12 @@ function ammoIcon(kind: AmmoKind): string {
   if (kind === "grape") {
     return `<svg viewBox="0 0 40 40" aria-hidden="true">${[[13, 14], [26, 13], [20, 22], [11, 27], [28, 27], [19, 32]].map(([x, y]) => ball(x!, y!, 5.5)).join("")}</svg>`;
   }
+  if (kind === "bomb") {
+    return `<svg viewBox="0 0 40 40" aria-hidden="true">${ball(18, 24, 12)}<rect x="22" y="9" width="7" height="6" rx="1" transform="rotate(35 25 12)" fill="#b8862a"/><path d="M27 9 Q31 3 35 5" stroke="#c7641a" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M35 1 L36 4 L39 4 L36.5 6 L37.5 9 L35 7 L32.5 9 L33.5 6 L31 4 L34 4 Z" fill="#e8b23a"/></svg>`;
+  }
+  if (kind === "blunderbuss") {
+    return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 27 L22 19" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M21 14 L34 8 L34 26 L21 21 Z" fill="currentColor"/><path d="M4 25 L12 33" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>`;
+  }
   return `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M11 29 Q20 12 29 11" stroke="currentColor" stroke-width="2.5" fill="none" stroke-dasharray="3 2"/>${ball(10, 29, 7)}${ball(30, 11, 7)}</svg>`;
 }
 
@@ -342,15 +369,19 @@ function renderTray(): void {
   tray.replaceChildren();
   if (!current) return;
   AMMO_ORDER.forEach((kind, index) => {
-    const total = current.level.ammo[kind] ?? 0;
+    const blunderbuss = kind === "blunderbuss";
+    const total = blunderbuss ? (current.vermin ? 1 : 0) : current.level.ammo[kind] ?? 0;
     if (total <= 0) return;
-    const left = current.ammo[kind];
+    const left = blunderbuss ? 1 : current.ammo[kind];
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `ammo${current.selected === kind ? " selected" : ""}${left <= 0 ? " empty" : ""}`;
+    button.className = `ammo${current.selected === kind ? " selected" : ""}${left <= 0 ? " empty" : ""}${blunderbuss ? " vermin" : ""}`;
     button.title = `${AMMO[kind].name} (${index + 1}): ${AMMO[kind].blurb}`;
     button.setAttribute("aria-pressed", String(current.selected === kind));
-    button.innerHTML = `${ammoIcon(kind)}<span class="label"><strong>${AMMO[kind].name}</strong><span class="pips">${Array.from({ length: total }, (_, pip) => `<b class="${pip < left ? "" : "spent"}"></b>`).join("")}</span></span><kbd>${index + 1}</kbd>`;
+    const pips = blunderbuss
+      ? "<em>RAT!</em>"
+      : Array.from({ length: total }, (_, pip) => `<b class="${pip < left ? "" : "spent"}"></b>`).join("") + `<small>${left > 0 ? `${left} left` : "none left"}</small>`;
+    button.innerHTML = `${ammoIcon(kind)}<span class="label"><strong>${AMMO[kind].name}</strong><span class="pips">${pips}</span></span><kbd>${index + 1}</kbd>`;
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       selectAmmo(kind);
@@ -407,6 +438,77 @@ function updateFallMeter(): void {
   meter.querySelector("em")!.textContent = drop >= current.level.greatFall ? "GREAT fall!" : "fall";
 }
 
+/** A surveyor's line from Humpty down to the boards: how far he'd fall if he dropped straight. */
+function updatePlumb(): void {
+  const plumb = $("#plumb");
+  const current = game;
+  const h = current?.humptyPosition;
+  const chip = $("#height-now");
+  if (current && h && screen === "play") {
+    const up = current.humptyHeight;
+    const text = `· he sits ${up.toFixed(1)} m up`;
+    if (text !== lastHeight) {
+      lastHeight = text;
+      chip.textContent = text;
+    }
+    chip.classList.toggle("enough", up >= current.level.greatFall);
+  }
+  const aiming = aimedAt > 0 || plumbHover || performance.now() < plumbUntil;
+  const show = current && h && screen === "play" && !verseOpen && !current.humptyAirborne && !current.hoisting && current.phase !== "won" && aiming;
+  if (!show || !current || !h) {
+    plumb.hidden = true;
+    return;
+  }
+  // Hung a little to his right, like a surveyor's tape, so it never hides behind his perch.
+  const x = h.x + 1.1;
+  const top = view.project({ x, y: h.y - HUMPTY_BASE, z: h.z });
+  const foot = view.project({ x, y: 0, z: h.z });
+  const great = view.project({ x, y: current.level.greatFall + HUMPTY_REST, z: h.z });
+  if (!top.visible || !foot.visible) {
+    plumb.hidden = true;
+    return;
+  }
+  plumb.hidden = false;
+  const dx = foot.x - top.x;
+  const dy = foot.y - top.y;
+  const line = plumb.querySelector<HTMLElement>(".line")!;
+  line.style.height = `${Math.hypot(dx, dy)}px`;
+  line.style.transform = `translate(${top.x}px, ${top.y}px) rotate(${Math.atan2(-dx, dy)}rad)`;
+  const tick = plumb.querySelector<HTMLElement>(".great")!;
+  tick.style.transform = `translate(${great.x}px, ${great.y}px)`;
+  const label = plumb.querySelector<HTMLElement>("span")!;
+  label.style.transform = `translate(${(top.x + foot.x) / 2 + 10}px, ${(top.y + foot.y) / 2}px) translateY(-50%)`;
+  label.querySelector("b")!.textContent = current.humptyHeight.toFixed(1);
+  plumb.classList.toggle("enough", current.humptyHeight >= current.level.greatFall);
+}
+
+/** Label the Astrologer's ring so nobody wonders what the green circle is. */
+function updateRingTag(ring: Vec3 | undefined): void {
+  const tag = $("#ring-tag");
+  const current = game;
+  if (!ring || !current?.canFire() || screen !== "play" || verseOpen) {
+    tag.hidden = true;
+    return;
+  }
+  const point = view.project({ x: ring.x, y: ring.y + 0.9, z: ring.z });
+  tag.hidden = !point.visible;
+  tag.classList.toggle("locked", hintLocked);
+  tag.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -100%)`;
+}
+
+/** Timed stage business the player is waiting on: lunch, for now. */
+function updateStatus(): void {
+  const status = $("#status");
+  const left = game && screen === "play" ? game.lunchLeft : 0;
+  if (left <= 0) {
+    status.hidden = true;
+    return;
+  }
+  status.hidden = false;
+  const html = `The King's men are at lunch: back in <b>${Math.ceil(left)}</b> s`;
+  if (status.innerHTML !== html) status.innerHTML = html;
+}
+
 // ------------------------------------------------------------------ input
 
 function updateAim(): void {
@@ -428,7 +530,16 @@ function updateAim(): void {
     view.setAim(undefined);
     return;
   }
-  const preview = current.aim(target);
+  // Inside the Astrologer's ring, the shot becomes exactly the recorded winning shot.
+  hintLocked = false;
+  const hinted = hintAim(current);
+  if (hinted && Math.hypot(target.x - hinted.ring.x, target.y - hinted.ring.y, target.z - hinted.ring.z) < 0.9) {
+    hintLocked = true;
+    aimTarget = hinted.aim;
+    if (current.selected !== hinted.ammo) current.select(hinted.ammo);
+  }
+  view.setHintLocked(hintLocked);
+  const preview = current.aim(aimTarget!);
   view.setAim(preview);
   const humpty = current.humptyPosition;
   const onHumpty = preview.hit && humpty && Math.hypot(preview.hit.x - humpty.x, preview.hit.y - humpty.y, preview.hit.z - humpty.z) < 1.2;
@@ -440,13 +551,33 @@ function updateAim(): void {
   view.lookHumptyAt(onHumpty ? { x: -0.9, y: 1, z: 8.4 } : undefined);
 }
 
+/** Where the recorded hint shot aims, and where its ring sits (its first contact). */
+function hintAim(current: Game): { aim: Vec3; ring: Vec3; ammo: StockKind } | undefined {
+  if (!hintShot) return undefined;
+  const humpty = current.humptyPosition;
+  const aim = hintShot.relativeToHumpty
+    ? humpty && { x: humpty.x + hintShot.at.x, y: humpty.y + hintShot.at.y, z: humpty.z + hintShot.at.z }
+    : hintShot.at;
+  if (!aim) return undefined;
+  return { aim, ring: current.aim(aim, hintShot.ammo).hit ?? aim, ammo: hintShot.ammo };
+}
+
 function fire(): void {
   const current = game;
   if (!current || screen !== "play" || verseOpen || !aimTarget) return;
+  const wasBlunderbuss = current.selected === "blunderbuss";
   if (current.fire(aimTarget)) {
-    $("#hint").classList.add("faded");
-    hintShot = undefined;
-    view.setHint(undefined);
+    if (!wasBlunderbuss) {
+      if (hintShot) {
+        $("#hint").textContent = current.level.hint;
+        $("#hint").classList.remove("astrologer");
+      }
+      $("#hint").classList.add("faded");
+      hintShot = undefined;
+      hintLocked = false;
+      view.setHint(undefined);
+      view.setHintLocked(false);
+    }
     renderTray();
   }
 }
@@ -514,9 +645,9 @@ window.addEventListener("keydown", (event) => {
   if (event.repeat && event.key !== " ") return;
   audio.unlock();
   if (screen === "play") {
-    const index = ["1", "2", "3", "4"].indexOf(event.key);
+    const index = ["1", "2", "3", "4", "5", "6"].indexOf(event.key);
     if (index >= 0) {
-      // Keys match the numbers printed on the tray: 1 shot, 2 shell, 3 grape, 4 chain.
+      // Keys match the numbers printed on the tray: 1 shot, 2 shell, 3 grape, 4 chain, 5 bomb, 6 blunderbuss.
       const kind = AMMO_ORDER[index];
       if (kind) selectAmmo(kind);
       return;
@@ -530,8 +661,8 @@ window.addEventListener("keydown", (event) => {
     if (event.key === "r" || event.key === "R") void startLevel(levelIndex);
     if (event.key === "c" || event.key === "C") view.resetCamera();
     if (event.key === "Escape") show("levels");
-    if (event.key === "ArrowLeft") view.orbit(-25, 0);
-    if (event.key === "ArrowRight") view.orbit(25, 0);
+    if (event.key === "ArrowLeft") view.look(-30);
+    if (event.key === "ArrowRight") view.look(30);
   } else if (screen === "result" && (event.key === "Enter" || event.key === " ")) {
     event.preventDefault();
     if (game?.cracked && levelIndex + 1 < LEVELS.length) void startLevel(levelIndex + 1);
@@ -550,7 +681,7 @@ function toggleMute(): void {
   saveProgress();
 }
 
-$("#hud-buttons").addEventListener("click", (event) => {
+$("#hud-bottom").addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-action]");
   if (!button) return;
   audio.unlock();
@@ -559,10 +690,15 @@ $("#hud-buttons").addEventListener("click", (event) => {
   if (action === "menu") show("levels");
   if (action === "restart") void startLevel(levelIndex);
   if (action === "camera") view.resetCamera();
+  if (action === "look-left") view.look(-30);
+  if (action === "look-right") view.look(30);
   if (action === "mute") toggleMute();
 });
 
 $("#fire-button").addEventListener("click", () => fire());
+const greatChip = $("#objectives [data-star=\"great\"]");
+greatChip.addEventListener("pointerenter", () => { plumbHover = true; });
+greatChip.addEventListener("pointerleave", () => { plumbHover = false; });
 $("#verse-go").addEventListener("click", () => {
   audio.unlock();
   audio.click();
@@ -629,6 +765,7 @@ function handle(event: GameEvent): void {
       // Stars are earned the moment he cracks, even if the player leaves before the curtain.
       if (live) recordStars(current);
       audio.crack();
+      if (live) audio.applause(3);
       hitStop = 0.16;
       crackedAt = current.time;
       if (live) {
@@ -640,6 +777,7 @@ function handle(event: GameEvent): void {
     case "caught":
       if (!live) break;
       audio.boing();
+      audio.aww();
       toast(event.by === "hay" ? "Saved by the hay" : event.by === "ground" ? "Still in one piece" : "Caught!", true);
       later(0.3, () => cue("caught", 1, 0));
       later(2.2, () => cue("caughtQueen", 0.8, 0));
@@ -650,11 +788,66 @@ function handle(event: GameEvent): void {
       break;
     case "bowled":
       audio.bowled();
+      if (live) audio.laugh();
       if (live) cue("bowled", 0.5, 6);
       break;
     case "airborne":
       audio.whoosh();
-      if (live) cue("falling", 1, 3);
+      audio.gasp();
+      if (live && current.level.perch === "seesaw" && !launchCued) {
+        launchCued = true;
+        cue("launch", 1, 0);
+      } else if (live) cue("falling", 1, 3);
+      break;
+    case "ricochet":
+      audio.ricochet(event.strength);
+      if (live) cue("ricochet", 0.5, 8);
+      break;
+    case "rope-cut":
+      audio.ropeSnap();
+      if (live) later(0.3, () => cue("ropeCut", 1, 6));
+      break;
+    case "spin":
+      audio.whirr(event.speed);
+      if (live) cue("spin", 0.6, 7);
+      break;
+    case "curio":
+      playCurio(event.id);
+      break;
+    case "cue":
+      audio.gong();
+      if (live) {
+        audio.laugh();
+        toast("Luncheon!", true, "The King's men have gone to lunch");
+        later(0.4, () => cue("lunch", 1, 0));
+        later(3, () => cue("lunchQueen", 1, 0));
+      }
+      break;
+    case "cut":
+      audio.chop();
+      if (live) {
+        audio.gasp();
+        later(0.2, () => cue("timber", 1, 3));
+      }
+      break;
+    case "rat":
+      if (event.action === "enter") {
+        audio.squeak();
+        if (live) {
+          cue("ratEnter", 1, 0);
+          toast("Rat!", true, "Press 6 for the Queen's blunderbuss");
+          later(3, () => cue("ratHumpty", 0.5, 20));
+        }
+      } else if (event.action === "steal") {
+        audio.chomp();
+        audio.aww();
+        if (live) cue("ratSteal", 1, 0);
+      } else if (event.action === "scared") {
+        audio.squeak();
+        audio.laugh();
+        if (live) cue("ratScared", 1, 4);
+      }
+      if (live) renderTray();
       break;
     case "wobble":
       if (live) cue("wobble", 0.7, 6);
@@ -675,6 +868,63 @@ function handle(event: GameEvent): void {
     default:
       break;
   }
+}
+
+const CURIO_SOUNDS: Record<CurioId, () => void> = {
+  cow: () => audio.moo(),
+  moon: () => audio.wink(),
+  "jack-and-jill": () => audio.tumble(),
+  cuckoo: () => audio.cuckoo(),
+  well: () => audio.dingDong(),
+  spider: () => audio.zip(),
+};
+
+function playCurio(id: CurioId): void {
+  CURIO_SOUNDS[id]();
+  audio.laugh();
+  const line = CURIO_LINES[id];
+  if (line && screen === "play") later(0.8, () => say(line.speaker, line.line));
+}
+
+/** Stage business that runs continuously: the music box and a scurrying rat. */
+function playAmbience(current: Game, realDt: number): void {
+  const spin = Math.abs(current.turntableSpeed);
+  if (spin > 0.01) {
+    musicBox += realDt * (2.2 + spin * 2.5);
+    if (musicBox >= 1) {
+      musicBox = 0;
+      audio.musicBoxNote(musicNote++);
+    }
+  }
+  if (current.ratView?.mode === "creep" || current.ratView?.mode === "flee") audio.scurry();
+  for (const fuse of current.fuses) audio.fizz(1 - fuse.left / BOMB_FUSE);
+}
+
+let fusesSeen = 0;
+
+/** Little countdowns over lit bombs; Humpty notices one landing near him. */
+function updateFuseTags(): void {
+  const host = $("#fuse-tags");
+  const fuses = game && screen === "play" ? game.fuses : [];
+  const humpty = game?.humptyPosition;
+  if (fuses.length > fusesSeen && humpty && fuses.some((fuse) => fuse.left > BOMB_FUSE - 0.2 && Math.hypot(fuse.at.x - humpty.x, fuse.at.z - humpty.z) < 4)) {
+    cue("fizz", 1, 5);
+  }
+  fusesSeen = fuses.length;
+  while (host.children.length < fuses.length) host.append(document.createElement("span"));
+  [...host.children].forEach((child, index) => {
+    const tag = child as HTMLElement;
+    const fuse = fuses[index];
+    if (!fuse) {
+      tag.hidden = true;
+      return;
+    }
+    const point = view.project({ x: fuse.at.x, y: fuse.at.y + 0.7, z: fuse.at.z });
+    tag.hidden = !point.visible;
+    tag.textContent = fuse.left > 0.05 ? Math.ceil(fuse.left).toString() : "!";
+    tag.classList.toggle("soon", fuse.left < 1);
+    tag.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -100%)`;
+  });
 }
 
 // ------------------------------------------------------------------ loop
@@ -734,13 +984,13 @@ function tick(realDt: number): void {
   }
   attract(realDt);
   updateAim();
-  if (screen === "play" && hintShot) {
-    const humpty = current.humptyPosition;
-    const at = hintShot.relativeToHumpty
-      ? humpty && { x: humpty.x + hintShot.at.x, y: humpty.y + hintShot.at.y, z: humpty.z + hintShot.at.z }
-      : hintShot.at;
-    view.setHint(at ? current.aim(at, hintShot.ammo).hit ?? at : undefined);
-  }
+  const ring = screen === "play" && hintShot ? hintAim(current)?.ring : undefined;
+  if (screen === "play" && hintShot) view.setHint(ring);
+  updateRingTag(ring);
+  updatePlumb();
+  updateStatus();
+  updateFuseTags();
+  if (screen === "play") playAmbience(current, realDt);
   view.sync(Math.min(1, accumulator / STEP));
   view.frame(realDt * scale, realDt);
   positionBubbles();

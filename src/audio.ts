@@ -97,6 +97,18 @@ export class TheatreAudio {
   }
 
   fire(ammo: AmmoKind): void {
+    if (ammo === "blunderbuss") {
+      this.burst({ duration: 0.3, volume: 0.8, filter: "bandpass", frequency: 1200, q: 0.6 });
+      this.burst({ duration: 0.5, volume: 0.5, filter: "lowpass", frequency: 800, sweepTo: 150 });
+      this.tone(140, 0.2, 0.5, "square", { to: 60 });
+      return;
+    }
+    if (ammo === "bomb") {
+      this.tone(80, 0.35, 0.7, "sine", { to: 38 });
+      this.burst({ duration: 0.3, volume: 0.6, filter: "lowpass", frequency: 700, sweepTo: 120 });
+      this.burst({ duration: 1.2, volume: 0.08, filter: "highpass", frequency: 3500, delay: 0.1 });
+      return;
+    }
     if (ammo === "shell") {
       this.tone(90, 0.35, 0.8, "sine", { to: 40 });
       this.burst({ duration: 0.35, volume: 0.7, filter: "lowpass", frequency: 900, sweepTo: 120 });
@@ -122,7 +134,7 @@ export class TheatreAudio {
       this.tone(930, 0.08, volume * 0.3, "sine");
     } else if (material === "powder") {
       this.tone(180, 0.2, volume * 0.7, "triangle", { to: 120 });
-    } else if (["shot", "chain", "grape", "shell"].includes(material)) {
+    } else if (["shot", "chain", "grape", "shell", "bomb"].includes(material)) {
       this.burst({ duration: 0.2, volume: volume * 0.8, filter: "lowpass", frequency: 500 });
       this.tone(60, 0.18, volume * 0.8, "sine", { to: 40 });
     } else {
@@ -193,6 +205,177 @@ export class TheatreAudio {
   reload(): void {
     this.burst({ duration: 0.05, volume: 0.2, filter: "bandpass", frequency: 1800, q: 3 });
     this.burst({ duration: 0.05, volume: 0.2, filter: "bandpass", frequency: 1400, q: 3, delay: 0.09 });
+  }
+
+  // ---------------------------------------------------------------- new stage business
+
+  ricochet(strength: number): void {
+    if (!this.throttle("ricochet", 80)) return;
+    this.tone(2400, 0.5, 0.18 * (0.5 + strength), "sine", { to: 1900 });
+    this.tone(3700, 0.35, 0.08, "sine", { to: 3100 });
+    this.burst({ duration: 0.06, volume: 0.4, filter: "highpass", frequency: 4000 });
+  }
+
+  ropeSnap(): void {
+    if (!this.throttle("rope", 60)) return;
+    this.tone(180, 0.35, 0.3, "sawtooth", { to: 60 });
+    this.burst({ duration: 0.12, volume: 0.35, filter: "bandpass", frequency: 1500, q: 2 });
+  }
+
+  whirr(speed: number): void {
+    if (!this.throttle("whirr", 300)) return;
+    this.tone(90 + Math.abs(speed) * 60, 0.6, 0.15, "sawtooth", { to: 200 + Math.abs(speed) * 80 });
+  }
+
+  /** The music box: a tinkling nursery tune, one note per call. */
+  musicBoxNote(index: number): void {
+    // A little made-up nursery tune, pitched high for the comb.
+    const tune = [72, 76, 76, 74, 72, 72, 76, 79, 79, 77, 76, 74, 72, 74, 76, 72];
+    const note = tune[index % tune.length]!;
+    const frequency = 440 * Math.pow(2, (note - 69) / 12);
+    this.tone(frequency, 0.9, 0.07, "sine", { attack: 0.003 });
+    this.tone(frequency * 2.01, 0.4, 0.02, "sine", { attack: 0.003 });
+  }
+
+  squeak(): void {
+    if (!this.throttle("squeak", 200)) return;
+    const base = 1800 + Math.random() * 600;
+    this.tone(base, 0.08, 0.12, "sine", { to: base * 1.4 });
+    this.tone(base * 1.2, 0.1, 0.1, "sine", { to: base * 0.9, delay: 0.1 });
+  }
+
+  scurry(): void {
+    if (!this.throttle("scurry", 90)) return;
+    this.burst({ duration: 0.03, volume: 0.08, filter: "highpass", frequency: 3000 });
+  }
+
+  chomp(): void {
+    for (let index = 0; index < 4; index += 1) this.burst({ duration: 0.05, volume: 0.3, filter: "bandpass", frequency: 900, q: 3, delay: index * 0.12 });
+  }
+
+  moo(): void {
+    this.tone(130, 1.1, 0.35, "sawtooth", { to: 105, attack: 0.15 });
+    this.tone(260, 1.1, 0.08, "triangle", { to: 210, attack: 0.15 });
+  }
+
+  cuckoo(): void {
+    for (let index = 0; index < 3; index += 1) {
+      this.tone(784, 0.18, 0.2, "sine", { delay: index * 0.8 });
+      this.tone(622, 0.3, 0.2, "sine", { delay: index * 0.8 + 0.22 });
+    }
+  }
+
+  dingDong(): void {
+    this.tone(880, 1.4, 0.2, "sine", { attack: 0.002 });
+    this.tone(1763, 0.8, 0.06, "sine", { attack: 0.002 });
+    this.tone(698, 1.6, 0.2, "sine", { delay: 0.5, attack: 0.002 });
+    this.tone(1398, 0.8, 0.06, "sine", { delay: 0.5, attack: 0.002 });
+    this.tone(560, 0.5, 0.15, "sawtooth", { to: 820, delay: 1.3, attack: 0.08 });
+  }
+
+  zip(): void {
+    this.tone(300, 0.4, 0.15, "square", { to: 1800 });
+  }
+
+  wink(): void {
+    this.tone(1200, 0.12, 0.15, "sine", { to: 2400 });
+    this.tone(2400, 0.2, 0.1, "sine", { to: 1600, delay: 0.12 });
+  }
+
+  tumble(): void {
+    for (let index = 0; index < 6; index += 1) {
+      this.tone(160 - index * 12, 0.12, 0.18, "triangle", { delay: index * 0.22 });
+      this.burst({ duration: 0.08, volume: 0.15, filter: "lowpass", frequency: 600, delay: index * 0.22 });
+    }
+    this.tone(1400, 0.1, 0.12, "square", { delay: 1.4 });
+  }
+
+  /** A lit fuse, fizzing. Call it every frame a bomb is live; it paces itself. */
+  fizz(urgency: number): void {
+    if (!this.throttle("fizz", 70 - urgency * 40)) return;
+    this.burst({ duration: 0.06, volume: 0.05 + urgency * 0.05, filter: "highpass", frequency: 4200 + Math.random() * 1500 });
+  }
+
+  /** The dinner gong: a long bronze shimmer with inharmonic partials. */
+  gong(): void {
+    if (!this.throttle("gong", 600)) return;
+    this.burst({ duration: 0.12, volume: 0.5, filter: "bandpass", frequency: 700, q: 1.5 });
+    const base = 98;
+    for (const [ratio, volume, length] of [[1, 0.32, 4], [1.47, 0.16, 3.4], [2.09, 0.12, 3], [2.56, 0.08, 2.4], [3.01, 0.06, 2], [4.2, 0.04, 1.5]] as const) {
+      this.tone(base * ratio, length, volume, "sine", { to: base * ratio * 0.985, attack: 0.02 });
+    }
+    this.tone(base * 1.005, 4, 0.2, "sine", { attack: 0.3 });
+  }
+
+  /** Chain shot through a maypole: a woody crack, then the creak of it going over. */
+  chop(): void {
+    if (!this.throttle("chop", 120)) return;
+    this.burst({ duration: 0.1, volume: 0.8, filter: "bandpass", frequency: 1100, q: 2.2 });
+    this.tone(210, 0.12, 0.4, "triangle", { to: 120 });
+    this.tone(95, 1.1, 0.12, "sawtooth", { to: 70, delay: 0.15, attack: 0.3 });
+    this.burst({ duration: 0.5, volume: 0.12, filter: "bandpass", frequency: 2400, q: 6, delay: 0.25 });
+  }
+
+  // ---------------------------------------------------------------- the audience
+
+  /** A crowd of voices shaped into a vowel, sliding in pitch: the house reacts. */
+  private crowd(vowel: "oo" | "aa" | "ah", from: number, to: number, duration: number, volume: number, delay = 0): void {
+    const audio = this.ready();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const formants = vowel === "oo" ? [320, 800] : vowel === "aa" ? [750, 1150] : [650, 1080];
+    const start = ctx.currentTime + delay;
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, start);
+    bus.gain.linearRampToValueAtTime(volume, start + 0.12);
+    bus.gain.setValueAtTime(volume, start + duration * 0.6);
+    bus.gain.exponentialRampToValueAtTime(0.001, start + duration);
+    const shape = ctx.createBiquadFilter();
+    shape.type = "bandpass";
+    shape.frequency.value = formants[0]!;
+    shape.Q.value = 3;
+    const shape2 = ctx.createBiquadFilter();
+    shape2.type = "bandpass";
+    shape2.frequency.value = formants[1]!;
+    shape2.Q.value = 4;
+    shape.connect(bus);
+    shape2.connect(bus);
+    bus.connect(out);
+    for (let voice = 0; voice < 7; voice += 1) {
+      const oscillator = ctx.createOscillator();
+      oscillator.type = "sawtooth";
+      const detune = 0.9 + Math.random() * 0.25;
+      oscillator.frequency.setValueAtTime(from * detune, start);
+      oscillator.frequency.linearRampToValueAtTime(to * detune, start + duration);
+      oscillator.connect(shape);
+      oscillator.connect(shape2);
+      oscillator.start(start);
+      oscillator.stop(start + duration + 0.05);
+    }
+  }
+
+  gasp(): void {
+    if (!this.throttle("gasp", 2500)) return;
+    this.crowd("oo", 160, 260, 1.4, 0.35);
+  }
+
+  aww(): void {
+    if (!this.throttle("aww", 2500)) return;
+    this.crowd("aa", 230, 150, 1.3, 0.3);
+  }
+
+  laugh(): void {
+    if (!this.throttle("laugh", 1500)) return;
+    for (let index = 0; index < 5; index += 1) this.crowd("ah", 240 - index * 8, 200 - index * 8, 0.16, 0.22, index * 0.17);
+  }
+
+  applause(seconds = 2.5): void {
+    for (let index = 0; index < Math.round(seconds * 45); index += 1) {
+      const delay = Math.random() * seconds;
+      const fade = 1 - delay / seconds;
+      this.burst({ duration: 0.03, volume: 0.12 + 0.12 * fade, filter: "bandpass", frequency: 1200 + Math.random() * 1800, q: 1.2, delay });
+    }
+    this.crowd("aa", 250, 290, 1.2, 0.18);
   }
 
   /** Plays a recorded line if one exists; returns false so the caller can mime instead. */

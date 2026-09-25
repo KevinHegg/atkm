@@ -19,10 +19,17 @@ Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Add `?all` to the URL to
 unlock every verse.
 
 - **Aim:** point at anything. A dotted arc shows the shot, and a red ring means it hits Humpty.
+  Off a bronze bumper the arc keeps going, so you can line up a bank shot. The gold ring on the
+  rug marks the gun that will fire, and you can see what it's loaded with in its mouth.
 - **Fire:** click. On touch screens, drag to aim and tap **Fire**.
-- **Look around:** drag, or right-drag. Scroll to zoom. **C** resets the view.
-- **Change shot:** keys **1–4**, or the tray.
-- **R** restarts the verse, **Esc** opens the verse list, **M** mutes.
+- **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom. **C** resets the view.
+  Some verses hide things behind scenery; it pays to look.
+- **Change shot:** keys **1–5**, or the tray. **6** is the Queen's blunderbuss when a rat appears.
+- **How high is he?** The star for a great fall asks for a drop of so many metres. The chip at the
+  top says how high he sits, and a surveyor's line from his feet to the boards shows it on stage
+  at the start of each verse, whenever you aim at him, or when you hover over the chip.
+- **R** restarts the verse, **Esc** opens the verse list, **M** mutes. These controls sit in the bottom bar,
+  next to the tray.
 
 ## Rules
 
@@ -38,11 +45,33 @@ unlock every verse.
   - **Round shot** is a flat, heavy punch.
   - **Mortar shells** lob over walls and burst on contact.
   - **Grapeshot** sprays small balls that bowl over the King's men.
-  - **Chain shot** is two spinning balls on a chain.
-- **Powder kegs** explode when struck hard, and set off their neighbours.
+  - **Chain shot** is two spinning balls on a chain. The chain is a blade: it knocks the
+    blocks it sweeps through and it cuts rope and maypoles.
+  - **Fizzing bombs** are lobbed from the mortar. The fuse is lit when the bomb lands; it
+    bounces and rolls, then goes off wherever it has got to.
+- **Powder kegs** explode when struck hard, and set off their neighbours. Stone and brick
+  keep a blast's flash from reaching powder on the other side.
 - **The King's men** carry stretchers and drive horse carts. They run to where Humpty
   will land. Knock them over (they get back up) or time your shot while they're
   away.
+- **Precarious perches.** The Queen's music box turns Humpty round on its arm, so
+  timing decides where he falls. A shot on the arm spins it. His swing hangs on four
+  ropes that only chain shot can cut. His see-saw is a trebuchet: drop the anvil on
+  the short end. His maypole is planted in the stage, and nothing moves it but chain
+  shot, which cuts it down like a tree. A royal canopy takes a mortar blast for him.
+- **Stage cues.** Some verses hide a small puzzle that sets the stage. Ring the dinner
+  gong and every one of the King's men downs tools for lunch (a timer at the top says
+  when they'll be back).
+- **Bumpers and screens.** Bronze bumpers bounce round shot cleanly. Painted screens
+  and hedges hide what's behind them, including hay.
+- **The rat.** In later verses a giant rat creeps out of the wings to gnaw the Queen's
+  powder. If he reaches it he steals a charge, but never the last one. The Queen's
+  blunderbuss (key **6**) sends him packing without spending a shot.
+- **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the moon, Jack and
+  Jill's hill, the cuckoo clock, the well or the spider and see what happens. None of
+  them change the verse.
+- **The Court Astrologer.** Lose a verse and, on the retry, a green ring marks a known
+  winning shot. Aim anywhere inside it and your shot becomes his exactly.
 
 ## Development
 
@@ -51,7 +80,9 @@ npm run typecheck   # strict TypeScript
 npm test            # physics rules + every verse stands still and is winnable
 npm run solve       # brute-force shot search: difficulty report per verse
 npm run solve -- --write           # re-record par solutions in src/sim/par.json
+                                   # (the most robust winning line, so hints survive a human hand)
 npx tsx scripts/trace.ts <verse-id> <ammo> x y z [wait]   # trace one shot
+npx tsx scripts/probe.ts <verse-id> <ammo> <xs> <ys> <zs> [opener-json]   # grid of shots
 npm run build       # static site in dist/
 npm run check       # all of the above that CI needs
 ```
@@ -65,8 +96,13 @@ The game is a static site. It deploys to GitHub Pages from
 src/sim/      rules and physics, headless, no rendering
   game.ts       Rapier world, projectiles, the crack rule, explosions, hoist, phases
   crew.ts       King's men: patrol, landing prediction, stun
-  level.ts      level format and the Mason builder (walls, towers, pillars, hay, kegs)
-  levels.ts     the eight verses
+  rat.ts        the rat: creep, gnaw, flee
+  curios.ts     where the nursery-rhyme curios hide (shared with the scenery)
+  geometry.ts   small vector helpers for ropes and rides
+  level.ts      level format and the Mason builder (walls, towers, pillars, hay, kegs,
+                fixtures, bumpers, hedges, turntables, swings, see-saws, canopies,
+                maypoles, gongs, railings, houses)
+  levels.ts     the thirteen verses
   ballistics.ts ammunition and launch solutions
   autoplay.ts   headless play-through used by tests and the solver
   par.json      one recorded winning line per verse
@@ -74,9 +110,10 @@ src/render/   PlayCanvas presentation, reads the sim and never writes it
   kit.ts        palette, material cache, primitives, lathe and baked-box meshes
   props.ts      Humpty, the Queen, King's men, horses, guns, blocks, kegs, hay
   stage.ts      the toy theatre: boards, painted backdrop, wings, proscenium
+  curios.ts     the curios' little scenes
   view.ts       sync + interpolation, animation, aim arc, effects, camera
 src/main.ts   screens, HUD, input, speech bubbles, the frame loop
-src/audio.ts  procedural foley and the recorded royal voices
+src/audio.ts  procedural foley, a music box, a theatre audience, the recorded royal voices
 src/lines.ts  who says what, and when
 ```
 

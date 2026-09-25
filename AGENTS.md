@@ -13,15 +13,28 @@ Core promises:
 - Only a hard impact cracks Humpty. Projectile contact never cracks him directly,
   and crew contact never cracks him.
 - The aim arc is honest: it is the real launch solution, and it stops at the first
-  collider the shot will touch.
+  collider the shot will touch. Off a bumper it continues with the true bounce.
+- Only chain shot cuts rope and maypoles; nothing else moves a maypole. Curios never
+  affect a verse. The rat never steals the last charge, and the blunderbuss never spends
+  a verse's shot.
+- A bomb's fuse is lit when it first lands. Stone and brick between a blast and a powder
+  keg keep the keg from going off (the blast still pushes things).
+- Stage cues (the dinner gong) are fixtures any stock shot can strike; lunch lasts
+  `LUNCH_BREAK` seconds and nothing, not even a falling egg, interrupts it.
+- The Court Astrologer's hint is the first shot of the recorded par line; aiming
+  inside its ring fires exactly that shot.
 - Every verse must stand still until the first shot and must have a recorded
-  winning line in `src/sim/par.json`.
+  winning line in `src/sim/par.json`. The obvious lazy shot (round shot straight at
+  Humpty, a shell on his head) should not be what wins a verse built around a mechanic;
+  check with `npm run solve` and the one-shot win rate.
 
 ## Source of truth
 
 - `src/sim/game.ts`: physics world, projectiles, the crack rule, explosions,
   hoist, phases, stars;
 - `src/sim/crew.ts`: King's men movement, landing prediction, stun/recover;
+- `src/sim/rat.ts`: the rat's visits; `src/sim/curios.ts`: curio positions shared
+  with `src/render/curios.ts`;
 - `src/sim/levels.ts` with `src/sim/level.ts`: verse layouts via the `Mason` builder;
 - `src/sim/ballistics.ts`: ammunition specs and launch solutions;
 - `src/render/*`: PlayCanvas presentation (kit, props, stage, view);
@@ -35,6 +48,7 @@ Core promises:
 - Tests: `npm test`
 - Difficulty report / par solutions: `npm run solve`, `npm run solve -- --write`
 - Trace a single shot: `npx tsx scripts/trace.ts <verse-id> <ammo> x y z [wait]`
+- Grid-test shots (optionally after an opener): `npx tsx scripts/probe.ts <verse-id> <ammo> <xs> <ys> <zs> [opener-json]`
 - Production build: `npm run build`
 - Full acceptance: `npm run check`
 
@@ -55,5 +69,10 @@ Core promises:
   scenery, not new rendering techniques.
 - After changing physics constants, level layouts or crew behaviour, run
   `npm run solve -- --write` and `npm test`. A verse without a par line is broken.
+  The solver records the most robust winning line (it re-runs candidates with the
+  aim nudged and fired late) because that line becomes the player's hint.
+- Moving rides (turntable, swing, see-saw) must start Humpty awake and give the
+  hoist a perch to return him to; fall back to the highest perch when the ride is
+  spent.
 - Browser storage holds only per-player progress (stars, mute) and must tolerate
   being unavailable.

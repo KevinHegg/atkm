@@ -11,7 +11,19 @@ export type Cue =
   | "bowled"
   | "nearMiss"
   | "crack"
-  | "lose";
+  | "lose"
+  | "ratEnter"
+  | "ratSteal"
+  | "ratScared"
+  | "ratHumpty"
+  | "ricochet"
+  | "ropeCut"
+  | "spin"
+  | "launch"
+  | "lunch"
+  | "lunchQueen"
+  | "timber"
+  | "fizz";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -92,4 +104,67 @@ export const LINES: Record<Cue, { speaker: "humpty" | "queen"; lines: string[] }
     speaker: "queen",
     lines: ["Bah. Tomorrow, then.", "More powder. Much more powder.", "He is mocking me. With his roundness."],
   },
+  ratEnter: {
+    speaker: "queen",
+    lines: ["RAT! Fetch my blunderbuss!", "Vermin! In MY theatre?", "Not the powder, you whiskered wretch!", "Somebody hand me the blunderbuss. Now."],
+  },
+  ratSteal: {
+    speaker: "queen",
+    lines: ["He's eaten a cartridge! The villain!", "Thief! Come back with my powder!", "That was a perfectly good cannonball."],
+  },
+  ratScared: {
+    speaker: "queen",
+    lines: ["Ha! Run, whiskers!", "And stay out!", "That's for the cheese.", "Next time I aim properly."],
+  },
+  ratHumpty: {
+    speaker: "humpty",
+    lines: ["Even the rats are on my side.", "Go on, little fellow. Eat the lot.", "I have always admired rats. Loyal creatures."],
+  },
+  ricochet: {
+    speaker: "queen",
+    lines: ["Off the cushion!", "Bank shot!", "Geometry, darling.", "Billiards is simply cannonry with manners."],
+  },
+  ropeCut: {
+    speaker: "humpty",
+    lines: ["Was that the rope? That sounded like the rope.", "Er. Hello? Ropes?", "I'd like to speak to whoever tied these."],
+  },
+  spin: {
+    speaker: "humpty",
+    lines: ["Wheee— I mean, stop that.", "I'm getting dizzy. Distinguished, but dizzy.", "Round and round goes the principal load."],
+  },
+  lunch: {
+    speaker: "humpty",
+    lines: [
+      "Lunch? NOW? Gentlemen, I am up a pole!",
+      "Bring me back a sandwich! Crusts off!",
+      "You can't all go! Who's minding the egg?",
+      "Soup? You're leaving me for SOUP?",
+    ],
+  },
+  lunchQueen: {
+    speaker: "queen",
+    lines: ["Luncheon is served, gentlemen. Take your time.", "Nobody refuses a free lunch.", "Chop chop. The stew won't eat itself."],
+  },
+  fizz: {
+    speaker: "humpty",
+    lines: ["Is that… fizzing?", "Somebody pinch that out!", "Nobody panic. It's a very small bomb.", "I say, that's lit!"],
+  },
+  timber: {
+    speaker: "humpty",
+    lines: ["TIMBER! Oh — that's me.", "That was load-bearing!", "Somebody has cut down my maypole!"],
+  },
+  launch: {
+    speaker: "humpty",
+    lines: ["I'M FLYING. I DON'T LIKE IT.", "This was not in the brochure!", "Put me DOWN. Gently. GENTLY!"],
+  },
+};
+
+/** What someone says when a curio in the scenery is struck. */
+export const CURIO_LINES: Readonly<Record<string, { speaker: "humpty" | "queen"; line: string }>> = {
+  cow: { speaker: "humpty", line: "Did that cow just jump over the moon?" },
+  moon: { speaker: "queen", line: "Don't shoot the moon. It's the only one we've got." },
+  "jack-and-jill": { speaker: "humpty", line: "Somebody fetch Jack a new crown. Not mine." },
+  cuckoo: { speaker: "queen", line: "It's the hour of your doom, egg. Cuckoo!" },
+  well: { speaker: "humpty", line: "Ding dong bell! Who put the cat in there?" },
+  spider: { speaker: "queen", line: "Miss Muffet will be absolutely furious." },
 };

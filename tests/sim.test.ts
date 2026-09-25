@@ -160,3 +160,188 @@ test("the King's men never crack Humpty by barging or crushing him", async () =>
     game.destroy();
   }
 });
+
+async function stepUntilReady(game: Game): Promise<void> {
+  for (let step = 0; step < 240 && !game.canFire(); step += 1) game.step();
+  game.drainEvents();
+}
+
+test("the music-box turntable carries Humpty round without dropping him", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("had-a-great-fall")!);
+  const start = game.humptyPosition!;
+  await run(game, 4);
+  const later = game.humptyPosition!;
+  assert.ok(Math.hypot(later.x - start.x, later.z - start.z) > 1, "he should have ridden round");
+  assert.ok(Math.abs(later.y - start.y) < 0.2, "and still be on his seat");
+  game.destroy();
+});
+
+test("only chain shot cuts the swing's ropes", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const level = levelById("hanging-by-a-thread")!;
+  const aimAtRope = (game: Game) => {
+    const rope = game.ropeViews[0]!;
+    return { x: (rope.top.x + rope.bottom.x) / 2, y: (rope.top.y + rope.bottom.y) / 2, z: (rope.top.z + rope.bottom.z) / 2 };
+  };
+  const shot = await Game.create(level);
+  await stepUntilReady(shot);
+  shot.select("shot");
+  assert.ok(shot.fire(aimAtRope(shot)));
+  const shotEvents = await run(shot, 3);
+  assert.ok(!shotEvents.some((event) => event.type === "rope-cut"), "round shot must not cut rope");
+  shot.destroy();
+  let cut = false;
+  for (const dy of [0, 0.6, -0.6, 1.2]) {
+    const chain = await Game.create(level);
+    await stepUntilReady(chain);
+    chain.select("chain");
+    const at = aimAtRope(chain);
+    chain.fire({ ...at, y: at.y + dy });
+    cut ||= (await run(chain, 3)).some((event) => event.type === "rope-cut");
+    chain.destroy();
+    if (cut) break;
+  }
+  assert.ok(cut, "chain shot should cut a rope");
+});
+
+test("an ignored rat steals a charge, but never the last one", async () => {
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("stone", 0, -1, 4, 5), -1), {
+    ammo: { shot: 2 },
+    rat: { first: 0.5, every: 1, visits: 3 },
+  }));
+  const events = await run(game, 60);
+  const steals = events.filter((event) => event.type === "rat" && event.action === "steal");
+  assert.equal(steals.length, 1, "one theft takes him to his last shot");
+  assert.equal(game.ammoLeft, 1);
+  game.destroy();
+});
+
+test("the Queen's blunderbuss sends the rat packing", async () => {
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("stone", 0, -1, 4, 5), -1), {
+    ammo: { shot: 2 },
+    rat: { first: 0.5, every: 30, visits: 1 },
+  }));
+  const events: GameEvent[] = [];
+  for (let step = 0; step < 60 * 12; step += 1) {
+    const rat = game.ratView;
+    if (rat && game.vermin && game.select("blunderbuss") && game.canFire()) {
+      const target = game.bodies.find((body) => body.id === rat.id)!.position;
+      game.fire({ x: target.x, y: 0.35, z: target.z });
+    }
+    game.step();
+    events.push(...game.drainEvents());
+    if (events.some((event) => event.type === "rat" && event.action === "scared")) break;
+  }
+  assert.ok(events.some((event) => event.type === "rat" && event.action === "scared"), "the rat should be startled");
+  assert.ok(!events.some((event) => event.type === "rat" && event.action === "steal"));
+  assert.equal(game.stats.shots, 0, "the blunderbuss does not spend the verse's shot");
+  game.destroy();
+});
+
+test("striking a curio makes mischief but does not stop the shot", async () => {
+  const { CURIOS } = await import("../src/sim/curios.js");
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("stone", 0, -1, 4, 5), -1)));
+  await stepUntilReady(game);
+  const moon = CURIOS.find((curio) => curio.id === "moon")!;
+  assert.ok(game.fire(moon.at));
+  const events = await run(game, 3);
+  assert.ok(events.some((event) => event.type === "curio" && event.id === "moon"));
+  game.destroy();
+});
+
+test("a canopy shields Humpty from a mortar dropped on his head", async () => {
+  const game = await Game.create(arena((mason) => {
+    const top = mason.pillar("stone", 0, -2, 4, { size: 1.6, height: 1 });
+    mason.canopy(0, top, -2);
+    return perchAt(0, top, -2);
+  }, { ammo: { shell: 1 } }));
+  await stepUntilReady(game);
+  const h = game.humptyPosition!;
+  game.select("shell");
+  assert.ok(game.fire({ x: h.x, y: h.y + 0.3, z: h.z }));
+  const events = await run(game, 6);
+  assert.ok(events.some((event) => event.type === "explode"));
+  assert.ok(!events.some((event) => event.type === "crack"), "the canopy should take the blast");
+  game.destroy();
+});
+
+test("round shot cannot move a maypole, but chain shot cuts it and brings the top down", async () => {
+  const build = (ammo: LevelDef["ammo"]) => arena((mason) => perchAt(0, mason.maypole(0, -2, 4.5), -2), { ammo });
+  const shot = await Game.create(build({ shot: 1 }));
+  await stepUntilReady(shot);
+  assert.ok(shot.fire({ x: 0, y: 2.5, z: -2 }));
+  const shotEvents = await run(shot, 3);
+  assert.ok(!shotEvents.some((event) => event.type === "cut"), "round shot must not cut a maypole");
+  assert.ok(Math.abs(shot.humptyPosition!.y - build({}).humpty.y) < 0.1, "Humpty stays up");
+  shot.destroy();
+  const chain = await Game.create(build({ chain: 1 }));
+  await stepUntilReady(chain);
+  chain.select("chain");
+  assert.ok(chain.fire({ x: 0, y: 2.5, z: -2 }));
+  const chainEvents = await run(chain, 5);
+  assert.ok(chainEvents.some((event) => event.type === "cut"), "chain shot should cut the maypole");
+  assert.ok(chainEvents.some((event) => event.type === "crack"), "with nobody to catch him, the fall cracks him");
+  chain.destroy();
+});
+
+test("the dinner gong sends every crew to lunch, and they come back", async () => {
+  const { LUNCH_BREAK } = await import("../src/sim/crew.js");
+  const game = await Game.create(arena((mason) => {
+    mason.gong(4, -1);
+    return perchAt(0, mason.wall("stone", 0, -1, 2, 6), -1);
+  }, {
+    crews: [
+      { id: "litter", kind: "litter", home: { x: -1.5, y: 0, z: -3 }, yaw: Math.PI / 2, zone: { minX: -9, maxX: 9, minZ: -8, maxZ: 0 } },
+      { id: "guard", kind: "guard", home: { x: 2, y: 0, z: 2 }, yaw: 0 },
+    ],
+  }));
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: 4, y: 1, z: -1 }));
+  const events = await run(game, 6);
+  assert.ok(events.some((event) => event.type === "cue" && event.cue === "lunch"));
+  assert.ok(game.crewViews.every((crew) => crew.mode === "lunch" && Math.abs(crew.x) > 8), "everyone heads for the wings");
+  assert.ok(game.lunchLeft > 0);
+  await run(game, LUNCH_BREAK + 10);
+  assert.equal(game.lunchLeft, 0);
+  for (const crew of game.crewViews) {
+    const home = crew.id === "litter" ? { x: -1.5, z: -3 } : { x: 2, z: 2 };
+    assert.ok(Math.hypot(crew.x - home.x, crew.z - home.z) < 0.3, `${crew.id} is back at their post`);
+  }
+  game.destroy();
+});
+
+test("a fizzing bomb lights its fuse on landing and goes off where it has rolled to", async () => {
+  const { BOMB_FUSE } = await import("../src/sim/game.js");
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("stone", 0, -4, 2, 6), -4), { ammo: { bomb: 1 } }));
+  await stepUntilReady(game);
+  game.select("bomb");
+  assert.ok(game.fire({ x: 3, y: 0, z: 0 }));
+  let landed: number | undefined;
+  let exploded: number | undefined;
+  for (let step = 0; step < 60 * 8 && exploded === undefined; step += 1) {
+    game.step();
+    if (landed === undefined && game.fuses.length) landed = game.time;
+    for (const event of game.drainEvents()) if (event.type === "explode") exploded = game.time;
+  }
+  assert.ok(landed !== undefined && landed > 1, "the fuse waits for the bomb to land");
+  assert.ok(exploded !== undefined && Math.abs(exploded - landed - BOMB_FUSE) < 0.05, "then burns for the fuse time");
+  game.destroy();
+});
+
+test("a stone wall keeps a blast from setting off the powder behind it", async () => {
+  for (const walled of [true, false]) {
+    const game = await Game.create(arena((mason) => {
+      if (walled) mason.wall("stone", 0, -3, 3, 3, { brick: { x: 1, y: 0.5, z: 0.6 } });
+      mason.keg(0, -4.4);
+      return perchAt(6, mason.wall("stone", 6, -1, 2, 6), -1);
+    }, { ammo: { shell: 1 } }));
+    await stepUntilReady(game);
+    game.select("shell");
+    assert.ok(game.fire({ x: 0, y: 0, z: -2 }));
+    const events = await run(game, 5);
+    const kegs = events.filter((event) => event.type === "explode" && event.keg).length;
+    assert.equal(kegs > 0, !walled, walled ? "the wall should stop the flash" : "an open keg should go up");
+    game.destroy();
+  }
+});

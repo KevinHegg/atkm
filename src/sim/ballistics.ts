@@ -8,7 +8,7 @@ export interface AmmoSpec {
   blurb: string;
   speed: number;
   lob: boolean;
-  gun: "cannon" | "mortar";
+  gun: "cannon" | "mortar" | "queen";
 }
 
 export const AMMO: Record<AmmoKind, AmmoSpec> = {
@@ -43,6 +43,22 @@ export const AMMO: Record<AmmoKind, AmmoSpec> = {
     speed: 21,
     lob: false,
     gun: "cannon",
+  },
+  bomb: {
+    kind: "bomb",
+    name: "Fizzing bomb",
+    blurb: "Lobbed from the mortar. It bounces and rolls, then goes off when the fuse runs out, wherever it has got to.",
+    speed: 14,
+    lob: true,
+    gun: "mortar",
+  },
+  blunderbuss: {
+    kind: "blunderbuss",
+    name: "Blunderbuss",
+    blurb: "The Queen's own gun, for vermin. Short range, never runs out.",
+    speed: 13,
+    lob: false,
+    gun: "queen",
   },
 };
 

@@ -1,9 +1,9 @@
 import { Game, STEP } from "./game.js";
 import type { LevelDef } from "./level.js";
-import type { AmmoKind, Vec3 } from "./types.js";
+import type { StockKind, Vec3 } from "./types.js";
 
 export interface PlannedShot {
-  ammo: AmmoKind;
+  ammo: StockKind;
   /** World aim point, or an offset from wherever Humpty is when the gun is ready. */
   at: Vec3;
   relativeToHumpty?: boolean;
@@ -92,7 +92,7 @@ export async function playOut(level: LevelDef, shots: readonly PlannedShot[], ma
 }
 
 /** Largest displacement of any body after `seconds` with every body awake and no shots. */
-export async function settleDrift(level: LevelDef, seconds = 6): Promise<{ drift: number; cracked: boolean; humptyDrift: number }> {
+export async function settleDrift(level: LevelDef, seconds = 6): Promise<{ drift: number; cracked: boolean; humptyDrift: number; humptyDrop: number }> {
   const game = await Game.create(level);
   try {
     for (const body of game.world.bodies.getAll()) if (body.isDynamic()) body.wakeUp();
@@ -103,14 +103,15 @@ export async function settleDrift(level: LevelDef, seconds = 6): Promise<{ drift
     let drift = 0;
     for (const view of game.bodies) {
       const from = start.get(view.id);
-      if (!from || view.kind === "man" || view.kind === "litter" || view.kind === "horse") continue;
+      if (!from || view.kind === "man" || view.kind === "litter" || view.kind === "horse" || view.kind === "rat") continue;
       drift = Math.max(drift, Math.hypot(view.position.x - from.x, view.position.y - from.y, view.position.z - from.z));
     }
     const humptyNow = game.humptyPosition;
     const humptyDrift = humptyStart && humptyNow
       ? Math.hypot(humptyNow.x - humptyStart.x, humptyNow.y - humptyStart.y, humptyNow.z - humptyStart.z)
       : Infinity;
-    return { drift, cracked: game.cracked, humptyDrift };
+    const humptyDrop = humptyStart && humptyNow ? humptyStart.y - humptyNow.y : Infinity;
+    return { drift, cracked: game.cracked, humptyDrift, humptyDrop };
   } finally {
     game.destroy();
   }
@@ -124,6 +125,8 @@ export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
     for (const view of game.bodies) {
       if (view.kind === "block" || view.kind === "keg" || view.kind === "hay") {
         points.push({ ...view.position });
+        // Heavy things perched on plinths are best struck high.
+        if (view.material === "anvil") for (const dy of [0.1, 0.18]) points.push({ ...view.position, y: view.position.y + dy });
       }
       if (view.kind === "humpty") {
         points.push({ ...view.position });
@@ -132,6 +135,20 @@ export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
         points.push({ x: view.position.x, y: view.position.y - 0.4, z: view.position.z });
       }
       if (view.kind === "man" || view.kind === "horse") points.push({ ...view.position });
+      // Stage cues come first: they are the openers of two-shot lines.
+      if (view.kind === "fixture" && view.material === "gong") points.unshift({ ...view.position });
+      if (view.kind === "fixture" && (view.material === "bumper" || view.material === "drum")) {
+        for (const dy of [-0.5, -0.25, 0, 0.25, 0.5]) points.push({ x: view.position.x, y: view.position.y + dy, z: view.position.z });
+      }
+    }
+    for (const rope of game.ropeViews) {
+      for (const k of [0.25, 0.5, 0.75]) {
+        points.push({
+          x: rope.bottom.x + (rope.top.x - rope.bottom.x) * k,
+          y: rope.bottom.y + (rope.top.y - rope.bottom.y) * k,
+          z: rope.bottom.z + (rope.top.z - rope.bottom.z) * k,
+        });
+      }
     }
     return points;
   } finally {

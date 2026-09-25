@@ -72,8 +72,9 @@ export function buildStage(kit: Kit, parent: pc.Entity): StageSet {
     kit.primitive("sky-band", "box", root, V(0, mid, backZ), { x: width + 8, y: height + 0.02, z: 0.1 }, kit.material(`sky-${band}`, color, 0.02), pc.Vec3.ZERO, false);
   }
   const moonMaterial = kit.material("moon", new pc.Color(0.95, 0.85, 0.55), 0.2, 0, { emissive: new pc.Color(0.55, 0.45, 0.22) });
-  const moon = kit.primitive("moon", "cylinder", root, V(-9, 11.5, backZ + 0.12), { x: 2.1, y: 0.05, z: 2.1 }, moonMaterial, V(90, 0, 0), false);
-  kit.primitive("moon-bite", "cylinder", root, V(-8.35, 11.8, backZ + 0.16), { x: 1.8, y: 0.05, z: 1.8 }, kit.material("moon-shadow", new pc.Color(0.075, 0.13, 0.17), 0.02), V(90, 0, 0), false);
+  const moon = kit.group("moon", root, V(-9, 11.5, backZ + 0.12));
+  kit.primitive("moon-disc", "cylinder", moon, V(), { x: 2.1, y: 0.05, z: 2.1 }, moonMaterial, V(90, 0, 0), false);
+  kit.primitive("moon-bite", "cylinder", moon, V(0.65, 0.3, 0.04), { x: 1.8, y: 0.05, z: 1.8 }, kit.material("moon-shadow", new pc.Color(0.075, 0.13, 0.17), 0.02), V(90, 0, 0), false);
   const star = kit.material("star", new pc.Color(1, 0.95, 0.75), 0.2, 0, { emissive: new pc.Color(0.8, 0.72, 0.45) });
   for (let index = 0; index < 26; index += 1) {
     const x = (hashUnit(`sx${index}`) - 0.5) * (width + 4);
@@ -131,7 +132,7 @@ export function buildStage(kit: Kit, parent: pc.Entity): StageSet {
     }
   }
 
-  // Proscenium: gilt arch, velvet curtains, a valance.
+  // Proscenium: gilt pilasters and velvet curtains at the sides. No valance: it hid the tall towers.
   const velvet = kit.material("velvet", palette.velvet, 0.22);
   const velvetDark = kit.material("velvet-dark", new pc.Color(0.26, 0.015, 0.03), 0.18);
   const archZ = STAGE.maxZ + 1.1;
@@ -144,17 +145,6 @@ export function buildStage(kit: Kit, parent: pc.Entity): StageSet {
     }
     kit.primitive("tieback", "cylinder", root, V(x - side * 1.7, 3.2, archZ - 0.25), { x: 0.1, y: 2.2, z: 0.1 }, gold, V(0, 0, 90), false);
   }
-  kit.primitive("valance", "box", root, V(0, 14.2, archZ - 0.3), { x: width + 5, y: 1.6, z: 0.4 }, velvet, pc.Vec3.ZERO, false);
-  for (let index = 0; index < 22; index += 1) {
-    const x = -width / 2 - 2 + index * ((width + 4) / 21);
-    kit.primitive("scallop", "sphere", root, V(x, 13.35, archZ - 0.3), { x: 1.6, y: 0.8, z: 0.4 }, velvet, pc.Vec3.ZERO, false);
-    kit.primitive("tassel", "cone", root, V(x, 12.85, archZ - 0.2), { x: 0.12, y: 0.35, z: 0.12 }, gold, V(180, 0, 0), false);
-  }
-  kit.primitive("arch-gilt", "box", root, V(0, 15.1, archZ + 0.05), { x: width + 5, y: 0.3, z: 0.5 }, gold, pc.Vec3.ZERO, false);
-  const crest = kit.group("crest", root, V(0, 15.2, archZ + 0.35));
-  kit.primitive("crest-shield", "cylinder", crest, V(), { x: 1.5, y: 0.1, z: 1.9 }, kit.material("crest", new pc.Color(0.035, 0.3, 0.2), 0.3), V(90, 0, 0), false);
-  kit.primitive("crest-egg", "sphere", crest, V(0, 0.05, 0.08), { x: 0.55, y: 0.75, z: 0.2 }, kit.material("egg-shell", palette.egg, 0.55), pc.Vec3.ZERO, false);
-  kit.primitive("crest-crack", "box", crest, V(0.02, 0.05, 0.19), { x: 0.07, y: 0.62, z: 0.02 }, kit.material("ink", palette.ink, 0.42), V(0, 0, 18), false);
 
   // Footlights along the apron.
   const footlights: pc.Entity[] = [];

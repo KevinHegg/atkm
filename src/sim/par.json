@@ -14,11 +14,12 @@
     {
       "ammo": "shot",
       "at": {
-        "x": 0,
-        "y": 0.35,
-        "z": -4.3
+        "x": 0.38,
+        "y": 0.1,
+        "z": 0
       },
-      "wait": 0
+      "relativeToHumpty": true,
+      "wait": 7
     }
   ],
   "all-the-kings-men": [
@@ -69,31 +70,84 @@
     {
       "ammo": "shot",
       "at": {
-        "x": 0,
-        "y": 6.23,
-        "z": -1.8
+        "x": 6.2,
+        "y": 1,
+        "z": -1.4
       },
       "wait": 0
+    },
+    {
+      "ammo": "chain",
+      "at": {
+        "x": -0.38,
+        "y": 0.1,
+        "z": 0
+      },
+      "relativeToHumpty": true
     }
   ],
   "the-keep": [
     {
       "ammo": "shell",
       "at": {
-        "x": -0.55,
-        "y": 1.93,
+        "x": 0.51,
+        "y": 3.6,
         "z": -2.2
       },
-      "wait": 0
+      "wait": 2.5
     }
   ],
   "the-encore": [
     {
       "ammo": "shell",
       "at": {
-        "x": 0,
-        "y": 2.48,
+        "x": -1.1,
+        "y": 0.28,
         "z": -2.4
+      },
+      "wait": 2.5
+    }
+  ],
+  "hanging-by-a-thread": [
+    {
+      "ammo": "chain",
+      "at": {
+        "x": 0.6,
+        "y": 6.07,
+        "z": -1.83
+      },
+      "wait": 0
+    }
+  ],
+  "the-queens-billiards": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 6.5,
+        "y": 5,
+        "z": -1
+      },
+      "wait": 0
+    }
+  ],
+  "see-saw-margery-daw": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 1.62,
+        "y": 5.12,
+        "z": -0.58
+      },
+      "wait": 0
+    }
+  ],
+  "remember-remember": [
+    {
+      "ammo": "bomb",
+      "at": {
+        "x": 1.48,
+        "y": 1.38,
+        "z": -2.6
       },
       "wait": 2.5
     }

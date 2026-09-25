@@ -11,9 +11,20 @@ export interface Quat {
   w: number;
 }
 
-export type AmmoKind = "shot" | "shell" | "grape" | "chain";
+export type AmmoKind = "shot" | "shell" | "grape" | "chain" | "bomb" | "blunderbuss";
+/** Ordnance the level stocks; the Queen's blunderbuss is always to hand when vermin appear. */
+export type StockKind = Exclude<AmmoKind, "blunderbuss">;
 
-export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick";
+export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole";
+
+/** Static scenery in the playing area: it stops shots but never moves. */
+export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing";
+
+/** Stage cues: strike one and the theatre does something that helps the Queen. */
+export type CueKind = "lunch";
+
+/** Nursery-rhyme curios hidden in the scenery; striking one only does something silly. */
+export type CurioId = "cow" | "moon" | "jack-and-jill" | "cuckoo" | "well" | "spider";
 
 export type BodyKind =
   | "ground"
@@ -21,6 +32,7 @@ export type BodyKind =
   | "humpty"
   | "shot"
   | "shell"
+  | "bomb"
   | "grape"
   | "chain"
   | "keg"
@@ -29,7 +41,11 @@ export type BodyKind =
   | "man"
   | "horse"
   | "crown"
-  | "shard";
+  | "shard"
+  | "fixture"
+  | "turntable"
+  | "rat"
+  | "pellet";
 
 export type Phase = "aim" | "flight" | "hoist" | "won" | "lost";
 
@@ -50,7 +66,14 @@ export type GameEvent =
   | { type: "wobble"; at: Vec3 }
   | { type: "say"; speaker: Speaker; line: string }
   | { type: "reload"; ammo: AmmoKind | undefined }
-  | { type: "result"; won: boolean };
+  | { type: "result"; won: boolean }
+  | { type: "ricochet"; at: Vec3; look: FixtureLook; strength: number }
+  | { type: "rope-cut"; at: Vec3; by: AmmoKind }
+  | { type: "curio"; id: CurioId; at: Vec3 }
+  | { type: "cue"; cue: CueKind; at: Vec3 }
+  | { type: "cut"; at: Vec3 }
+  | { type: "spin"; at: Vec3; speed: number }
+  | { type: "rat"; action: "enter" | "gnaw" | "steal" | "scared" | "gone"; at: Vec3; stole?: StockKind };
 
 export interface BodyView {
   id: number;
@@ -64,6 +87,8 @@ export interface BodyView {
   removed: boolean;
   /** Partner body for chain shot. */
   link?: number;
+  /** Seconds left on a bomb's fuse. */
+  fuse?: number;
 }
 
 export const vec = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });

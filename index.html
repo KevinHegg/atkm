@@ -16,30 +16,40 @@
       <div id="stage"></div>
       <div id="bubbles" aria-live="polite"></div>
       <div id="fall-meter" hidden><strong>0.0</strong><span>m</span><em>fall</em></div>
+      <div id="plumb" hidden aria-hidden="true"><i class="line"></i><i class="great"><em>great fall</em></i><span><b>0.0</b> m to the boards</span></div>
+      <div id="ring-tag" hidden>The Court Astrologer's mark</div>
+      <div id="fuse-tags" aria-hidden="true"></div>
 
       <header id="hud-top" hidden>
         <div class="verse-tag">
           <span id="hud-number">Verse I</span>
           <strong id="hud-title">Sat on a Wall</strong>
         </div>
-        <ol id="objectives" aria-label="Stars for this verse">
-          <li data-star="cracked"><i></i><span>Crack him</span></li>
-          <li data-star="spare"><i></i><span>A shot to spare</span></li>
-          <li data-star="great"><i></i><span>Fall <b id="great-fall">3</b> m or more</span></li>
-        </ol>
-        <nav id="hud-buttons" aria-label="Game">
-          <button type="button" data-action="menu" title="Verses (Esc)" aria-label="Verses"><i data-lucide="scroll-text"></i></button>
-          <button type="button" data-action="restart" title="Restart (R)" aria-label="Restart"><i data-lucide="rotate-ccw"></i></button>
-          <button type="button" data-action="camera" title="Reset view (C)" aria-label="Reset view"><i data-lucide="scan"></i></button>
-          <button type="button" data-action="mute" title="Sound (M)" aria-label="Toggle sound"><i data-lucide="volume-2" class="sound-on"></i><i data-lucide="volume-x" class="sound-off"></i></button>
-        </nav>
+        <div class="hud-notes">
+          <ol id="objectives" aria-label="Stars for this verse">
+            <li data-star="cracked"><i></i><span>Crack him</span></li>
+            <li data-star="spare"><i></i><span>A shot to spare</span></li>
+            <li data-star="great" title="Measured from where he falls from to where he lands"><i></i><span>A fall of <b id="great-fall">3</b> m <em id="height-now"></em></span></li>
+          </ol>
+          <p id="hint"></p>
+          <p id="status" hidden></p>
+        </div>
       </header>
 
       <footer id="hud-bottom" hidden>
-        <p id="hint"></p>
         <div id="tray-row">
+          <nav class="tools" aria-label="Verse">
+            <button type="button" data-action="menu" title="Verses (Esc)" aria-label="Verses"><i data-lucide="scroll-text"></i></button>
+            <button type="button" data-action="restart" title="Restart the verse (R)" aria-label="Restart the verse"><i data-lucide="rotate-ccw"></i></button>
+          </nav>
           <div id="ammo-tray" role="toolbar" aria-label="Ammunition"></div>
           <button type="button" id="fire-button" hidden><span>Fire!</span></button>
+          <nav class="tools" aria-label="View">
+            <button type="button" data-action="look-left" title="Look around to the left (←)" aria-label="Look left"><i data-lucide="chevrons-left"></i></button>
+            <button type="button" data-action="look-right" title="Look around to the right (→)" aria-label="Look right"><i data-lucide="chevrons-right"></i></button>
+            <button type="button" data-action="camera" title="Reset the view (C)" aria-label="Reset the view"><i data-lucide="scan"></i></button>
+            <button type="button" data-action="mute" title="Sound (M)" aria-label="Toggle sound"><i data-lucide="volume-2" class="sound-on"></i><i data-lucide="volume-x" class="sound-off"></i></button>
+          </nav>
         </div>
       </footer>
 
@@ -63,7 +73,7 @@
             <button type="button" id="play-button" class="primary" disabled>Loading…</button>
             <button type="button" id="verses-button" disabled>Choose a verse</button>
           </div>
-          <p class="controls">Point to aim &middot; click to fire &middot; drag to look around &middot; 1&ndash;4 changes shot</p>
+          <p class="controls">Point to aim &middot; click to fire &middot; drag to look around &middot; number keys change shot</p>
         </div>
       </section>
 
