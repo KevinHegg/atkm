@@ -1,3 +1,5 @@
+import type { MayhemEvent } from "./mayhem.js";
+
 export interface Vec3 {
   x: number;
   y: number;
@@ -18,13 +20,13 @@ export type StockKind = Exclude<AmmoKind, "blunderbuss">;
 export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole";
 
 /** Static scenery in the playing area: it stops shots but never moves. */
-export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing";
+export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder";
 
 /** Stage cues: strike one and the theatre does something that helps the Queen. */
 export type CueKind = "lunch";
 
 /** Nursery-rhyme curios hidden in the scenery; striking one only does something silly. */
-export type CurioId = "cow" | "moon" | "jack-and-jill" | "cuckoo" | "well" | "spider";
+export type CurioId = "cow" | "moon" | "jack-and-jill" | "cuckoo" | "well" | "spider" | "king" | "duke";
 
 export type BodyKind =
   | "ground"
@@ -45,7 +47,9 @@ export type BodyKind =
   | "fixture"
   | "turntable"
   | "rat"
-  | "pellet";
+  | "pellet"
+  | "bucket"
+  | "sandbag";
 
 export type Phase = "aim" | "flight" | "hoist" | "won" | "lost";
 
@@ -72,6 +76,7 @@ export type GameEvent =
   | { type: "curio"; id: CurioId; at: Vec3 }
   | { type: "cue"; cue: CueKind; at: Vec3 }
   | { type: "cut"; at: Vec3 }
+  | MayhemEvent
   | { type: "spin"; at: Vec3; speed: number }
   | { type: "rat"; action: "enter" | "gnaw" | "steal" | "scared" | "gone"; at: Vec3; stole?: StockKind };
 

@@ -1,3 +1,4 @@
+import { CURIOS } from "./curios.js";
 import { Game, STEP } from "./game.js";
 import type { LevelDef } from "./level.js";
 import type { StockKind, Vec3 } from "./types.js";
@@ -26,6 +27,8 @@ export interface PlayResult {
   bowled: number;
   catches: number;
   shotsFired: number;
+  /** Mayhem earned before the crack (or by the end). */
+  mayhem: number;
   landing?: Vec3;
 }
 
@@ -66,6 +69,7 @@ export async function playOut(level: LevelDef, shots: readonly PlannedShot[], ma
             bowled: game.stats.bowled,
             catches: game.stats.catches,
             shotsFired: game.stats.shots,
+            mayhem: game.mayhem.total,
             ...(landing ? { landing } : {}),
           };
         }
@@ -81,6 +85,7 @@ export async function playOut(level: LevelDef, shots: readonly PlannedShot[], ma
       bowled: game.stats.bowled,
       catches: game.stats.catches,
       shotsFired: game.stats.shots,
+      mayhem: game.mayhem.total,
       ...(landing ? { landing } : {}),
     };
   } catch (error) {
@@ -117,6 +122,23 @@ export async function settleDrift(level: LevelDef, seconds = 6): Promise<{ drift
   }
 }
 
+/** Things worth a shot for the sake of mayhem alone: curios, gags and the King's men. */
+export async function mayhemTargets(level: LevelDef): Promise<Array<{ label: string; at: Vec3 }>> {
+  const game = await Game.create(level);
+  try {
+    const targets: Array<{ label: string; at: Vec3 }> = CURIOS.map((curio) => ({ label: curio.id, at: { ...curio.at } }));
+    for (const view of game.bodies) {
+      if (view.kind === "bucket" || view.kind === "sandbag") targets.push({ label: view.kind, at: { ...view.position } });
+      if (view.kind === "man" || view.kind === "horse") targets.push({ label: view.kind, at: { ...view.position } });
+      if (view.kind === "keg") targets.push({ label: "keg", at: { ...view.position } });
+      if (view.kind === "fixture" && view.material === "gong") targets.push({ label: "gong", at: { ...view.position } });
+    }
+    return targets;
+  } finally {
+    game.destroy();
+  }
+}
+
 /** Aim points worth trying: every structural body, Humpty, and the crews. */
 export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
   const game = await Game.create(level);
@@ -135,6 +157,7 @@ export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
         points.push({ x: view.position.x, y: view.position.y - 0.4, z: view.position.z });
       }
       if (view.kind === "man" || view.kind === "horse") points.push({ ...view.position });
+      if (view.kind === "bucket" || view.kind === "sandbag") points.push({ ...view.position });
       // Stage cues come first: they are the openers of two-shot lines.
       if (view.kind === "fixture" && view.material === "gong") points.unshift({ ...view.position });
       if (view.kind === "fixture" && (view.material === "bumper" || view.material === "drum")) {

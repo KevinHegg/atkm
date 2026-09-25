@@ -99,13 +99,13 @@
   ],
   "the-encore": [
     {
-      "ammo": "shell",
+      "ammo": "shot",
       "at": {
-        "x": -1.1,
-        "y": 0.28,
+        "x": 0,
+        "y": 4.96,
         "z": -2.4
       },
-      "wait": 2.5
+      "wait": 0
     }
   ],
   "hanging-by-a-thread": [
@@ -149,7 +149,7 @@
         "y": 1.38,
         "z": -2.6
       },
-      "wait": 2.5
+      "wait": 0
     }
   ]
 }

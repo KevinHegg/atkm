@@ -23,7 +23,12 @@ export type Cue =
   | "lunch"
   | "lunchQueen"
   | "timber"
-  | "fizz";
+  | "fizz"
+  | "kingOutrage"
+  | "kingCheer"
+  | "kingSulk"
+  | "kingLaugh"
+  | "bucket";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -37,7 +42,9 @@ export const RECORDED: Readonly<Record<string, string>> = {
   "Again. The egg remains offensively spherical.": "queen-spherical.m4a",
 };
 
-export const LINES: Record<Cue, { speaker: "humpty" | "queen"; lines: string[] }> = {
+export type Speaker = "humpty" | "queen" | "king";
+
+export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   start: {
     speaker: "queen",
     lines: [
@@ -145,6 +152,26 @@ export const LINES: Record<Cue, { speaker: "humpty" | "queen"; lines: string[] }
     speaker: "queen",
     lines: ["Luncheon is served, gentlemen. Take your time.", "Nobody refuses a free lunch.", "Chop chop. The stew won't eat itself."],
   },
+  kingOutrage: {
+    speaker: "king",
+    lines: ["Treason! In MY box?", "Call for my fiddlers three! And a new crown!", "I say! That was nearly my pipe!"],
+  },
+  kingCheer: {
+    speaker: "king",
+    lines: ["Well held, men! Well held!", "Ha! That's my egg!", "A pint for every man on that stretcher!"],
+  },
+  kingSulk: {
+    speaker: "king",
+    lines: ["My egg. My beautiful egg.", "Somebody fetch the glue.", "I shall need a larger bowl."],
+  },
+  kingLaugh: {
+    speaker: "king",
+    lines: ["Ho ho! Clumsy oafs.", "Get up, you great puddings!", "Ha! Down like ninepins."],
+  },
+  bucket: {
+    speaker: "queen",
+    lines: ["A perfect fit.", "Whitewash suits him.", "Somebody fetch that man a mirror."],
+  },
   fizz: {
     speaker: "humpty",
     lines: ["Is that… fizzing?", "Somebody pinch that out!", "Nobody panic. It's a very small bomb.", "I say, that's lit!"],
@@ -160,11 +187,12 @@ export const LINES: Record<Cue, { speaker: "humpty" | "queen"; lines: string[] }
 };
 
 /** What someone says when a curio in the scenery is struck. */
-export const CURIO_LINES: Readonly<Record<string, { speaker: "humpty" | "queen"; line: string }>> = {
+export const CURIO_LINES: Readonly<Record<string, { speaker: Speaker; line: string }>> = {
   cow: { speaker: "humpty", line: "Did that cow just jump over the moon?" },
   moon: { speaker: "queen", line: "Don't shoot the moon. It's the only one we've got." },
   "jack-and-jill": { speaker: "humpty", line: "Somebody fetch Jack a new crown. Not mine." },
   cuckoo: { speaker: "queen", line: "It's the hour of your doom, egg. Cuckoo!" },
   well: { speaker: "humpty", line: "Ding dong bell! Who put the cat in there?" },
   spider: { speaker: "queen", line: "Miss Muffet will be absolutely furious." },
+  duke: { speaker: "humpty", line: "The Grand Old Duke of York! He had ten thousand men. Had." },
 };

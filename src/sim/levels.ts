@@ -14,8 +14,9 @@ function satOnAWall(): LevelDef {
     title: "Sat on a Wall",
     verse: ["Humpty Dumpty sat on a wall,", "and the Queen wheeled her cannon into the hall."],
     hint: "Aim at anything and fire. A cannonball won’t break him — only a fall will.",
-    ammo: { shot: 3 },
+    ammo: { shot: 4 },
     greatFall: 3,
+    mayhem: 550,
     humpty: perchAt(0, top, -1),
     pieces: m.pieces,
     crews: [],
@@ -36,8 +37,9 @@ function hadAGreatFall(): LevelDef {
     title: "Had a Great Fall",
     verse: ["Humpty Dumpty went round and round", "on a music box, high off the ground."],
     hint: "Hay covers only one side. Wait for him to swing round to the bare side, or shoot the arm to spin it.",
-    ammo: { shot: 3 },
+    ammo: { shot: 4 },
     greatFall: 4,
+    mayhem: 600,
     humpty: perchAt(seat.x, seat.y, seat.z),
     pieces: m.pieces,
     crews: [],
@@ -50,6 +52,8 @@ function allTheKingsMen(): LevelDef {
   const m = new Mason();
   const base = m.pillar("stone", 0, -1.5, 3, { size: 1.1, height: 0.7 });
   const top = m.tower("oak", 0, -1.5, 6, { y: base });
+  // A painter left his pot on a stepladder right in front of a guard.
+  m.paintPot(2.1, 2.95);
   const crews: CrewDef[] = [
     {
       id: "litter-a",
@@ -69,8 +73,9 @@ function allTheKingsMen(): LevelDef {
     title: "All the King's Men",
     verse: ["Then along came the King's men, two to a litter,", "and whenever he fell, they caught him. How bitter."],
     hint: "The stretcher crew will run to catch him. Time your shot while they're far away, or bowl them over first.",
-    ammo: { shot: 3, grape: 1 },
+    ammo: { shot: 4, grape: 1 },
     greatFall: 4,
+    mayhem: 625,
     humpty: perchAt(0, top, -1.5),
     pieces: m.pieces,
     crews,
@@ -91,8 +96,9 @@ function overTheWall(): LevelDef {
     title: "Over the Wall",
     verse: ["Humpty Dumpty hid behind a wall,", "so the Queen sent for something that doesn't aim at all."],
     hint: "Round shot can't clear this wall. Mortar shells go up and over, then burst: press 2.",
-    ammo: { shell: 2, shot: 2 },
+    ammo: { shell: 2, shot: 3 },
     greatFall: 4,
+    mayhem: 650,
     humpty: perchAt(0, top, -2.6),
     pieces: m.pieces,
     crews: [
@@ -126,8 +132,9 @@ function thePowderRoom(): LevelDef {
     title: "The Powder Room",
     verse: ["Humpty Dumpty built on a keg.", "Say what you like — he's a very brave egg."],
     hint: "Powder kegs go off when they're struck hard. One good blast can take the whole tower.",
-    ammo: { shot: 2 },
+    ammo: { shot: 3 },
     greatFall: 3.8,
+    mayhem: 600,
     humpty: perchAt(0, top, -1.4),
     pieces: m.pieces,
     crews: [
@@ -155,13 +162,16 @@ function allTheKingsHorses(): LevelDef {
   m.keg(-5, -7.6);
   m.keg(5, -7.6);
   m.keg(0.95, -2.55);
+  // A stage weight hangs over the cart road: push it and it swings like a wrecking ball.
+  m.sandbag(4.2, 1.2, -3.4);
   return {
     id: "all-the-kings-horses",
     title: "All the King's Horses",
     verse: ["All the King's horses came thundering near,", "with a cart full of straw and a very large ear."],
     hint: "The horse cart catches everything. Scatter it — grapeshot, or a keg as it passes — then knock Humpty off.",
-    ammo: { grape: 2, shot: 2 },
+    ammo: { grape: 2, shot: 3 },
     greatFall: 4.5,
+    mayhem: 650,
     humpty: perchAt(0, top, -1.6),
     pieces: m.pieces,
     crews: [
@@ -202,8 +212,9 @@ function chainOfCommand(): LevelDef {
     title: "Chain of Command",
     verse: ["Humpty Dumpty sat on a stick.", "The Queen brought a chain. It was ever so quick."],
     hint: "Only chain shot can cut down his maypole. But four stretcher crews stand guard: ring the dinner gong first, and they'll all go to lunch.",
-    ammo: { chain: 2, shot: 1 },
+    ammo: { chain: 2, shot: 2 },
     greatFall: 5,
+    mayhem: 700,
     humpty: perchAt(0, top, -1.8),
     pieces: m.pieces,
     crews: [guard("litter-d1", -1.6, -1.9, 0), guard("litter-d2", 1.6, -1.9, 0), guard("litter-d3", -2.3, -6.9, Math.PI / 2), guard("litter-d4", 2.3, -6.9, Math.PI / 2)],
@@ -229,8 +240,9 @@ function theKeep(): LevelDef {
     title: "The Keep",
     verse: ["All the King's horses and all the King's men", "built him a castle. Let's knock it down again."],
     hint: "Everything you've learned, all at once. There's more than one way in.",
-    ammo: { shot: 2, shell: 2, grape: 1, chain: 1, bomb: 1 },
+    ammo: { shot: 3, shell: 2, grape: 1, chain: 1, bomb: 1 },
     greatFall: 5,
+    mayhem: 700,
     humpty: perchAt(0, top, -2.2),
     pieces: m.pieces,
     crews: [
@@ -281,6 +293,7 @@ function theEncore(): LevelDef {
   m.canopy(0, y, -2.4);
   for (const x of [-2.2, -0.8, 0.8, 2.2]) m.hay(x, -5.6);
   for (const x of [-7.2, 7.2]) m.hay(x, -0.2);
+  m.sandbag(-3.4, 1.2, -3.3);
   return {
     id: "the-encore",
     title: "The Encore",
@@ -288,6 +301,7 @@ function theEncore(): LevelDef {
     hint: "He's under a royal canopy, so shells burst on the roof. Strip it away first, then make it the greatest fall of all.",
     ammo: { shot: 5, shell: 2, grape: 3, chain: 2, bomb: 2 },
     greatFall: 4.6,
+    mayhem: 1000,
     humpty: perchAt(0, y, -2.4),
     pieces: m.pieces,
     crews: [
@@ -334,8 +348,9 @@ function hangingByAThread(): LevelDef {
     title: "Hanging by a Thread",
     verse: ["Humpty Dumpty sat on a swing,", "held up by nothing but four bits of string."],
     hint: "Chain shot cuts rope. Cut the ropes on one side to tip him out, or all four to drop him.",
-    ammo: { chain: 2, shot: 2 },
+    ammo: { chain: 2, shot: 3 },
     greatFall: 4,
+    mayhem: 675,
     humpty: perchAt(seat.x, seat.y, seat.z),
     pieces: m.pieces,
     crews: [
@@ -368,8 +383,9 @@ function seeSawMargeryDaw(): LevelDef {
     title: "See-Saw Margery Daw",
     verse: ["See-saw, Margery Daw,", "drop the anvil and watch the egg soar."],
     hint: "Knock the anvil onto the high end of the see-saw. And mind the rat: grab the blunderbuss (6) when it creeps in.",
-    ammo: { shot: 3, grape: 1 },
+    ammo: { shot: 4, grape: 1 },
     greatFall: 3.2,
+    mayhem: 575,
     humpty: perchAt(bucket.x, bucket.y, bucket.z),
     pieces: m.pieces,
     crews: [
@@ -407,8 +423,9 @@ function theQueensBilliards(): LevelDef {
     title: "The Queen's Billiards",
     verse: ["Humpty Dumpty hid out of sight,", "so the Queen played billiards by candlelight."],
     hint: "The screen stops round shot, but the bronze bumpers bounce it. Bank your shot — and drag to look behind the screen first.",
-    ammo: { shot: 3 },
+    ammo: { shot: 4 },
     greatFall: 4.5,
+    mayhem: 625,
     humpty: perchAt(0, top, -3),
     pieces: m.pieces,
     crews: [],
@@ -427,13 +444,15 @@ function rememberRemember(): LevelDef {
   m.canopy(0, roof, z, { span: 1.3, height: 2, roof: 2.4 });
   // Area railings in front of the cellar door: flat shot can't get through them.
   m.railing(0, z + 2.4, 3.4);
+  m.paintPot(2.75, 0.15);
   return {
     id: "remember-remember",
     title: "Remember, Remember",
     verse: ["Remember, remember the fifth of November,", "gunpowder, treason, and one flying egg."],
     hint: "The parapet stops round shot and the canopy stops shells. But there's powder in the cellar: lob a fizzing bomb (5) over the railings to the cellar door.",
-    ammo: { bomb: 2, shot: 2 },
+    ammo: { bomb: 2, shot: 3 },
     greatFall: 7,
+    mayhem: 1350,
     humpty: perchAt(0, roof, z),
     pieces: m.pieces,
     crews: [

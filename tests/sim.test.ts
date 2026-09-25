@@ -15,6 +15,7 @@ function arena(build: (mason: Mason) => { x: number; y: number; z: number }, ext
     hint: "",
     ammo: { shot: 3 },
     greatFall: 3,
+    mayhem: 0,
     humpty,
     pieces: mason.pieces,
     crews: [],
@@ -344,4 +345,102 @@ test("a stone wall keeps a blast from setting off the powder behind it", async (
     assert.equal(kegs > 0, !walled, walled ? "the wall should stop the flash" : "an open keg should go up");
     game.destroy();
   }
+});
+
+test("mayhem is tallied until the crack and not a moment after", async () => {
+  const game = await Game.create(arena(() => perchAt(0, 3, 0)));
+  wake(game);
+  const events = await run(game, 3, (event) => event.type === "crack");
+  assert.ok(events.some((event) => event.type === "crack"));
+  const atCrack = game.mayhem.total;
+  assert.ok(atCrack >= 300, "the crack itself is worth something");
+  assert.equal(game.mayhem.entries.get("crack")?.count, 1);
+  await run(game, 3);
+  assert.equal(game.mayhem.total, atCrack, "debris after the crack earns nothing");
+  game.destroy();
+});
+
+test("each curio pays out once, however often it is struck", async () => {
+  const { CURIOS } = await import("../src/sim/curios.js");
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("stone", 0, -1, 4, 5), -1)));
+  const moon = CURIOS.find((curio) => curio.id === "moon")!;
+  for (let shot = 0; shot < 2; shot += 1) {
+    await stepUntilReady(game);
+    assert.ok(game.fire(moon.at));
+    await run(game, 3);
+  }
+  assert.equal(game.mayhem.entries.get("curio")?.count, 1);
+  game.destroy();
+});
+
+test("a paint pot knocked onto a guard's head blinds his crew for a while", async () => {
+  const { BUCKET_TIME } = await import("../src/sim/crew.js");
+  const level = arena((mason) => {
+    mason.paintPot(2.1, 2.95);
+    return perchAt(0, mason.wall("stone", 0, -1, 2, 5), -1);
+  }, { crews: [{ id: "guard", kind: "guard", home: { x: 2.4, y: 0, z: 2.44 }, yaw: 0 }] });
+  const game = await Game.create(level);
+  await stepUntilReady(game);
+  const pot = { ...game.bodies.find((body) => body.kind === "bucket")!.position };
+  assert.ok(game.fire(pot));
+  const events = await run(game, 2);
+  assert.ok(events.some((event) => event.type === "mayhem" && event.kind === "bucket"));
+  assert.ok(game.crewViews[0]!.bucket && game.crewViews[0]!.mode === "blind");
+  await run(game, BUCKET_TIME);
+  assert.ok(!game.crewViews[0]!.bucket, "the bucket comes off in the end");
+  game.destroy();
+});
+
+test("a sandbag swings when shot and only chain shot cuts its line", async () => {
+  const build = (ammo: LevelDef["ammo"]) => arena((mason) => {
+    mason.sandbag(3, 1.2, -2);
+    return perchAt(-3, mason.wall("stone", -3, -1, 2, 5), -1);
+  }, { ammo });
+  const shot = await Game.create(build({ shot: 1 }));
+  await stepUntilReady(shot);
+  const bag = { ...shot.bodies.find((body) => body.kind === "sandbag")!.position };
+  assert.ok(shot.fire(bag));
+  const shotEvents = await run(shot, 2);
+  assert.ok(!shotEvents.some((event) => event.type === "rope-cut"), "round shot must not cut the line");
+  const swung = shot.bodies.find((body) => body.kind === "sandbag")!.position;
+  assert.ok(Math.hypot(swung.x - bag.x, swung.z - bag.z) > 0.5, "the bag swings");
+  shot.destroy();
+  let cut = false;
+  for (const dy of [2, 4, 6]) {
+    const chain = await Game.create(build({ chain: 1 }));
+    await stepUntilReady(chain);
+    chain.select("chain");
+    chain.fire({ x: bag.x, y: bag.y + dy, z: bag.z });
+    cut ||= (await run(chain, 3)).some((event) => event.type === "rope-cut");
+    chain.destroy();
+    if (cut) break;
+  }
+  assert.ok(cut, "chain shot should cut the sandbag's line");
+});
+
+test("replaying the shot log reproduces the verse exactly", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const level = levelById("sat-on-a-wall")!;
+  const live = await Game.create(level);
+  await stepUntilReady(live);
+  for (let step = 0; step < 37; step += 1) live.step();
+  assert.ok(live.fire({ x: 0, y: 3.25, z: -1 }));
+  await run(live, 8);
+  assert.ok(live.cracked);
+  const replay = await Game.create(level);
+  let next = 0;
+  while (replay.steps < live.steps) {
+    while (live.log[next] && live.log[next]!.step === replay.steps) {
+      replay.select(live.log[next]!.ammo);
+      replay.fire(live.log[next]!.at);
+      next += 1;
+    }
+    replay.step();
+  }
+  assert.equal(replay.cracked, true);
+  assert.equal(replay.stats.fall, live.stats.fall);
+  assert.equal(replay.mayhem.total, live.mayhem.total);
+  assert.deepEqual(replay.humptyPosition, live.humptyPosition);
+  live.destroy();
+  replay.destroy();
 });

@@ -585,6 +585,32 @@ function buildGong(kit: Kit, root: pc.Entity, size: { x: number; y: number; z: n
   return root;
 }
 
+/** A tin paint pot, full to the brim with royal whitewash. */
+export function buildBucket(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }, upsideDown = false): pc.Entity {
+  const root = kit.group("paint-pot", parent);
+  const tin = kit.material("bucket-tin", new pc.Color(0.5, 0.52, 0.53), 0.7, 0.6);
+  const paint = kit.material("whitewash", new pc.Color(0.95, 0.95, 0.9), 0.5);
+  const flip = upsideDown ? -1 : 1;
+  kit.primitive("pail", "cylinder", root, V(), { x: size.x, y: size.y, z: size.z }, tin);
+  kit.primitive("pail-rim", "cylinder", root, V(0, (flip * size.y) / 2, 0), { x: size.x * 1.08, y: 0.03, z: size.z * 1.08 }, tin, pc.Vec3.ZERO, false);
+  kit.primitive("pail-paint", "cylinder", root, V(0, (flip * size.y) / 2 - flip * 0.03, 0), { x: size.x * 0.92, y: 0.02, z: size.z * 0.92 }, paint, pc.Vec3.ZERO, false);
+  kit.primitive("pail-drip", "box", root, V(size.x * 0.46, (flip * size.y) / 2 - flip * 0.12, 0), { x: 0.03, y: 0.24, z: 0.08 }, paint, pc.Vec3.ZERO, false);
+  const handle = kit.group("pail-handle", root, V(0, (flip * size.y) / 2, 0), V(90, 0, 0));
+  kit.meshEntity("pail-handle", kit.torus(size.x * 0.5, 0.012, 16, 4, 180), kit.material("iron", palette.iron, 0.55, 0.68), handle, false);
+  return root;
+}
+
+/** A canvas stage-weight: a fat sack of sand, tied at the neck. */
+export function buildSandbag(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const root = kit.group("sandbag", parent);
+  const canvas = kit.material("sandbag-canvas", new pc.Color(0.62, 0.52, 0.36), 0.08);
+  kit.primitive("sack", "sphere", root, V(0, -0.05, 0), { x: size.x * 1.05, y: size.y * 0.95, z: size.z * 1.05 }, canvas);
+  kit.primitive("neck", "cone", root, V(0, size.y / 2 - 0.02, 0), { x: size.x * 0.5, y: 0.22, z: size.z * 0.5 }, canvas, pc.Vec3.ZERO, false);
+  kit.primitive("tie", "cylinder", root, V(0, size.y / 2 - 0.06, 0), { x: size.x * 0.34, y: 0.05, z: size.z * 0.34 }, kit.material("rope", palette.rope, 0.12), pc.Vec3.ZERO, false);
+  kit.primitive("stencil", "box", root, V(0, -0.05, size.z * 0.5), { x: size.x * 0.5, y: 0.1, z: 0.01 }, kit.material("ink", palette.ink, 0.42), pc.Vec3.ZERO, false);
+  return root;
+}
+
 /** Immovable scenery in the playing area. */
 export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { x: number; y: number; z: number }): pc.Entity {
   const root = kit.group(`fixture-${look}`, parent);
@@ -642,6 +668,22 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
   }
   if (look === "maypole" || look === "stump") return buildMaypole(kit, root, y, look === "maypole");
   if (look === "gong") return buildGong(kit, root, size);
+  if (look === "ladder") {
+    // A painter's stepladder, spattered with whitewash.
+    const splash = new pc.Color(0.92, 0.92, 0.87);
+    const wood = palette.oakLight;
+    const parts: Box[] = [];
+    for (const side of [-1, 1]) {
+      parts.push({ center: [side * (x / 2 - 0.04), 0, z / 2 - 0.08], size: [0.07, y, 0.07], color: wood });
+      parts.push({ center: [side * (x / 2 - 0.04), -0.05, -z / 2 + 0.08], size: [0.07, y - 0.1, 0.07], color: wood });
+    }
+    for (let rung = 1; rung <= 4; rung += 1) parts.push({ center: [0, -y / 2 + (rung * y) / 5, z / 2 - 0.08], size: [x - 0.08, 0.05, 0.1], color: wood });
+    parts.push({ center: [0, y / 2 - 0.03, 0], size: [x, 0.06, z], color: wood });
+    parts.push({ center: [0.08, y / 2 - 0.25, z / 2 - 0.02], size: [0.06, 0.4, 0.02], color: splash });
+    parts.push({ center: [-0.15, -0.3, z / 2 - 0.02], size: [0.12, 0.08, 0.02], color: splash });
+    kit.meshEntity("ladder", kit.boxes(`ladder-${x.toFixed(2)}x${y.toFixed(2)}`, parts), kit.paintMaterial(0.2), root);
+    return root;
+  }
   if (look === "railing") {
     const iron = kit.material("railing-iron", new pc.Color(0.09, 0.1, 0.1), 0.5, 0.6);
     const bars = Math.max(3, Math.round(x / 0.22));

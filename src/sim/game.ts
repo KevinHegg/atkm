@@ -1,24 +1,28 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { AMMO, arcPoint, arcVelocity, solveLaunch } from "./ballistics.js";
-import { CREW_SPECS, callLunch, createCrewState, formation, slotWorld, steerCrew, type CrewState, type Threat } from "./crew.js";
+import { CREW_SPECS, callLunch, createCrewState, crownWithBucket, formation, slotWorld, steerCrew, type CrewState, type Threat } from "./crew.js";
 import { eggHullPoints } from "./egg.js";
 import {
+  BUCKET_SIZE,
   HAY_SIZE,
   HUMPTY_BASE,
   KEG_HALF_HEIGHT,
   KEG_RADIUS,
   MAYPOLE_CROWN,
   MAYPOLE_WIDTH,
+  SANDBAG_SIZE,
   SEESAW_FLOOR,
   TURNTABLE_SEAT,
   type FixtureDef,
   type LevelDef,
+  type SandbagDef,
   type SeesawDef,
   type SwingDef,
   type TurntableDef,
 } from "./level.js";
 import { CURIOS } from "./curios.js";
 import { add, closestOnSegment, distanceToSegment, rotate, segmentDistance, yAxisTo } from "./geometry.js";
+import { FALL_POINTS, MayhemTally, type MayhemKind } from "./mayhem.js";
 import { createRat, scareRat, stepRat, type RatState } from "./rat.js";
 import {
   distance,
@@ -133,8 +137,9 @@ export interface RatView {
 
 export interface Stars {
   cracked: boolean;
-  spare: boolean;
   great: boolean;
+  /** Enough mayhem before he cracked. */
+  mayhem: boolean;
   count: number;
 }
 
@@ -149,6 +154,8 @@ export interface CrewView {
   stride: number;
   toppled: number;
   slots: number[];
+  /** Somebody in this crew is wearing a bucket. */
+  bucket: boolean;
 }
 
 export interface AimPreview {
@@ -191,6 +198,12 @@ export class Game {
   won = false;
   resultAt: number | undefined;
   readonly stats = { shots: 0, bowled: 0, fall: 0, blocksMoved: 0, catches: 0 };
+  /** Everything the Queen has broken, up to the crack. */
+  readonly mayhem = new MayhemTally();
+  /** Every shot fired, by step, so a replay can fire them again at exactly the same moments. */
+  readonly log: Array<{ step: number; ammo: AmmoKind; at: Vec3 }> = [];
+  /** Fixed steps taken so far. */
+  steps = 0;
   humptyMood: HumptyMood = "calm";
   humptyAirborne = false;
   humptyDrop = 0;
@@ -230,7 +243,9 @@ export class Game {
   private swing: { seat: Entity; def: SwingDef } | undefined;
   private seesaw: { plank: Entity; def: SeesawDef; restAngle: number } | undefined;
   private readonly ropes: Array<{ joint: RAPIER.ImpulseJoint; seat: Entity; local: Vec3; top: Vec3; cut: boolean }> = [];
-  private readonly curios = new Map<number, { id: CurioId; at: Vec3; last: number }>();
+  private readonly curios = new Map<number, { id: CurioId; at: Vec3; last: number; scored: boolean }>();
+  /** Structural bodies already counted as toppled or scattered. */
+  private readonly toppled = new Set<number>();
   private rat: { state: RatState; entity: Entity } | undefined;
   private readonly startPositions = new Map<number, Vec3>();
 
@@ -253,6 +268,8 @@ export class Game {
       else if (piece.kind === "keg") this.addKeg(piece.pos);
       else if (piece.kind === "hay") this.addHay(piece.pos, piece.yaw);
       else if (piece.kind === "fixture") fixtures.push(this.addFixture(piece));
+      else if (piece.kind === "bucket") this.addBucket(piece.pos);
+      else if (piece.kind === "sandbag") this.addSandbag(piece);
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -286,6 +303,7 @@ export class Game {
       stride: crew.stride,
       toppled: crew.toppled,
       slots: crew.slots,
+      bucket: this.time < crew.bucketUntil,
     }));
   }
 
@@ -337,7 +355,7 @@ export class Game {
   }
 
   get ropeViews(): RopeView[] {
-    return this.ropes.filter((rope) => !rope.cut).map((rope) => ({ top: rope.top, bottom: this.ropeBottom(rope) }));
+    return this.ropes.filter((rope) => !rope.cut && !rope.seat.view.removed).map((rope) => ({ top: rope.top, bottom: this.ropeBottom(rope) }));
   }
 
   /** Spin rate of the clockwork turntable, for the music box. */
@@ -363,9 +381,9 @@ export class Game {
 
   stars(): Stars {
     const cracked = this.cracked;
-    const spare = cracked && this.ammoLeft > 0;
     const great = cracked && this.stats.fall >= this.level.greatFall;
-    return { cracked, spare, great, count: Number(cracked) + Number(spare) + Number(great) };
+    const mayhem = cracked && this.mayhem.total >= this.level.mayhem;
+    return { cracked, great, mayhem, count: Number(cracked) + Number(great) + Number(mayhem) };
   }
 
   drainEvents(): GameEvent[] {
@@ -455,6 +473,7 @@ export class Game {
   fire(target: Vec3): boolean {
     if (!this.canFire()) return false;
     const kind = this.selected;
+    this.log.push({ step: this.steps, ammo: kind, at: { ...target } });
     const preview = this.aim(target, kind);
     const { from, velocity } = preview;
     if (kind === "blunderbuss") {
@@ -577,14 +596,17 @@ export class Game {
     }
     this.world.step(this.queue);
     this.time += STEP;
+    this.steps += 1;
     this.handleCollisions();
     this.handleForces();
     this.handleExplosions();
     this.cutRopes();
     this.sweepChains();
+    this.dropBuckets();
     this.syncViews();
     this.updateHumpty();
     this.cleanUp();
+    if (Math.round(this.time / STEP) % 6 === 0) this.tallyWreckage();
     this.updatePhase();
   }
 
@@ -678,7 +700,7 @@ export class Game {
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
       body,
     );
-    this.curios.set(collider.handle, { id, at, last: -10 });
+    this.curios.set(collider.handle, { id, at, last: -10, scored: false });
   }
 
   private addFixture(def: FixtureDef): Entity {
@@ -811,6 +833,8 @@ export class Game {
     if (!this.ropes.length) return;
     const shots = [...this.entities.values()].filter((entity) => entity.ammo === "chain");
     for (const rope of this.ropes) {
+      // Whatever hung on it may have been swept off the stage entirely.
+      if (rope.seat.view.removed) rope.cut = true;
       if (rope.cut) continue;
       const bottom = this.ropeBottom(rope);
       let cutter: Entity | undefined;
@@ -827,6 +851,7 @@ export class Game {
       rope.seat.body.wakeUp();
       const p = cutter.body.translation();
       this.events.push({ type: "rope-cut", at: { x: p.x, y: p.y, z: p.z }, by: cutter.ammo ?? "shot" });
+      this.score("rope", { x: p.x, y: p.y, z: p.z });
     }
   }
 
@@ -904,6 +929,62 @@ export class Game {
     }
   }
 
+  private addBucket(pos: Vec3): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setCcdEnabled(true).setSleeping(true),
+    );
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cylinder(BUCKET_SIZE.height / 2, BUCKET_SIZE.radius).setMass(4).setFriction(0.6).setRestitution(0.1).setCollisionGroups(GROUPS.block),
+      body,
+    );
+    this.register("bucket", "paint", { x: BUCKET_SIZE.radius * 2, y: BUCKET_SIZE.height, z: BUCKET_SIZE.radius * 2 }, body, [collider]);
+  }
+
+  /** A flying paint pot that passes over a man's head ends up on it. */
+  private dropBuckets(): void {
+    const crowned: Array<{ bucket: Entity; crew: CrewState }> = [];
+    for (const bucket of this.entities.values()) {
+      if (bucket.view.kind !== "bucket" || bucket.body.isSleeping() || lengthOf(bucket.body.linvel()) < 1) continue;
+      const p = bucket.view.position;
+      for (const man of this.entities.values()) {
+        const crew = man.crew;
+        if (man.role !== "man" || !crew || crew.mode === "lunch" || this.time < crew.bucketUntil) continue;
+        const head = man.view.position;
+        if (Math.hypot(p.x - head.x, p.z - head.z) < 0.55 && p.y > head.y + 0.35 && p.y < head.y + 1.6) {
+          crowned.push({ bucket, crew });
+          break;
+        }
+      }
+    }
+    for (const { bucket, crew } of crowned) {
+      if (bucket.view.removed) continue;
+      crownWithBucket(crew, this.time);
+      this.score("bucket", { ...bucket.view.position });
+      this.remove(bucket);
+    }
+  }
+
+  private addSandbag(def: SandbagDef): void {
+    const anchor = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, def.top, def.pos.z));
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(def.pos.x, def.pos.y, def.pos.z)
+        .setLinearDamping(0.02)
+        .setAngularDamping(0.4)
+        .setCcdEnabled(true)
+        .setSleeping(true),
+    );
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cylinder(SANDBAG_SIZE.height / 2, SANDBAG_SIZE.radius).setMass(110).setFriction(0.7).setRestitution(0.05).setCollisionGroups(GROUPS.block),
+      body,
+    );
+    const bag = this.register("sandbag", "canvas", { x: SANDBAG_SIZE.radius * 2, y: SANDBAG_SIZE.height, z: SANDBAG_SIZE.radius * 2 }, body, [collider]);
+    const local = { x: 0, y: SANDBAG_SIZE.height / 2, z: 0 };
+    const top = { x: def.pos.x, y: def.top, z: def.pos.z };
+    const joint = this.world.createImpulseJoint(RAPIER.JointData.rope(def.top - def.pos.y - local.y, { x: 0, y: 0, z: 0 }, local), anchor, body, true);
+    this.ropes.push({ joint, seat: bag, local, top, cut: false });
+  }
+
   /** A maypole's shaft and crown, on a body centred at half its height. */
   private maypoleColliders(body: RAPIER.RigidBody, height: number): RAPIER.Collider[] {
     const shaft = height - MAYPOLE_CROWN.height;
@@ -933,6 +1014,7 @@ export class Game {
     );
     const loose = this.register("block", "maypole", { x: MAYPOLE_WIDTH, y: top - cut - 0.004, z: MAYPOLE_WIDTH }, body, this.maypoleColliders(body, top - cut - 0.004), { structural: true });
     this.events.push({ type: "cut", at: { x, y: cut, z } });
+    this.score("maypole", { x, y: cut, z });
     return loose;
   }
 
@@ -981,6 +1063,7 @@ export class Game {
   private seesawBucket(): Vec3 | undefined {
     const seesaw = this.seesaw;
     if (!seesaw) return undefined;
+    if (seesaw.plank.view.removed) return undefined;
     const r = seesaw.plank.body.rotation();
     const angle = 2 * Math.atan2(r.z, r.w);
     if (Math.abs(angle - seesaw.restAngle) > 0.06 || lengthOf(seesaw.plank.body.angvel()) > 0.1) return undefined;
@@ -1045,6 +1128,7 @@ export class Game {
     const rat = this.rat;
     if (!rat || !scareRat(rat.state, this.time)) return;
     this.events.push({ type: "rat", action: "scared", at: { x: rat.state.x, y: 0.4, z: rat.state.z } });
+    this.score("rat", { x: rat.state.x, y: 1, z: rat.state.z });
   }
 
   private addBlock(material: string, pos: Vec3, size: Vec3, yaw: number): Entity {
@@ -1220,6 +1304,32 @@ export class Game {
     crew.threatSince = -1;
     this.stats.bowled += 1;
     this.events.push({ type: "bowled", at: { ...at }, crewId: crew.id });
+    this.score("bowled", { x: at.x, y: 1.6, z: at.z });
+  }
+
+  /** Put something on the King's bill, unless the curtain is already down. */
+  private score(kind: MayhemKind, at: Vec3, points?: number): void {
+    if (this.cracked && kind !== "crack") return;
+    const earned = this.mayhem.add(kind, points);
+    this.events.push({ type: "mayhem", kind, points: earned, at: { ...at } });
+  }
+
+  /** Count masonry that has come down and hay that has been scattered, once each. */
+  private tallyWreckage(): void {
+    for (const [id, start] of this.startPositions) {
+      if (this.toppled.has(id)) continue;
+      const entity = this.entities.get(id);
+      if (!entity) continue;
+      const p = entity.view.position;
+      const r = entity.view.rotation;
+      const moved = distance(p, start);
+      const upright = 1 - 2 * (r.x * r.x + r.z * r.z);
+      const kind = entity.view.kind;
+      if (kind === "hay" ? moved > 0.8 : kind === "block" && (moved > 0.5 || upright < 0.82)) {
+        this.toppled.add(id);
+        this.score(kind === "hay" ? "hay" : "masonry", { ...p });
+      }
+    }
   }
 
   // Rapier invokes these callbacks while it holds borrows on the world, so they only
@@ -1253,6 +1363,11 @@ export class Game {
         if (curio && this.time - curio.last > 1.2) {
           curio.last = this.time;
           this.events.push({ type: "curio", id: curio.id, at: curio.at });
+          // Each piece of scenery pays out once: explore, don't farm.
+          if (!curio.scored) {
+            curio.scored = true;
+            this.score(curio.id === "king" ? "royal" : curio.id === "duke" ? "duke" : "curio", curio.at);
+          }
           continue;
         }
         const owner = this.byCollider.get(other);
@@ -1261,6 +1376,7 @@ export class Game {
           const v = shot.lastVelocity ?? shot.body.linvel();
           const p = shot.body.translation();
           this.events.push({ type: "ricochet", at: { x: p.x, y: p.y, z: p.z }, look: owner.look, strength: Math.min(1, lengthOf(v) / 20) });
+          if (shot.ammo !== "blunderbuss") this.score("ricochet", { x: p.x, y: p.y, z: p.z });
         } else if (owner.cue && shot.ammo !== "blunderbuss") {
           this.callCue(owner, shot);
         } else if (owner.view.kind === "turntable") {
@@ -1280,6 +1396,7 @@ export class Game {
     if (cue === "lunch") for (const crew of this.crews) callLunch(crew, this.time);
     const p = shot.body.translation();
     this.events.push({ type: "cue", cue, at: { x: p.x, y: p.y, z: p.z } });
+    this.score("gong", { x: p.x, y: p.y, z: p.z });
   }
 
   private handleForces(): void {
@@ -1357,6 +1474,8 @@ export class Game {
       const at = entity.body.translation();
       if (entity.view.kind === "keg") {
         this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.6, power: 900, keg: true });
+        this.score("keg", { x: at.x, y: at.y, z: at.z });
+        this.startPositions.delete(entity.view.id);
         this.remove(entity);
       } else if (entity.view.kind === "bomb") {
         this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.4, power: 820, keg: false });
@@ -1438,6 +1557,7 @@ export class Game {
     this.stats.fall = Math.round(fall * 10) / 10;
     this.humptyMood = "cracked";
     this.events.push({ type: "crack", at, fall: this.stats.fall, speed });
+    this.score("crack", at, 300 + Math.round(this.stats.fall * FALL_POINTS));
     const rotation = humpty.body.rotation();
     this.remove(humpty);
     this.humpty = undefined;
@@ -1653,7 +1773,7 @@ export class Game {
     let seat: Vec3 | undefined;
     if (mode === "turntable") seat = this.turntableSeat();
     else if (mode === "seesaw") seat = this.seesawBucket();
-    else if (mode === "swing" && this.swing) {
+    else if (mode === "swing" && this.swing && !this.swing.seat.view.removed) {
       const intact = this.ropes.filter((rope) => !rope.cut).length;
       const r = this.swing.seat.body.rotation();
       const level = Math.abs(r.w) > Math.cos(0.08);

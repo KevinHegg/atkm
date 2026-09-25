@@ -296,6 +296,37 @@ export class TheatreAudio {
     this.burst({ duration: 0.06, volume: 0.05 + urgency * 0.05, filter: "highpass", frequency: 4200 + Math.random() * 1500 });
   }
 
+  /** Old King Cole's fiddlers three strike up a jig. */
+  fiddle(): void {
+    if (!this.throttle("fiddle", 2500)) return;
+    const jig = [67, 71, 74, 71, 67, 71, 74, 79, 78, 74, 76, 72, 71, 69, 67, 67];
+    jig.forEach((note, index) => {
+      const frequency = 440 * Math.pow(2, (note - 69) / 12);
+      for (const detune of [0.997, 1, 1.004]) this.tone(frequency * detune, 0.17, 0.035, "sawtooth", { delay: 0.25 + index * 0.14, attack: 0.03 });
+    });
+  }
+
+  /** The Grand Old Duke's drummer, and a very small cry of "About turn!". */
+  drumroll(): void {
+    if (!this.throttle("drum", 1500)) return;
+    for (let index = 0; index < 14; index += 1) this.burst({ duration: 0.05, volume: 0.12 + index * 0.012, filter: "bandpass", frequency: 1600, q: 1.2, delay: index * 0.045 });
+    this.burst({ duration: 0.18, volume: 0.35, filter: "lowpass", frequency: 400, delay: 0.66 });
+    this.tone(520, 0.2, 0.08, "square", { to: 700, delay: 0.8 });
+  }
+
+  /** A paint pot comes down over somebody's head. */
+  clang(): void {
+    this.tone(880, 0.6, 0.18, "triangle", { to: 820 });
+    this.tone(1320, 0.4, 0.08, "sine", { to: 1200 });
+    this.burst({ duration: 0.2, volume: 0.25, filter: "lowpass", frequency: 900, delay: 0.05 });
+  }
+
+  /** Mayhem points ticking up: a little coin-counter blip. */
+  tally(size: number): void {
+    if (!this.throttle("tally", 90)) return;
+    this.tone(1200 + Math.min(600, size * 4), 0.06, 0.04, "square", { to: 1800 });
+  }
+
   /** The dinner gong: a long bronze shimmer with inharmonic partials. */
   gong(): void {
     if (!this.throttle("gong", 600)) return;
@@ -405,9 +436,9 @@ export class TheatreAudio {
   }
 
   /** Nonsense mumble for lines without a recording, like a puppet talking. */
-  mumble(speaker: "humpty" | "queen", text: string): void {
+  mumble(speaker: "humpty" | "queen" | "king", text: string): void {
     const syllables = Math.min(10, Math.max(2, Math.round(text.length / 7)));
-    const base = speaker === "queen" ? 190 : 150;
+    const base = speaker === "queen" ? 190 : speaker === "king" ? 105 : 150;
     for (let index = 0; index < syllables; index += 1) {
       const pitch = base * (0.85 + Math.random() * 0.4);
       this.tone(pitch, 0.09, 0.07, speaker === "queen" ? "sawtooth" : "triangle", { to: pitch * (0.8 + Math.random() * 0.4), delay: index * 0.11, attack: 0.02 });

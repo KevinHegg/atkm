@@ -19,6 +19,8 @@
       <div id="plumb" hidden aria-hidden="true"><i class="line"></i><i class="great"><em>great fall</em></i><span><b>0.0</b> m to the boards</span></div>
       <div id="ring-tag" hidden>The Court Astrologer's mark</div>
       <div id="fuse-tags" aria-hidden="true"></div>
+      <div id="popups" aria-hidden="true"></div>
+      <div id="replay-banner" hidden><span>Replay</span><button type="button" id="replay-skip">Skip</button></div>
 
       <header id="hud-top" hidden>
         <div class="verse-tag">
@@ -28,8 +30,8 @@
         <div class="hud-notes">
           <ol id="objectives" aria-label="Stars for this verse">
             <li data-star="cracked"><i></i><span>Crack him</span></li>
-            <li data-star="spare"><i></i><span>A shot to spare</span></li>
             <li data-star="great" title="Measured from where he falls from to where he lands"><i></i><span>A fall of <b id="great-fall">3</b> m <em id="height-now"></em></span></li>
+            <li data-star="mayhem" title="Everything you break, bowl, ring or startle before he cracks"><i></i><span>Mayhem <b id="mayhem-now">0</b> / <b id="mayhem-target">500</b></span></li>
           </ol>
           <p id="hint"></p>
           <p id="status" hidden></p>
@@ -89,14 +91,27 @@
       </section>
 
       <section id="result-screen" class="screen" hidden>
-        <div class="playbill">
+        <div class="playbill result">
           <p class="kicker" id="result-kicker">Verse I</p>
           <h2 id="result-title">Humpty had a great fall</h2>
           <div id="result-stars" aria-label="Stars"></div>
-          <p class="couplet" id="result-line"></p>
-          <dl id="result-stats"></dl>
+          <div class="result-body">
+            <article class="newspaper" aria-label="The morning papers">
+              <header><span id="paper-name">The Nursery Times</span><small id="paper-date"></small></header>
+              <h3 id="paper-headline"></h3>
+              <p id="paper-body"></p>
+              <p id="paper-critic"></p>
+            </article>
+            <section class="bill" aria-label="The King's bill of damages">
+              <h4>The King's bill of damages</h4>
+              <ol id="bill-lines"></ol>
+              <p class="bill-total"><span>Mayhem</span><b id="bill-total">0</b></p>
+              <p id="bill-best"></p>
+            </section>
+          </div>
           <div class="actions">
             <button type="button" id="next-button" class="primary">Next verse</button>
+            <button type="button" id="replay-button">Replay</button>
             <button type="button" id="retry-button">Try again</button>
             <button type="button" id="menu-button">Verses</button>
           </div>

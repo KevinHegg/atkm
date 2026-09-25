@@ -1,10 +1,12 @@
 import { ChevronsLeft, ChevronsRight, createIcons, RotateCcw, Scan, ScrollText, Volume2, VolumeX } from "lucide";
 import { TheatreAudio } from "./audio.js";
-import { CURIO_LINES, LINES, type Cue } from "./lines.js";
+import { CURIO_LINES, LINES, type Cue, type Speaker } from "./lines.js";
+import { review } from "./review.js";
 import { StageView } from "./render/view.js";
 import { AMMO } from "./sim/ballistics.js";
 import { BOMB_FUSE, Game, HUMPTY_REST, STEP } from "./sim/game.js";
 import { HUMPTY_BASE } from "./sim/level.js";
+import { MAYHEM, type MayhemKind } from "./sim/mayhem.js";
 import { LEVELS } from "./sim/levels.js";
 import parSolutions from "./sim/par.json" with { type: "json" };
 import type { PlannedShot } from "./sim/autoplay.js";
@@ -17,10 +19,12 @@ const STOCK_ORDER: StockKind[] = ["shot", "shell", "grape", "chain", "bomb"];
 const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 const STORAGE_KEY = "great-fall:progress:v1";
 
-type Screen = "title" | "levels" | "play" | "result";
+type Screen = "title" | "levels" | "play" | "result" | "replay";
 
 interface Progress {
   stars: Record<string, number>;
+  /** Best mayhem per verse. */
+  best: Record<string, number>;
   muted: boolean;
 }
 
@@ -35,12 +39,12 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, muted: Boolean(parsed.muted) };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted) };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
   }
-  return { stars: {}, muted: false };
+  return { stars: {}, best: {}, muted: false };
 }
 
 function saveProgress(): void {
@@ -100,7 +104,7 @@ let launchCued = false;
 
 interface Bubble {
   element: HTMLElement;
-  speaker: "humpty" | "queen";
+  speaker: Speaker;
   until: number;
 }
 
@@ -108,17 +112,17 @@ const bubbles: Bubble[] = [];
 const lastLine = new Map<Cue, string>();
 const cueCooldown = new Map<Cue, number>();
 
-function say(speaker: "humpty" | "queen", text: string, seconds = 3.4): void {
+function say(speaker: Speaker, text: string, seconds = 3.4): void {
   for (const bubble of bubbles.filter((item) => item.speaker === speaker)) dismissBubble(bubble);
   const element = document.createElement("div");
   element.className = `bubble ${speaker}`;
   const name = document.createElement("b");
-  name.textContent = speaker === "queen" ? "The Queen" : "Humpty";
+  name.textContent = speaker === "queen" ? "The Queen" : speaker === "king" ? "Old King Cole" : "Humpty";
   element.append(name, document.createTextNode(text));
   $("#bubbles").append(element);
   bubbles.push({ element, speaker, until: performance.now() + seconds * 1000 });
   if (!audio.voice(text)) audio.mumble(speaker, text);
-  view.talk(speaker, Math.min(seconds, 0.4 + text.length * 0.05));
+  if (speaker !== "king") view.talk(speaker, Math.min(seconds, 0.4 + text.length * 0.05));
   positionBubbles();
 }
 
@@ -137,10 +141,14 @@ function later(seconds: number, action: () => void): void {
   }, seconds * 1000);
 }
 
+/** The best mayhem before this attempt, so the result can say whether it was beaten. */
+let previousBest = 0;
+
 function recordStars(current: Game): void {
   if (!current.cracked) return;
   const id = current.level.id;
   progress.stars[id] = Math.max(progress.stars[id] ?? 0, current.stars().count);
+  progress.best[id] = Math.max(progress.best[id] ?? 0, current.mayhem.total);
   saveProgress();
 }
 
@@ -158,12 +166,14 @@ function cue(kind: Cue, chance = 1, cooldown = 4): void {
 
 function positionBubbles(): void {
   const now = performance.now();
+  // Keep speech clear of the verse title and caption at the top.
+  const top = bubbles.length ? $("#hud-top").getBoundingClientRect().bottom + 8 : 0;
   for (const bubble of [...bubbles]) {
     if (now > bubble.until) {
       dismissBubble(bubble);
       continue;
     }
-    const anchor = bubble.speaker === "queen" ? view.queenHead() : view.humptyHead();
+    const anchor = bubble.speaker === "queen" ? view.queenHead() : bubble.speaker === "king" ? view.kingHead() : view.humptyHead();
     if (!anchor) {
       dismissBubble(bubble);
       continue;
@@ -173,7 +183,7 @@ function positionBubbles(): void {
     const width = bubble.element.offsetWidth;
     const height = bubble.element.offsetHeight;
     const x = Math.min(window.innerWidth - width - 8, Math.max(8, point.x - 30));
-    const y = Math.max(70, point.y - height - 14);
+    const y = Math.max(top, point.y - height - 14);
     bubble.element.style.transform = `translate(${x}px, ${y}px)`;
   }
 }
@@ -203,7 +213,8 @@ function show(next: Screen): void {
   $("#title-screen").hidden = next !== "title";
   $("#levels-screen").hidden = next !== "levels";
   $("#result-screen").hidden = next !== "result";
-  const playing = next === "play" || next === "result";
+  $("#replay-banner").hidden = next !== "replay";
+  const playing = next === "play" || next === "result" || next === "replay";
   $("#hud-top").hidden = !playing;
   $("#hud-bottom").hidden = next !== "play";
   if (next !== "play") $("#fall-meter").hidden = true;
@@ -272,6 +283,10 @@ async function startLevel(index: number): Promise<void> {
     $("#hud-number").textContent = `Verse ${NUMERALS[index]}`;
     $("#hud-title").textContent = level.title;
     $("#great-fall").textContent = String(level.greatFall);
+    $("#mayhem-target").textContent = level.mayhem.toLocaleString("en-GB");
+    $("#mayhem-now").textContent = "0";
+    previousBest = progress.best[level.id] ?? 0;
+    $("#popups").replaceChildren();
     for (const item of document.querySelectorAll<HTMLElement>("#objectives li")) item.classList.remove("lit", "lost");
     $("#verse-number").textContent = `Verse ${NUMERALS[index]}`;
     $("#verse-title").textContent = level.title;
@@ -302,6 +317,72 @@ async function startLevel(index: number): Promise<void> {
   }
 }
 
+// ------------------------------------------------------------------ replay
+
+interface ReplayRun {
+  original: Game;
+  shots: Game["log"];
+  next: number;
+  lastStep: number;
+}
+
+let replaying: ReplayRun | undefined;
+
+/** Fire the recorded shots that fall due on this step. The simulation is deterministic, so they land the same. */
+function fireDue(target: Game, run: ReplayRun): void {
+  while (run.next < run.shots.length && run.shots[run.next]!.step <= target.steps) {
+    const shot = run.shots[run.next]!;
+    run.next += 1;
+    target.select(shot.ammo);
+    target.fire(shot.at);
+  }
+}
+
+/** The instant replay: re-run the verse quietly up to the final shot, then show it again, slowly. */
+async function startReplay(): Promise<void> {
+  const original = game;
+  if (!original?.cracked || !original.log.length || loading || replaying) return;
+  loading = true;
+  try {
+    const shadow = await Game.create(original.level);
+    const shots = original.log;
+    const lastStep = shots[shots.length - 1]!.step;
+    const run: ReplayRun = { original, shots, next: 0, lastStep };
+    // Start just before the last real shot (a blunderbuss blast may have come after it).
+    const finale = [...shots].reverse().find((shot) => shot.ammo !== "blunderbuss") ?? shots[shots.length - 1]!;
+    const from = Math.max(0, finale.step - 75);
+    while (shadow.steps < from) {
+      fireDue(shadow, run);
+      shadow.step();
+    }
+    shadow.drainEvents();
+    replaying = run;
+    game = shadow;
+    accumulator = 0;
+    timeScale = 0.6;
+    hitStop = 0;
+    crackedAt = -1;
+    for (const bubble of [...bubbles]) dismissBubble(bubble);
+    $("#popups").replaceChildren();
+    view.bind(shadow);
+    view.setCameraMode("replay");
+    show("replay");
+  } finally {
+    loading = false;
+  }
+}
+
+function endReplay(): void {
+  const run = replaying;
+  if (!run) return;
+  replaying = undefined;
+  game?.destroy();
+  game = run.original;
+  view.bind(run.original);
+  view.setCameraMode("play");
+  show("result");
+}
+
 function closeVerse(): void {
   if (!verseOpen) return;
   verseOpen = false;
@@ -322,20 +403,41 @@ function showResult(): void {
   recordStars(current);
   $("#result-kicker").textContent = `Verse ${NUMERALS[levelIndex]} · ${level.title}`;
   $("#result-title").textContent = won ? "Humpty had a great fall" : "All the King's men win";
-  $("#result-line").textContent = won
-    ? stars.count === 3
-      ? "…and all the King's horses and all the King's men couldn't put Humpty together again."
-      : "Cracked! Though a connoisseur might ask for a longer drop, or a shot to spare."
-    : "He's still up there, smug as an egg. Try again — the Court Astrologer has a suggestion.";
   $("#result-stars").innerHTML = [0, 1, 2].map((star) => `<i class="star${star < stars.count ? " lit" : ""}"></i>`).join("");
-  const stats: Array<[string, string]> = [
-    ["Fall", won ? `${current.stats.fall.toFixed(1)} m<small>${stars.great ? "a great fall" : `${level.greatFall} m for a great fall`}</small>` : "—"],
-    ["Shots", `${current.stats.shots}`],
-    ["Men bowled", `${current.stats.bowled}`],
-  ];
-  $("#result-stats").innerHTML = stats.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join("");
+  const notice = review({
+    won,
+    fall: current.stats.fall,
+    greatFall: level.greatFall,
+    stars: stars.count,
+    mayhem: current.mayhem.total,
+    tally: current.mayhem.entries,
+    shots: current.stats.shots,
+    title: level.title,
+  });
+  $("#paper-name").textContent = notice.paper;
+  $("#paper-date").textContent = `Verse ${NUMERALS[levelIndex]} · price one penny`;
+  $("#paper-headline").textContent = notice.headline;
+  $("#paper-body").textContent = notice.body;
+  $("#paper-critic").textContent = notice.critic;
+  const lines = current.mayhem.lines();
+  $("#bill-lines").innerHTML = lines.length
+    ? lines
+      .map((line) => {
+        const detail = line.kind === "crack" ? `${current.stats.fall.toFixed(1)} m fall` : line.count > 1 ? `×${line.count}` : "";
+        return `<li><span>${line.bill}${detail ? ` <em>${detail}</em>` : ""}</span><b>${line.points.toLocaleString("en-GB")}</b></li>`;
+      })
+      .join("")
+    : `<li class="none"><span>Nothing broken. Not even the egg.</span><b>0</b></li>`;
+  $("#bill-total").textContent = current.mayhem.total.toLocaleString("en-GB");
+  const best = progress.best[level.id] ?? 0;
+  $("#bill-best").textContent = !won
+    ? `Mayhem only counts once he cracks. ${level.mayhem.toLocaleString("en-GB")} for the mayhem star.`
+    : current.mayhem.total > previousBest
+      ? `A new record for this verse!${stars.mayhem ? "" : ` ${level.mayhem.toLocaleString("en-GB")} for the mayhem star.`}`
+      : `Best so far: ${best.toLocaleString("en-GB")}.${stars.mayhem ? "" : ` ${level.mayhem.toLocaleString("en-GB")} for the mayhem star.`}`;
   const hasNext = levelIndex + 1 < LEVELS.length;
   $("#next-button").hidden = !won || !hasNext;
+  $("#replay-button").hidden = !won || current.log.length === 0;
   $("#retry-button").classList.toggle("primary", !won || !hasNext);
   show("result");
   if (won) audio.fanfare();
@@ -388,6 +490,7 @@ function renderTray(): void {
     });
     tray.append(button);
   });
+  tray.classList.toggle("crowded", tray.children.length >= 4);
 }
 
 function selectAmmo(kind: AmmoKind): void {
@@ -409,8 +512,44 @@ function updateObjectives(): void {
   };
   const over = current.phase === "won" || current.phase === "lost";
   set("cracked", stars.cracked, current.phase === "lost");
-  set("spare", stars.spare, over && !stars.spare);
   set("great", stars.great, over && !stars.great);
+  set("mayhem", stars.mayhem, over && !stars.mayhem);
+  const shown = $("#mayhem-now");
+  const total = current.mayhem.total.toLocaleString("en-GB");
+  if (shown.textContent !== total) shown.textContent = total;
+  document.querySelector("#objectives [data-star=\"mayhem\"]")?.classList.toggle("enough", current.mayhem.total >= current.level.mayhem);
+}
+
+/** Points float up from wherever the mayhem happened. Rubble is counted in one pop-up, not twenty. */
+const openPopups = new Map<MayhemKind, { element: HTMLElement; points: number; count: number; until: number; at: Vec3 }>();
+
+function popup(kind: MayhemKind, points: number, at: Vec3): void {
+  const now = performance.now();
+  const open = openPopups.get(kind);
+  if (open && now < open.until && (kind === "masonry" || kind === "hay" || kind === "bowled" || kind === "keg")) {
+    open.points += points;
+    open.count += 1;
+    open.element.querySelector("b")!.textContent = `+${open.points}`;
+    open.element.querySelector("span")!.textContent = open.count > 1 ? `${MAYHEM[kind].shout} ×${open.count}` : MAYHEM[kind].shout;
+    return;
+  }
+  const host = $("#popups");
+  if (host.children.length > 7) host.firstElementChild?.remove();
+  const element = document.createElement("div");
+  element.className = `popup${kind === "crack" ? " big" : ""}`;
+  element.innerHTML = `<b>+${points}</b><span>${MAYHEM[kind].shout}</span>`;
+  host.append(element);
+  const entry = { element, points, count: 1, until: now + 450, at: { ...at } };
+  openPopups.set(kind, entry);
+  placePopup(entry);
+  window.setTimeout(() => element.remove(), 1500);
+}
+
+function placePopup(entry: { element: HTMLElement; at: Vec3 }): void {
+  const point = view.project({ x: entry.at.x, y: entry.at.y + 0.8, z: entry.at.z });
+  entry.element.hidden = !point.visible;
+  entry.element.style.left = `${Math.min(window.innerWidth - 90, Math.max(10, point.x))}px`;
+  entry.element.style.top = `${Math.max(90, point.y)}px`;
 }
 
 function updateFallMeter(): void {
@@ -729,6 +868,14 @@ $("#next-button").addEventListener("click", () => {
   audio.click();
   void startLevel(Math.min(levelIndex + 1, LEVELS.length - 1));
 });
+$("#replay-button").addEventListener("click", () => {
+  audio.click();
+  void startReplay();
+});
+$("#replay-skip").addEventListener("click", () => {
+  audio.click();
+  endReplay();
+});
 $("#retry-button").addEventListener("click", () => {
   audio.click();
   void startLevel(levelIndex);
@@ -772,12 +919,14 @@ function handle(event: GameEvent): void {
         const great = event.fall >= current.level.greatFall;
         toast("Cracked!", false, great ? `A ${event.fall.toFixed(1)} m great fall` : undefined);
         later(0.7, () => cue("crack", 1, 0));
+        later(2, () => cue("kingSulk", 0.6, 0));
       }
       break;
     case "caught":
       if (!live) break;
       audio.boing();
       audio.aww();
+      later(3.4, () => cue("kingCheer", 0.35, 15));
       toast(event.by === "hay" ? "Saved by the hay" : event.by === "ground" ? "Still in one piece" : "Caught!", true);
       later(0.3, () => cue("caught", 1, 0));
       later(2.2, () => cue("caughtQueen", 0.8, 0));
@@ -790,6 +939,7 @@ function handle(event: GameEvent): void {
       audio.bowled();
       if (live) audio.laugh();
       if (live) cue("bowled", 0.5, 6);
+      if (live) later(1.2, () => cue("kingLaugh", 0.3, 14));
       break;
     case "airborne":
       audio.whoosh();
@@ -813,6 +963,15 @@ function handle(event: GameEvent): void {
       break;
     case "curio":
       playCurio(event.id);
+      break;
+    case "mayhem":
+      popup(event.kind, event.points, event.at);
+      audio.tally(event.points);
+      if (live && event.kind === "bucket") {
+        audio.clang();
+        audio.laugh();
+        later(0.5, () => cue("bucket", 1, 6));
+      }
       break;
     case "cue":
       audio.gong();
@@ -858,7 +1017,8 @@ function handle(event: GameEvent): void {
       break;
     case "result":
       if (live) {
-        resultTimer = event.won ? 0.6 : 1.4;
+        // Leave time to see the stagehand come on with his mop.
+        resultTimer = event.won ? 1.6 : 1.4;
         if (!event.won) {
           cue("lose", 1, 0);
           losses.set(current.level.id, (losses.get(current.level.id) ?? 0) + 1);
@@ -871,6 +1031,8 @@ function handle(event: GameEvent): void {
 }
 
 const CURIO_SOUNDS: Record<CurioId, () => void> = {
+  king: () => audio.fiddle(),
+  duke: () => audio.drumroll(),
   cow: () => audio.moo(),
   moon: () => audio.wink(),
   "jack-and-jill": () => audio.tumble(),
@@ -882,8 +1044,13 @@ const CURIO_SOUNDS: Record<CurioId, () => void> = {
 function playCurio(id: CurioId): void {
   CURIO_SOUNDS[id]();
   audio.laugh();
+  if (screen !== "play") return;
+  if (id === "king") {
+    cue("kingOutrage", 1, 4);
+    return;
+  }
   const line = CURIO_LINES[id];
-  if (line && screen === "play") later(0.8, () => say(line.speaker, line.line));
+  if (line) later(0.8, () => say(line.speaker, line.line));
 }
 
 /** Stage business that runs continuously: the music box and a scurrying rat. */
@@ -967,6 +1134,8 @@ function tick(realDt: number): void {
     let target = 1;
     if (current.humptyAirborne && current.humptyDrop > 1.2) target = 0.42;
     if (crackedAt >= 0 && current.time - crackedAt < 0.8) target = 0.35;
+    // The replay runs in slow motion throughout.
+    if (screen === "replay") target *= 0.6;
     timeScale += (target - timeScale) * Math.min(1, realDt * 7);
     scale = timeScale;
   }
@@ -975,6 +1144,7 @@ function tick(realDt: number): void {
     accumulator += realDt * scale;
     let steps = 0;
     while (accumulator >= STEP && steps < 4) {
+      if (replaying) fireDue(current, replaying);
       current.step();
       accumulator -= STEP;
       steps += 1;
@@ -995,8 +1165,12 @@ function tick(realDt: number): void {
   view.frame(realDt * scale, realDt);
   positionBubbles();
   updateFallMeter();
+  if (screen === "replay" && replaying) {
+    const late = current.steps > replaying.lastStep + 60 * 14;
+    if ((current.cracked && current.time - crackedAt > 2.4) || late) endReplay();
+  }
+  if (screen === "play" || screen === "replay") updateObjectives();
   if (screen === "play") {
-    updateObjectives();
     const fireButton = $<HTMLButtonElement>("#fire-button");
     fireButton.disabled = !current.canFire() || !aimTarget;
     const selected = document.querySelector<HTMLElement>(".ammo.selected");

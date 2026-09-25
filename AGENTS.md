@@ -21,6 +21,13 @@ Core promises:
   keg keep the keg from going off (the blast still pushes things).
 - Stage cues (the dinner gong) are fixtures any stock shot can strike; lunch lasts
   `LUNCH_BREAK` seconds and nothing, not even a falling egg, interrupts it.
+- The verse ends when Humpty cracks. Mayhem (`src/sim/mayhem.ts`) is scored in the
+  simulation, frozen at the crack; each curio pays once. Stars: crack, great fall,
+  mayhem target (`LevelDef.mayhem`). Set targets with `npm run solve -- --mayhem`: about
+  the par line's mayhem plus one good exploring shot.
+- Every shot is logged by step (`Game.log`); replays re-fire the log on a fresh game.
+  Anything that makes the simulation depend on wall-clock time or `Math.random` breaks
+  replays and the solver.
 - The Court Astrologer's hint is the first shot of the recorded par line; aiming
   inside its ring fires exactly that shot.
 - Every verse must stand still until the first shot and must have a recorded
@@ -64,6 +71,9 @@ Core promises:
   callback. Record what happened and act after the drain; Rapier holds world
   borrows during callbacks.
 - Shared meshes in `Kit` are reference-held on creation; do not destroy them.
+- Keep draw calls down: long-lived bodies go in the "actors" dynamic batch group,
+  static scenery in the "scenery" batch, and new figures bake their fixed parts with
+  `kit.boxes`. Check `app.stats.drawCalls` in a visible tab after adding scenery.
 - Keep the look: chunky primitives, the oak/iron/bronze/crimson/verdigris palette,
   warm key light, the toy-theatre stage. Visual variety goes into props and
   scenery, not new rendering techniques.

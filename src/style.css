@@ -127,6 +127,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 #objectives li em { font: italic 400 14px/1 var(--serif); color: rgb(239 230 207 / 0.6); }
 #objectives li em.enough { color: var(--gold); }
 #objectives li.lit { background: rgb(232 178 58 / 0.18); border-color: var(--gold); color: var(--paper); }
+#objectives li b { font-variant-numeric: tabular-nums; }
+#objectives li[data-star="mayhem"].enough:not(.lit) { border-color: rgb(232 178 58 / 0.6); }
 #objectives li.lit i { background: var(--gold); transform: scale(1.25) rotate(18deg); }
 #objectives li.lost { opacity: 0.45; text-decoration: line-through; }
 
@@ -236,6 +238,14 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   opacity: 0.45;
 }
 
+/* A full armoury: icons and pips only, so the tools beside the tray stay on screen. */
+@media (max-width: 1200px) {
+  #ammo-tray.crowded .ammo { min-width: 0; grid-template-columns: 36px; padding: 5px 7px; }
+  #ammo-tray.crowded .ammo svg { width: 36px; height: 36px; }
+  #ammo-tray.crowded .ammo .label strong,
+  #ammo-tray.crowded .ammo .pips small { display: none; }
+}
+
 .ammo.vermin { background: #3b2a12; color: var(--gold); animation: vermin 0.5s ease-in-out infinite alternate; }
 .ammo.vermin.selected { background: var(--ink); border-color: var(--crimson); }
 @keyframes vermin { from { transform: rotate(-2deg); } to { transform: rotate(2deg) scale(1.04); } }
@@ -303,6 +313,9 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 .bubble.queen { background: #dcead9; }
 .bubble.queen::after { background: #dcead9; }
+.bubble.king { background: #f3dfb0; }
+.bubble.king::after { background: #f3dfb0; }
+.bubble.king b { color: var(--gold-dark); }
 .bubble b { display: block; margin-bottom: 2px; font: 700 11px/1 var(--ui); letter-spacing: 0.14em; text-transform: uppercase; color: var(--crimson); }
 .bubble.queen b { color: var(--verdigris); }
 .bubble.leaving { animation: bubble-out 0.25s forwards; }
@@ -422,6 +435,47 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 }
 #fuse-tags span.soon { background: var(--crimson); color: var(--paper); border-color: var(--paper); animation: fuse 0.2s ease-in-out infinite alternate; }
 @keyframes fuse { to { scale: 1.2; } }
+
+/* Mayhem points floating up from the wreckage. */
+#popups { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.popup {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  transform: translate(-50%, -100%);
+  animation: popup 1.5s ease-out forwards;
+  text-shadow: 2px 2px 0 var(--ink);
+  white-space: nowrap;
+}
+.popup b { font: 700 22px/1 var(--ui); color: var(--gold); font-variant-numeric: tabular-nums; }
+.popup span { font: italic 15px/1.1 var(--serif); color: var(--paper); }
+.popup.big b { font-size: 34px; }
+@keyframes popup {
+  0% { opacity: 0; translate: 0 10px; scale: 0.6; }
+  12% { opacity: 1; translate: 0 0; scale: 1.1; }
+  25% { scale: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; translate: 0 -46px; }
+}
+
+#replay-banner {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 10px 8px 16px;
+  background: rgb(20 17 15 / 0.85);
+  border: 2px solid var(--paper);
+  font: 400 24px/1 var(--display);
+  color: var(--paper);
+}
+#replay-banner span::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 10px; border-radius: 50%; background: var(--crimson); animation: blink 0.8s steps(2) infinite; }
+#replay-banner button { padding: 6px 12px; background: var(--paper); color: var(--ink); font: 700 14px/1 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
+@keyframes blink { 50% { opacity: 0; } }
 
 #toast {
   position: absolute;
@@ -578,6 +632,35 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 .star.lit { background: var(--gold-dark); }
 
+.playbill.result { width: min(820px, 100%); }
+.result-body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin: 0 0 20px; text-align: left; }
+
+/* The morning papers. */
+.newspaper {
+  padding: 12px 14px 14px;
+  background: #f4efe2;
+  border: 1px solid var(--paper-edge);
+  box-shadow: 2px 3px 0 rgb(0 0 0 / 0.18);
+  transform: rotate(-0.8deg);
+}
+.newspaper header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-bottom: 5px; border-bottom: 3px double var(--ink); }
+.newspaper header span { font: 400 21px/1 var(--display); }
+.newspaper header small { font: 600 11px/1 var(--ui); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.newspaper h3 { margin: 9px 0 7px; font: 700 21px/1.05 var(--ui); letter-spacing: 0.01em; text-transform: uppercase; }
+.newspaper p { margin: 0 0 6px; font: 15px/1.3 var(--serif); color: #2c241a; }
+#paper-critic { font-style: italic; color: var(--crimson-dark); }
+
+/* The King's bill of damages. */
+.bill h4 { margin: 0 0 6px; font: 600 12px/1 var(--ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--crimson); }
+.bill ol { margin: 0; padding: 0; list-style: none; max-height: 190px; overflow-y: auto; }
+.bill li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dotted var(--paper-edge); font: 15px/1.2 var(--serif); }
+.bill li em { font-style: italic; color: var(--muted); }
+.bill li b { font: 600 15px/1.2 var(--ui); font-variant-numeric: tabular-nums; }
+.bill-total { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 4px; }
+.bill-total span { font: 600 13px/1 var(--ui); letter-spacing: 0.16em; text-transform: uppercase; }
+.bill-total b { font: 700 32px/1 var(--ui); font-variant-numeric: tabular-nums; color: var(--crimson); }
+#bill-best { margin: 0; font: italic 14px/1.3 var(--serif); color: var(--muted); }
+
 #result-stars { display: flex; justify-content: center; gap: 10px; margin: 6px 0 14px; }
 #result-stars .star { width: 54px; height: 54px; }
 #result-stars .star.lit { background: var(--gold); animation: star-pop 0.5s cubic-bezier(0.2, 1.8, 0.4, 1) backwards; }
@@ -586,20 +669,6 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 @keyframes star-pop { from { transform: scale(0) rotate(-90deg); } to { transform: none; } }
 
-#result-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 0 0 22px;
-  padding: 12px 0;
-  border-top: 1px solid var(--paper-edge);
-  border-bottom: 1px solid var(--paper-edge);
-}
-
-#result-stats div { display: grid; gap: 3px; }
-#result-stats dt { font: 600 12px/1 var(--ui); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-#result-stats dd { margin: 0; font: 700 30px/1 var(--ui); font-variant-numeric: tabular-nums; }
-#result-stats dd small { display: block; margin-top: 4px; font: italic 400 13px/1.1 var(--serif); color: var(--muted); }
 
 #verse-card {
   position: absolute;
@@ -635,7 +704,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   #objectives li em { display: none; }
   .playbill, #verse-card { padding: 22px 20px; }
   .tagline, .couplet { font-size: 19px; }
-  #result-stats dd { font-size: 24px; }
+  .result-body { grid-template-columns: 1fr; }
+  .newspaper h3 { font-size: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -3,7 +3,10 @@ import type { CrewDef, Zone } from "./level.js";
 import type { Vec3 } from "./types.js";
 
 export type CrewKind = CrewDef["kind"];
-export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer" | "lunch";
+export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer" | "lunch" | "blind";
+
+/** How long a man with a bucket on his head blunders about. */
+export const BUCKET_TIME = 8;
 
 /** How long the King's men are away when the dinner gong goes. */
 export const LUNCH_BREAK = 13;
@@ -70,6 +73,8 @@ export interface CrewState {
   /** Which wing they go to for lunch (-1 or 1), and when they're due back. */
   canteen: number;
   lunchUntil: number;
+  /** Wearing a bucket: blundering about until then, catching nothing. */
+  bucketUntil: number;
 }
 
 export function createCrewState(def: CrewDef): CrewState {
@@ -91,7 +96,15 @@ export function createCrewState(def: CrewDef): CrewState {
     toppled: 0,
     canteen: def.home.x < 0 ? -1 : 1,
     lunchUntil: -1,
+    bucketUntil: -1,
   };
+}
+
+/** A bucket lands on someone's head. The whole crew stops to deal with it. */
+export function crownWithBucket(crew: CrewState, time: number): void {
+  crew.bucketUntil = time + BUCKET_TIME;
+  crew.threatSince = -1;
+  if (crew.mode !== "stunned" && crew.mode !== "recover") crew.mode = "blind";
 }
 
 /** The gong: off they go to the nearest wing. Anyone knocked flat follows once he's up. */
@@ -104,6 +117,7 @@ export function callLunch(crew: CrewState, time: number): void {
 
 /** What a crew goes back to doing: lunch if it isn't over, otherwise their post. */
 function resume(crew: CrewState, time: number): CrewMode {
+  if (time < crew.bucketUntil) return "blind";
   if (time < crew.lunchUntil) return "lunch";
   return crew.def.patrol?.length ? "patrol" : "idle";
 }
@@ -169,6 +183,21 @@ export function steerCrew(crew: CrewState, dt: number, time: number, threat: Thr
   let pace = spec.walk;
   const canCatch = spec.run > 0;
 
+  if (crew.mode === "blind") {
+    if (time >= crew.bucketUntil) {
+      crew.mode = resume(crew, time);
+    } else {
+      // Arms out, turning in slow circles, walking into things.
+      crew.heading = wrapAngle(crew.heading + dt * (crew.kind === "guard" ? 1.6 : 0.9));
+      crew.speed = crew.kind === "guard" ? 0.25 : 0.7;
+      const travel = crew.speed * dt;
+      crew.x += Math.sin(crew.heading) * travel;
+      crew.z += Math.cos(crew.heading) * travel;
+      crew.stride += travel;
+      crew.target = undefined;
+      return;
+    }
+  }
   if (crew.mode === "lunch") {
     // Nothing comes between the King's men and their lunch. Not even a falling egg.
     if (time >= crew.lunchUntil) crew.mode = resume(crew, time);

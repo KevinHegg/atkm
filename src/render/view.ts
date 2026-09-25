@@ -5,6 +5,7 @@ import type { AmmoKind, BodyView, GameEvent, StockKind, Vec3 } from "../sim/type
 import { Kit, palette } from "./kit.js";
 import {
   buildBlock,
+  buildBucket,
   buildCannon,
   buildCartBed,
   buildCrown,
@@ -21,6 +22,7 @@ import {
   buildShellPiece,
   buildFixture,
   buildRat,
+  buildSandbag,
   buildTurntable,
   type RatRig,
   type GunRig,
@@ -30,10 +32,13 @@ import {
   type QueenRig,
 } from "./props.js";
 import { buildStage, type StageSet } from "./stage.js";
+import { Company } from "./company.js";
 import { Curios } from "./curios.js";
 
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
 const DEG = 180 / Math.PI;
+/** Bodies that last the whole verse: worth batching. Shots and debris come and go too often. */
+const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag"]);
 /** The Queen stands on a podium stage-left of her battery. */
 const QUEEN_SPOT = { x: -4.4, y: 0.42, z: 7.4 };
 
@@ -45,6 +50,8 @@ interface BodyVisual {
   wheels?: pc.Entity[];
   rat?: RatRig;
   key?: pc.Entity;
+  /** A paint pot worn as a hat, for a man who has had one dropped on him. */
+  hat?: pc.Entity;
 }
 
 interface Puff {
@@ -73,7 +80,7 @@ export interface ScreenPoint {
   visible: boolean;
 }
 
-export type CameraMode = "title" | "intro" | "play";
+export type CameraMode = "title" | "intro" | "play" | "replay";
 
 export class StageView {
   readonly app: pc.Application;
@@ -86,6 +93,7 @@ export class StageView {
   private readonly effects: pc.Entity;
   private readonly stage: StageSet;
   private readonly curios: Curios;
+  private readonly company: Company;
   private readonly ropePool: pc.Entity[] = [];
   private readonly blunderbuss: pc.Entity;
   private blunderRecoil = 0;
@@ -99,6 +107,8 @@ export class StageView {
   private lastSelected: AmmoKind | undefined;
   private swap = 0;
   private readonly visuals = new Map<number, BodyVisual>();
+  /** Masonry, hay, powder and the King's men share materials: drawn in a few dynamic batches. */
+  private readonly actorBatch: number;
   private readonly chains = new Map<number, pc.Entity>();
   private readonly puffs: Puff[] = [];
   private readonly splats: Splat[] = [];
@@ -163,7 +173,12 @@ export class StageView {
     this.createLights();
     this.stage = buildStage(this.kit, this.world);
     this.curios = new Curios(this.kit, this.world, this.stage.moon);
+    this.company = new Company(this.kit, this.world, this.stage.root, (at) => {
+      this.puff(at, V(0.1, 0.5, 0.05), 0.22, 1.6, 0, palette.smoke);
+    });
     this.batchScenery();
+    this.actorBatch = this.app.batcher.addGroup("actors", true, 200).id;
+    this.batch(this.company.actors);
     this.cannon = buildCannon(this.kit, this.world);
     this.cannon.root.setLocalPosition(CANNON_PIVOT.x, 0.12, CANNON_PIVOT.z);
     this.cannon.pitch.setLocalPosition(0, CANNON_PIVOT.y - 0.12, 0);
@@ -272,6 +287,7 @@ export class StageView {
     this.cannon.root.enabled = !mortar || stocked.some((kind) => AMMO[kind].gun === "cannon");
     this.lastSelected = game.selected;
     this.swap = 0;
+    this.company.reset();
     this.sync(0);
   }
 
@@ -333,6 +349,11 @@ export class StageView {
   project(point: Vec3): ScreenPoint {
     const out = this.camera.camera!.worldToScreen(new pc.Vec3(point.x, point.y, point.z), new pc.Vec3());
     return { x: out.x, y: out.y, visible: out.z > 0 };
+  }
+
+  kingHead(): Vec3 {
+    const p = this.company.kingHead();
+    return { x: p.x, y: p.y, z: p.z };
   }
 
   queenHead(): Vec3 {
@@ -401,6 +422,8 @@ export class StageView {
       if (event.strength > 0.6) this.shake = Math.max(this.shake, event.strength * 0.18);
     } else if (event.type === "crack") {
       this.crackAt = V(event.at.x, event.at.y, event.at.z);
+      this.company.mopUp(this.crackAt, this.elapsed);
+      this.company.kingReacts("sulk", this.elapsed + 0.8);
       this.confetti(event.at);
       this.shake = 0.9;
       this.queenCheer = 1;
@@ -411,8 +434,11 @@ export class StageView {
       }
     } else if (event.type === "caught") {
       this.queenSulk = 1;
+      this.company.kingReacts("cheer", this.elapsed);
     } else if (event.type === "curio") {
       this.curios.trigger(event.id, this.elapsed);
+      if (event.id === "king") this.company.kingReacts("outrage", this.elapsed);
+      if (event.id === "duke") this.company.dukeStruck(this.elapsed);
       this.flash(event.at, 0.5);
     } else if (event.type === "ricochet") {
       for (let index = 0; index < 6; index += 1) {
@@ -440,6 +466,7 @@ export class StageView {
         }
       }
     } else if (event.type === "bowled") {
+      this.company.kingReacts("laugh", this.elapsed);
       for (let index = 0; index < 4; index += 1) {
         this.puff(V(event.at.x, 0.2, event.at.z), V((Math.random() - 0.5) * 2, 0.6, (Math.random() - 0.5) * 2), 0.4, 0.8);
       }
@@ -496,7 +523,7 @@ export class StageView {
     }
     for (const [id, visual] of this.visuals) {
       const crew = crews.get(id);
-      if (crew) this.animateCrew(visual, crew);
+      if (crew) this.animateCrew(visual, crew, crew.slots.find((slot) => this.visuals.get(slot)?.man) === id);
       if (visual.key) visual.key.setLocalEulerAngles(0, this.elapsed * -120, 0);
     }
   }
@@ -514,6 +541,7 @@ export class StageView {
     this.animateBlunderbuss(realDt);
     this.animateBombs(dt);
     this.curios.update(this.elapsed);
+    this.company.update(this.elapsed, Boolean(this.game?.hoisting));
     this.animateEffects(dt);
     this.animateScenery();
     this.updateCamera(realDt);
@@ -580,13 +608,27 @@ export class StageView {
       case "pellet":
         buildProjectile(this.kit, root, "grape", view.size);
         break;
+      case "bucket":
+        buildBucket(this.kit, root, view.size);
+        break;
+      case "sandbag":
+        buildSandbag(this.kit, root, view.size);
+        break;
       default:
         break;
     }
+    if (BATCHED.has(view.kind)) this.batch(root);
     return visual;
   }
 
-  private animateCrew(visual: BodyVisual, crew: CrewView): void {
+  /** Put every mesh under this visual into the actors' dynamic batch group. */
+  private batch(node: pc.GraphNode): void {
+    const entity = node as pc.Entity;
+    if (entity.render) entity.render.batchGroupId = this.actorBatch;
+    for (const child of node.children) this.batch(child);
+  }
+
+  private animateCrew(visual: BodyVisual, crew: CrewView, lead: boolean): void {
     const stride = crew.stride;
     const running = crew.speed > 2;
     const cheering = crew.mode === "cheer";
@@ -596,7 +638,18 @@ export class StageView {
       man.leftLeg.setLocalEulerAngles(swing, 0, 0);
       man.rightLeg.setLocalEulerAngles(-swing, 0, 0);
       const gameOver = this.game?.cracked ?? false;
-      if (crew.kind === "litter") {
+      // A paint pot on the leader's head, dripping whitewash.
+      const hatted = lead && crew.bucket;
+      if (hatted && !visual.hat) {
+        visual.hat = buildBucket(this.kit, man.rig, { x: 0.42, y: 0.4, z: 0.42 }, true);
+        visual.hat.setLocalPosition(0, 1.72, 0);
+      }
+      if (visual.hat) visual.hat.enabled = hatted;
+      if (hatted) {
+        const grope = Math.sin(this.elapsed * 3) * 15;
+        man.leftArm.setLocalEulerAngles(-80 + grope, 0, 10);
+        man.rightArm.setLocalEulerAngles(-80 - grope, 0, -10);
+      } else if (crew.kind === "litter") {
         man.leftArm.setLocalEulerAngles(-25, 0, 8);
         man.rightArm.setLocalEulerAngles(-25, 0, -8);
       } else if (cheering && !gameOver) {
@@ -1138,6 +1191,15 @@ export class StageView {
       pitch += (Math.min(pitch, -34) - pitch) * this.follow;
     }
     let ease = Math.min(1, dt * 3);
+    if (this.cameraMode === "replay") {
+      // Down on the boards beside him, turning slowly, like a newsreel.
+      const subject = humpty ?? this.crackAt;
+      if (subject) target.set(subject.x, Math.max(1, subject.y), subject.z);
+      yaw = level.yaw + 32 + Math.sin(this.elapsed * 0.3) * 8;
+      pitch = -12;
+      distance = 13;
+      ease = Math.min(1, dt * 2.2);
+    }
     if (this.cameraMode === "intro") {
       this.introTime += dt;
       ease = Math.min(1, dt * 1.3);

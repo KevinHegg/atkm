@@ -39,8 +39,14 @@ unlock every verse.
 - **The King's men put him back.** When he lands safely, the stagehands lower a hook
   from the flies and hoist him back to the highest perch near his old spot. That
   costs you the shot.
-- **Stars:** crack him; crack him with a shot to spare; crack him with a drop of at
-  least the verse's *great fall* height.
+- **The verse ends when he cracks.** Until then, everything you break, bowl over, ring or
+  startle counts as **mayhem**, and the King sends you the bill. Each verse has a spare
+  round shot for exploring: spend it on mischief, but save enough to finish the job.
+- **Stars:** crack him; crack him with a drop of at least the verse's *great fall* height;
+  crack him after causing the verse's target of mayhem. Your best mayhem per verse is kept.
+- **Reviews and replays.** After the curtain the morning papers review the performance,
+  and **Replay** shows the final shot again in slow motion. The simulation is
+  deterministic, so the replay is exact.
 - **Ordnance:**
   - **Round shot** is a flat, heavy punch.
   - **Mortar shells** lob over walls and burst on contact.
@@ -68,8 +74,13 @@ unlock every verse.
   powder. If he reaches it he steals a charge, but never the last one. The Queen's
   blunderbuss (key **6**) sends him packing without spending a shot.
 - **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the moon, Jack and
-  Jill's hill, the cuckoo clock, the well or the spider and see what happens. None of
-  them change the verse.
+  Jill's hill, the cuckoo clock, the well, the spider, the Grand Old Duke of York's men
+  on the painted hill, or Old King Cole in his royal box, and see what happens. None of
+  them change the verse, but each pays mayhem once.
+- **Gags.** A painter's pot on a stepladder, knocked onto a guard's head, blinds his crew
+  for a while. A sandbag hanging from the flies swings like a wrecking ball when shot;
+  chain shot cuts it loose. The stagehands who work the hoist can be seen in the wings,
+  and one comes on with a mop when it's all over.
 - **The Court Astrologer.** Lose a verse and, on the retry, a green ring marks a known
   winning shot. Aim anywhere inside it and your shot becomes his exactly.
 
@@ -80,6 +91,7 @@ npm run typecheck   # strict TypeScript
 npm test            # physics rules + every verse stands still and is winnable
 npm run solve       # brute-force shot search: difficulty report per verse
 npm run solve -- --write           # re-record par solutions in src/sim/par.json
+npm run solve -- --mayhem          # also report mayhem: the par line alone and with one exploring shot
                                    # (the most robust winning line, so hints survive a human hand)
 npx tsx scripts/trace.ts <verse-id> <ammo> x y z [wait]   # trace one shot
 npx tsx scripts/probe.ts <verse-id> <ammo> <xs> <ys> <zs> [opener-json]   # grid of shots
@@ -97,6 +109,7 @@ src/sim/      rules and physics, headless, no rendering
   game.ts       Rapier world, projectiles, the crack rule, explosions, hoist, phases
   crew.ts       King's men: patrol, landing prediction, stun
   rat.ts        the rat: creep, gnaw, flee
+  mayhem.ts     the score: what everything is worth on the King's bill
   curios.ts     where the nursery-rhyme curios hide (shared with the scenery)
   geometry.ts   small vector helpers for ropes and rides
   level.ts      level format and the Mason builder (walls, towers, pillars, hay, kegs,
@@ -111,8 +124,10 @@ src/render/   PlayCanvas presentation, reads the sim and never writes it
   props.ts      Humpty, the Queen, King's men, horses, guns, blocks, kegs, hay
   stage.ts      the toy theatre: boards, painted backdrop, wings, proscenium
   curios.ts     the curios' little scenes
+  company.ts    stagehands, Old King Cole in his box, the Grand Old Duke of York's men
   view.ts       sync + interpolation, animation, aim arc, effects, camera
-src/main.ts   screens, HUD, input, speech bubbles, the frame loop
+src/main.ts   screens, HUD, input, speech bubbles, replays, the frame loop
+src/review.ts the morning papers, written from the bill of damages
 src/audio.ts  procedural foley, a music box, a theatre audience, the recorded royal voices
 src/lines.ts  who says what, and when
 ```

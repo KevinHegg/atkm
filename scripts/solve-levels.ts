@@ -4,15 +4,17 @@
  *   npm run solve                      # every verse
  *   npm run solve -- over-the-wall     # one verse
  *   npm run solve -- --write           # record the best line per verse in src/sim/par.json
+ *   npm run solve -- --mayhem          # also report the mayhem the par line earns, with and without exploring
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { candidateTargets, playOut, settleDrift, type PlannedShot } from "../src/sim/autoplay.js";
+import { candidateTargets, mayhemTargets, playOut, settleDrift, type PlannedShot } from "../src/sim/autoplay.js";
 import { LEVELS } from "../src/sim/levels.js";
 import type { StockKind } from "../src/sim/types.js";
 
 const args = process.argv.slice(2);
 const write = args.includes("--write");
+const calibrate = args.includes("--mayhem");
 const only = args.filter((arg) => !arg.startsWith("--"));
 const parPath = resolve(import.meta.dirname, "../src/sim/par.json");
 const par: Record<string, PlannedShot[]> = JSON.parse(readFileSync(parPath, "utf8"));
@@ -114,6 +116,17 @@ for (const level of LEVELS) {
   const best = wins[0];
   if (best) par[level.id] = best.shots;
   else console.log("  ✗ NO SOLUTION FOUND");
+  if (best && calibrate) {
+    // How much mayhem the par line earns alone, and with one exploring round shot fired first.
+    const alone = await playOut(level, best.shots, 24);
+    let top = { mayhem: alone.mayhem, label: "par alone" };
+    for (const target of await mayhemTargets(level)) {
+      const line: PlannedShot[] = [{ ammo: "shot", at: target.at }, ...best.shots];
+      const result = await playOut(level, line, 30);
+      if (result.won && result.mayhem > top.mayhem) top = { mayhem: result.mayhem, label: target.label };
+    }
+    console.log(`  mayhem: par line ${alone.mayhem}; with one exploring shot ${top.mayhem} (${top.label}); target ${level.mayhem}`);
+  }
 }
 
 if (write) {

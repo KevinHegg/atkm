@@ -69,7 +69,23 @@ export interface SeesawDef {
   offset: number;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef;
+/** A paint pot on top of a painter's stepladder. Knock it onto a head. */
+export interface BucketDef {
+  kind: "bucket";
+  /** Where the bucket sits (its centre). */
+  pos: Vec3;
+}
+
+/** A stage-weight sandbag hanging on a line from the flies: a wrecking ball, once pushed. */
+export interface SandbagDef {
+  kind: "sandbag";
+  /** Centre of the bag. */
+  pos: Vec3;
+  /** Height of the fly gallery the line hangs from. */
+  top: number;
+}
+
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef;
 
 /** A giant rat that creeps out of the wings to gnaw the Queen's powder. */
 export interface RatDef {
@@ -111,6 +127,8 @@ export interface LevelDef {
   ammo: Partial<Record<StockKind, number>>;
   /** Metres Humpty must drop for the "great fall" star. */
   greatFall: number;
+  /** Mayhem points (earned before he cracks) for the mayhem star. */
+  mayhem: number;
   humpty: Vec3;
   pieces: PieceDef[];
   crews: CrewDef[];
@@ -136,6 +154,8 @@ export const SEESAW_FLOOR = 0.14;
 /** A maypole's shaft, and the flat crown on top of it where the ribbons hang. */
 export const MAYPOLE_WIDTH = 0.3;
 export const MAYPOLE_CROWN = { radius: 0.48, height: 0.12 };
+export const BUCKET_SIZE = { radius: 0.2, height: 0.36 };
+export const SANDBAG_SIZE = { radius: 0.32, height: 0.7 };
 
 /** Small builder so level layouts read as masonry rather than coordinates. */
 export class Mason {
@@ -284,6 +304,20 @@ export class Mason {
       this.block("brick", cx, y, cz + side * (depth / 2 - thick / 2), width, height, thick);
       this.block("brick", cx + side * (width / 2 - thick / 2), y, cz, thick, height, depth - thick * 2 - 0.01);
     }
+  }
+
+  /** A painter's stepladder with a full paint pot on top. Returns the bucket's position. */
+  paintPot(x: number, z: number, yaw = 0): Vec3 {
+    const height = 1.95;
+    this.fixture("ladder", x, 0, z, 0.62, height, 0.5, { yaw });
+    const pos = { x, y: height + BUCKET_SIZE.height / 2 + GAP, z };
+    this.pieces.push({ kind: "bucket", pos });
+    return pos;
+  }
+
+  /** A sandbag hanging from the flies on a single line. Only chain shot cuts the line. */
+  sandbag(x: number, y: number, z: number, top = 13): void {
+    this.pieces.push({ kind: "sandbag", pos: { x, y: y + SANDBAG_SIZE.height / 2, z }, top });
   }
 
   /** The dinner gong: strike it and every one of the King's men downs tools for lunch. */
