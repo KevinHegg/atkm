@@ -539,3 +539,67 @@ test("the wind machine rocks the cradle harder and harder", async () => {
   assert.ok(reach > 2, `the cradle swings out over the boards (${reach.toFixed(1)} m)`);
   game.destroy();
 });
+
+test("the stage lever drops the King's men through the trapdoor, and they climb back out", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const { TRAP_TIME } = await import("../src/sim/crew.js");
+  const game = await Game.create(levelById("ring-of-roses")!);
+  await stepUntilReady(game);
+  const lever = game.bodies.find((body) => body.material === "lever")!.position;
+  assert.ok(game.fire({ ...lever, y: lever.y + 0.4 }));
+  const events = await run(game, 2.5);
+  assert.ok(events.some((event) => event.type === "cue" && event.cue === "trap"));
+  assert.ok(game.crewViews.length > 0 && game.crewViews.every((crew) => crew.mode === "trapped"), "every dancer drops");
+  assert.equal(game.mayhem.entries.get("trap")?.count, game.crewViews.length);
+  assert.ok(game.trapLeft > 0);
+  // A second pull while the leaves are open does nothing, and says nothing.
+  await stepUntilReady(game);
+  assert.ok(game.fire({ ...lever, y: lever.y + 0.4 }));
+  const again = await run(game, 2.5);
+  assert.ok(again.some((event) => event.type === "impact" && Math.hypot(event.at.x - lever.x, event.at.z - lever.z) < 0.8), "the second shot strikes the lever");
+  assert.ok(!again.some((event) => event.type === "cue"), "the lever won't budge until they're back up");
+  await run(game, TRAP_TIME + 6);
+  assert.equal(game.trapLeft, 0);
+  assert.ok(game.crewViews.every((crew) => crew.mode !== "trapped"), "they all climb back up");
+  game.destroy();
+});
+
+test("while he falls the gun crew reloads double-quick, but never instantly", async () => {
+  const reloadTime = async (fall: boolean): Promise<number> => {
+    const game = await Game.create(arena(() => perchAt(0, 9, 0), { ammo: { shot: 4 } }));
+    await stepUntilReady(game);
+    assert.ok(game.fire({ x: 9, y: 0.5, z: 5 }));
+    if (fall) wake(game);
+    let steps = 0;
+    while (!game.canFire() && steps < 600) {
+      game.step();
+      steps += 1;
+    }
+    assert.equal(game.humptyAirborne, fall);
+    game.destroy();
+    return steps * STEP;
+  };
+  const standing = await reloadTime(false);
+  const falling = await reloadTime(true);
+  assert.ok(falling < standing * 0.6, `falling ${falling.toFixed(2)} s against ${standing.toFixed(2)} s`);
+  assert.ok(falling > 0.4, "no volleys");
+});
+
+test("a crew knocked flat drops through the trapdoor and climbs out on its feet, even mid-cheer", async () => {
+  const { createCrewState, dropThroughTrap, steerCrew, TRAP_TIME } = await import("../src/sim/crew.js");
+  const crew = createCrewState({ id: "c", kind: "litter", home: { x: 0, y: 0, z: 0 } });
+  crew.mode = "stunned";
+  crew.toppled = 1;
+  crew.modeUntil = 5;
+  dropThroughTrap(crew, 0);
+  assert.equal(crew.toppled, 0);
+  let time = 0;
+  for (; time < TRAP_TIME + 0.5; time += STEP) steerCrew(crew, STEP, time, undefined, 0.5);
+  assert.ok(crew.sink > 0.5, "on the way back up");
+  // Humpty cracks mid-climb: everyone cheers, and they still come up out of the floor.
+  crew.mode = "cheer";
+  crew.modeUntil = time + 99;
+  for (let step = 0; step < 60 * 3; step += 1, time += STEP) steerCrew(crew, STEP, time, undefined, 0.5);
+  assert.equal(crew.sink, 0);
+  assert.equal(crew.mode, "cheer");
+});

@@ -344,6 +344,14 @@ export class TheatreAudio {
     this.burst({ duration: 1.1, volume: 0.16, filter: "bandpass", frequency: 500 + Math.random() * 300, sweepTo: 1100 + Math.random() * 500, q: 2.2 });
   }
 
+  /** The stage lever: a clack, a slide-whistle plunge, and the thud of men landing in the cellar. */
+  trapdoor(): void {
+    this.burst({ duration: 0.06, volume: 0.5, filter: "bandpass", frequency: 1400, q: 3 });
+    this.tone(1500, 0.8, 0.14, "sine", { to: 220, delay: 0.1, attack: 0.02 });
+    this.tone(90, 0.3, 0.5, "sine", { to: 45, delay: 0.85 });
+    this.burst({ duration: 0.3, volume: 0.5, filter: "lowpass", frequency: 500, delay: 0.85 });
+  }
+
   /** Bedsprings. */
   sproing(): void {
     this.tone(180, 0.45, 0.3, "triangle", { to: 620 });

@@ -3,7 +3,12 @@ import type { CrewDef, Zone } from "./level.js";
 import type { Vec3 } from "./types.js";
 
 export type CrewKind = CrewDef["kind"];
-export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer" | "lunch" | "blind";
+export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer" | "lunch" | "blind" | "trapped";
+
+/** How long the King's men are down the trapdoor before they climb back up. */
+export const TRAP_TIME = 9;
+/** How far below the boards they drop, and how fast they fall and climb. */
+const TRAP_DEPTH = 2.6;
 
 /** How long a man with a bucket on his head blunders about. */
 export const BUCKET_TIME = 8;
@@ -75,6 +80,9 @@ export interface CrewState {
   lunchUntil: number;
   /** Wearing a bucket: blundering about until then, catching nothing. */
   bucketUntil: number;
+  /** Down the trapdoor: how far below the boards, and when they climb back out. */
+  sink: number;
+  trapUntil: number;
 }
 
 export function createCrewState(def: CrewDef): CrewState {
@@ -97,14 +105,26 @@ export function createCrewState(def: CrewDef): CrewState {
     canteen: def.home.x < 0 ? -1 : 1,
     lunchUntil: -1,
     bucketUntil: -1,
+    sink: 0,
+    trapUntil: -1,
   };
+}
+
+/** The trapdoor opens under them: a-tishoo, a-tishoo, they all fall down. */
+export function dropThroughTrap(crew: CrewState, time: number): void {
+  // Anyone lying flat drops through too, and climbs back out on his feet.
+  crew.toppled = 0;
+  crew.mode = "trapped";
+  crew.trapUntil = time + TRAP_TIME;
+  crew.threatSince = -1;
+  crew.speed = 0;
 }
 
 /** A bucket lands on someone's head. The whole crew stops to deal with it. */
 export function crownWithBucket(crew: CrewState, time: number): void {
   crew.bucketUntil = time + BUCKET_TIME;
   crew.threatSince = -1;
-  if (crew.mode !== "stunned" && crew.mode !== "recover") crew.mode = "blind";
+  if (crew.mode !== "stunned" && crew.mode !== "recover" && crew.mode !== "trapped") crew.mode = "blind";
 }
 
 /** The gong: off they go to the nearest wing. Anyone knocked flat follows once he's up. */
@@ -112,11 +132,12 @@ export function callLunch(crew: CrewState, time: number): void {
   crew.canteen = crew.x < 0 ? -1 : 1;
   crew.lunchUntil = time + LUNCH_BREAK;
   crew.threatSince = -1;
-  if (crew.mode !== "stunned" && crew.mode !== "recover") crew.mode = "lunch";
+  if (crew.mode !== "stunned" && crew.mode !== "recover" && crew.mode !== "trapped") crew.mode = "lunch";
 }
 
 /** What a crew goes back to doing: lunch if it isn't over, otherwise their post. */
 function resume(crew: CrewState, time: number): CrewMode {
+  if (crew.sink > 0) return "trapped";
   if (time < crew.bucketUntil) return "blind";
   if (time < crew.lunchUntil) return "lunch";
   return crew.def.patrol?.length ? "patrol" : "idle";
@@ -155,6 +176,8 @@ function wrapAngle(angle: number): number {
 /** Advance one crew by dt. Pure bookkeeping — the Game moves the kinematic bodies. */
 export function steerCrew(crew: CrewState, dt: number, time: number, threat: Threat | undefined, humptyCatchOffset: number): void {
   const spec = CREW_SPECS[crew.kind];
+  // Out of the trapdoor, whatever else is happening (a crack sends everyone cheering mid-climb).
+  if (crew.mode !== "trapped" && crew.sink > 0) crew.sink = Math.max(0, crew.sink - dt * 2.4);
   if (crew.mode === "stunned") {
     crew.toppled = Math.min(1, crew.toppled + dt * 6);
     crew.speed = 0;
@@ -180,9 +203,20 @@ export function steerCrew(crew: CrewState, dt: number, time: number, threat: Thr
   }
 
   let goal: { x: number; z: number } | undefined;
-  let pace = spec.walk;
+  let pace = crew.def.pace ?? spec.walk;
   const canCatch = spec.run > 0;
 
+  if (crew.mode === "trapped") {
+    // Down they go, fast; later they climb back up the ladder, slowly.
+    crew.speed = 0;
+    if (time < crew.trapUntil) {
+      crew.sink = Math.min(TRAP_DEPTH, crew.sink + dt * 7);
+    } else {
+      crew.sink = Math.max(0, crew.sink - dt * 2.4);
+      if (crew.sink === 0) crew.mode = resume(crew, time);
+    }
+    return;
+  }
   if (crew.mode === "blind") {
     if (time >= crew.bucketUntil) {
       crew.mode = resume(crew, time);

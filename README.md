@@ -42,11 +42,15 @@ unlock every verse.
 - **The verse ends when he cracks.** Until then, everything you break, bowl over, ring or
   startle counts as **mayhem**, and the King sends you the bill. Each verse has a spare
   round shot for exploring: spend it on mischief, but save enough to finish the job.
+- **Parting shots.** While he's falling the gun crew reloads at double-quick time, so
+  there's room for one more shot (perhaps two) of mayhem before he lands. Never a volley.
 - **Stars:** crack him; reach the verse's target of mayhem; and find the **hidden star**.
   Every verse hides a star inside one figure (always the same one: a guard, a stretcher
   crew, the horse cart, the rat, or a curio such as the cow or Old King Cole). Knock that
   figure down with a munition and the star floats up off the stage. Like the others, it
   only counts if he cracks. Watch for the occasional glint. Your best mayhem per verse is kept.
+- **The Grand Finale.** Win all forty-eight stars (three in each of the sixteen verses)
+  and the Queen herself takes centre stage to plant her standard beside the broken egg.
 - **A great fall** (at least the verse's height, shown by the surveyor's line) earns a
   mayhem bonus on top of the crack.
 - **Treasure chests.** Every verse has an iron-bound chest of spare powder somewhere on
@@ -79,6 +83,8 @@ unlock every verse.
   gong and every one of the King's men downs tools for lunch (a timer at the top says
   when they'll be back). Strike the stagehands' wind machine and a gale rocks anything
   hanging on a line, harder and harder, for a few seconds. It never bends your shot.
+  Pull the stage lever and a ring of trapdoors drops the King's men beneath the boards;
+  they climb back out a few seconds later.
 - **Bumpers and screens.** Bronze bumpers bounce round shot cleanly. Painted screens
   and hedges hide what's behind them, including hay.
 - **The rat.** In later verses a giant rat creeps out of the wings to gnaw the Queen's
@@ -118,15 +124,16 @@ The game is a static site. It deploys to GitHub Pages from
 ```
 src/sim/      rules and physics, headless, no rendering
   game.ts       Rapier world, projectiles, the crack rule, explosions, hoist, phases
-  crew.ts       King's men: patrol, landing prediction, stun
+  crew.ts       King's men: patrol, landing prediction, stun, lunch, the trapdoor
   rat.ts        the rat: creep, gnaw, flee
   mayhem.ts     the score: what everything is worth on the King's bill
   curios.ts     where the nursery-rhyme curios hide (shared with the scenery)
   geometry.ts   small vector helpers for ropes and rides
   level.ts      level format and the Mason builder (walls, towers, pillars, hay, kegs,
                 fixtures, bumpers, hedges, turntables, swings, see-saws, canopies,
-                maypoles, gongs, railings, houses, chests, beds, wind machines, cradles)
-  levels.ts     the fifteen verses
+                maypoles, gongs, railings, houses, chests, beds, wind machines, cradles,
+                trapdoor rings)
+  levels.ts     the sixteen verses
   ballistics.ts ammunition and launch solutions
   autoplay.ts   headless play-through used by tests and the solver
   par.json      one recorded winning line per verse
@@ -136,7 +143,7 @@ src/render/   PlayCanvas presentation, reads the sim and never writes it
   stage.ts      the toy theatre: boards, painted backdrop, wings, proscenium
   curios.ts     the curios' little scenes
   company.ts    stagehands, Old King Cole in his box, the Grand Old Duke of York's men
-  view.ts       sync + interpolation, animation, aim arc, effects, camera
+  view.ts       sync + interpolation, animation, aim arc, pooled effects, camera, finale
 src/main.ts   screens, HUD, input, speech bubbles, replays, the frame loop
 src/review.ts the morning papers, written from the bill of damages
 src/audio.ts  procedural foley, a music box, a theatre audience, the recorded royal voices

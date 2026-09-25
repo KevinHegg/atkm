@@ -32,7 +32,8 @@ export type Cue =
   | "chest"
   | "star"
   | "bounce"
-  | "gale";
+  | "gale"
+  | "trapdoor";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -183,6 +184,10 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   bounce: {
     speaker: "humpty",
     lines: ["Wheeeee— I mean, stop that.", "This bed is FAR too bouncy!", "Up I go! And, er, down?"],
+  },
+  trapdoor: {
+    speaker: "humpty",
+    lines: ["Gentlemen? GENTLEMEN? Where did everybody go?", "A-tishoo yourselves! Come back up!", "That was not in the choreography."],
   },
   gale: {
     speaker: "humpty",

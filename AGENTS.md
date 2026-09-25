@@ -19,8 +19,12 @@ Core promises:
   a verse's shot.
 - A bomb's fuse is lit when it first lands. Stone and brick between a blast and a powder
   keg keep the keg from going off (the blast still pushes things).
-- Stage cues (the dinner gong) are fixtures any stock shot can strike; lunch lasts
-  `LUNCH_BREAK` seconds and nothing, not even a falling egg, interrupts it.
+- Stage cues (the dinner gong, the wind machine, the trapdoor lever) are fixtures any
+  stock shot can strike; lunch lasts `LUNCH_BREAK` seconds and nothing, not even a
+  falling egg, interrupts it. The trapdoor (`Mason.trapRing`) drops every crew standing
+  on its ring for `TRAP_TIME` seconds; trapped crews can't be stunned or sent to lunch.
+- The gun reloads `FALLING_RELOAD` times faster while Humpty is airborne, so a parting
+  shot or two can add mayhem before he lands, but never a volley.
 - The verse ends when Humpty cracks. Mayhem (`src/sim/mayhem.ts`) is scored in the
   simulation, frozen at the crack (the crack and its great-fall bonus are the last
   entries); each curio pays once. Stars, all registered only if he cracks: crack, mayhem
@@ -50,7 +54,8 @@ Core promises:
 
 - `src/sim/game.ts`: physics world, projectiles, the crack rule, explosions,
   hoist, phases, stars;
-- `src/sim/crew.ts`: King's men movement, landing prediction, stun/recover;
+- `src/sim/crew.ts`: King's men movement, landing prediction, stun/recover, lunch and
+  the trapdoor;
 - `src/sim/rat.ts`: the rat's visits; `src/sim/curios.ts`: curio positions shared
   with `src/render/curios.ts`;
 - `src/sim/levels.ts` with `src/sim/level.ts`: verse layouts via the `Mason` builder;
@@ -84,7 +89,12 @@ Core promises:
 - Shared meshes in `Kit` are reference-held on creation; do not destroy them.
 - Keep draw calls down: long-lived bodies go in the "actors" dynamic batch group,
   static scenery in the "scenery" batch, and new figures bake their fixed parts with
-  `kit.boxes`. Check `app.stats.drawCalls` in a visible tab after adding scenery.
+  `kit.boxes`. The Queen and the curios batch too; anything a figure toggles on and
+  off (a cat in the well, a daze of stars) goes in `UNBATCHED`. Check
+  `app.stats.drawCalls` in a visible tab after adding scenery.
+- Effect particles (puffs, sparks, flashes, confetti) come from pools in `view.ts`:
+  `retire()` them, never destroy them. The pixel ratio steps down on slow machines
+  (`governPixelRatio`) and back up when frames are quick again.
 - Keep the look: chunky primitives, the oak/iron/bronze/crimson/verdigris palette,
   warm key light, the toy-theatre stage. Visual variety goes into props and
   scenery, not new rendering techniques.
@@ -95,5 +105,7 @@ Core promises:
 - Moving rides (turntable, swing, see-saw) must start Humpty awake and give the
   hoist a perch to return him to; fall back to the highest perch when the ride is
   spent.
-- Browser storage holds only per-player progress (stars, mute) and must tolerate
-  being unavailable.
+- Browser storage holds only per-player progress (stars, best mayhem, whether the
+  finale has played, mute) and must tolerate being unavailable. Bump `STORAGE_KEY` in
+  `src/main.ts` (listing the old key for removal) only when a scoring change makes old
+  stars meaningless. Winning all `LEVELS.length * 3` stars plays the Grand Finale once.

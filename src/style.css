@@ -132,6 +132,23 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 #objectives li.found i { background: rgb(232 178 58 / 0.7); }
 @keyframes found { to { box-shadow: 0 0 12px rgb(232 178 58 / 0.6); } }
 #objectives li[data-info] { border-style: dashed; }
+#objectives li.caught { animation: chip-catch 0.6s cubic-bezier(0.2, 1.8, 0.4, 1); }
+@keyframes chip-catch { 0% { scale: 1; } 40% { scale: 1.35; background: rgb(232 178 58 / 0.6); } 100% { scale: 1; } }
+
+/* The released star flying into its chip. */
+.star-flyer {
+  position: fixed;
+  z-index: 9;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  background: var(--gold);
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  filter: drop-shadow(0 0 8px rgb(255 214 110 / 0.9));
+  pointer-events: none;
+  transition: transform 0.7s cubic-bezier(0.5, 0, 0.3, 1), opacity 0.7s;
+}
 #objectives li .ruler {
   width: 15px;
   height: 7px;
@@ -604,10 +621,11 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .playbill.wide header h2 { margin: 0; }
 #levels-back { min-width: 0; }
 
+/* Sixteen verses: a four-by-four playbill. */
 #level-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -615,10 +633,12 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 #level-list button {
   display: grid;
+  grid-template-rows: auto auto 1fr;
   gap: 6px;
   width: 100%;
-  min-height: 118px;
-  padding: 12px 14px;
+  height: 100%;
+  min-height: 104px;
+  padding: 10px 12px;
   text-align: left;
   background: var(--paper-2);
   border: 2px solid var(--ink);
@@ -629,8 +649,12 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 #level-list button:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--ink); background: #fff7e2; }
 #level-list button:disabled { opacity: 0.45; cursor: not-allowed; }
 #level-list .numeral { font: 700 12px/1 var(--ui); letter-spacing: 0.18em; color: var(--crimson); text-transform: uppercase; }
-#level-list .name { font: 400 25px/0.98 var(--display); }
-#level-list .stars { display: flex; gap: 3px; margin-top: auto; }
+#level-list .name { font: 400 22px/0.98 var(--display); }
+#level-list .foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; align-self: end; }
+#level-list .stars { display: flex; gap: 3px; }
+#level-list .best { font: 600 11px/1 var(--ui); letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
+#level-list li.complete button { background: #fff3cf; border-color: var(--gold-dark); }
+#star-total.all { color: var(--gold-dark); font-weight: 700; }
 
 .star {
   width: 20px;
@@ -669,6 +693,13 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .bill-total span { font: 600 13px/1 var(--ui); letter-spacing: 0.16em; text-transform: uppercase; }
 .bill-total b { font: 700 32px/1 var(--ui); font-variant-numeric: tabular-nums; color: var(--crimson); }
 #bill-best { margin: 0; font: italic 14px/1.3 var(--serif); color: var(--muted); }
+
+#finale-screen { background: radial-gradient(ellipse at center, rgb(16 23 23 / 0), rgb(16 23 23 / 0.55)); align-items: end; }
+.playbill.finale { border-color: var(--gold-dark); box-shadow: 0 0 0 7px var(--paper), 0 0 0 9px var(--gold), 10px 12px 0 9px rgb(0 0 0 / 0.45); margin-bottom: 4vh; }
+.finale-stars { display: flex; justify-content: center; gap: 8px; margin: 0 0 12px; }
+.finale-stars .star { width: 40px; height: 40px; background: var(--gold); animation: star-pop 0.6s cubic-bezier(0.2, 1.8, 0.4, 1) backwards; }
+.finale-stars .star:nth-child(2) { animation-delay: 0.2s; }
+.finale-stars .star:nth-child(3) { animation-delay: 0.4s; }
 
 #result-stars { display: flex; justify-content: center; gap: 10px; margin: 6px 0 14px; }
 #result-stars .star { width: 54px; height: 54px; }
@@ -715,6 +746,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   .playbill, #verse-card { padding: 22px 20px; }
   .tagline, .couplet { font-size: 19px; }
   .result-body { grid-template-columns: 1fr; }
+  #level-list { grid-template-columns: repeat(2, 1fr); }
   .newspaper h3 { font-size: 18px; }
 }
 

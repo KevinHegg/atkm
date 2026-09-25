@@ -1,4 +1,5 @@
 import { Mason, perchAt, type CrewDef, type LevelDef, type ViewDef } from "./level.js";
+import { CREW_SPECS } from "./crew.js";
 
 const VIEW: ViewDef = { yaw: 0, pitch: -22, distance: 20, target: { x: 0, y: 1.8, z: -1.8 } };
 
@@ -320,7 +321,7 @@ function theEncore(): LevelDef {
     hint: "He's under a royal canopy, so shells burst on the roof. Strip it away first, then make it the greatest fall of all.",
     ammo: { shot: 5, shell: 2, grape: 3, chain: 2, bomb: 2 },
     greatFall: 4.6,
-    mayhem: 1000,
+    mayhem: 1175,
     star: { rat: true },
     humpty: perchAt(0, y, -2.4),
     pieces: m.pieces,
@@ -569,6 +570,51 @@ function rockABye(): LevelDef {
   };
 }
 
+function ringOfRoses(): LevelDef {
+  const m = new Mason();
+  const base = m.pillar("stone", 0, -2.2, 3, { size: 1.1, height: 0.8 });
+  const top = m.tower("oak", 0, -2.2, 4, { y: base });
+  // The King's men dance in a ring round him, on a ring of stage trapdoors.
+  m.trapRing(0, -2.2, 1.9, 4.6, { x: 6.6, z: 0.2, yaw: -0.5 });
+  m.chest(-7.6, -5, { yaw: 0.3 });
+  const radius = 3.2;
+  const steps = 16;
+  const ring = Array.from({ length: steps }, (_, index) => {
+    const angle = (index / steps) * Math.PI * 2;
+    return { x: Math.sin(angle) * radius, y: 0, z: -2.2 + Math.cos(angle) * radius };
+  });
+  const circle = (start: number) => [...ring.slice(start), ...ring.slice(0, start)];
+  // Stretcher crews and guards take turns round the ring; the stretchers dash out to catch.
+  const crews: CrewDef[] = Array.from({ length: 8 }, (_, index) => {
+    const start = index * 2;
+    const litter = index % 2 === 0;
+    return {
+      id: `rose-${index + 1}`,
+      kind: litter ? "litter" : "guard",
+      home: ring[start]!,
+      yaw: Math.atan2(ring[(start + 1) % steps]!.x - ring[start]!.x, ring[(start + 1) % steps]!.z - ring[start]!.z),
+      ...(litter ? { zone: { minX: -9, maxX: 9, minZ: -9, maxZ: 2.5 } } : {}),
+      patrol: circle(start),
+      // Everyone keeps the stretchers' pace, or they tread on the guards' heels.
+      pace: CREW_SPECS.litter.walk,
+    };
+  });
+  return {
+    id: "ring-of-roses",
+    title: "Ring-a-ring o' Roses",
+    verse: ["Ring-a-ring o' roses, a pocket full of posies;", "a-tishoo! a-tishoo! We ALL fall down."],
+    hint: "The King's men dance round him and catch anything that falls. Shoot the stage lever and the trapdoors drop them, then knock him off before they climb back up.",
+    ammo: { shot: 4 },
+    greatFall: 4,
+    mayhem: 1125,
+    star: { crew: "rose-4" },
+    humpty: perchAt(0, top, -2.2),
+    pieces: m.pieces,
+    crews,
+    view: view({ pitch: -24, distance: 21, target: { x: 0.5, y: 2.4, z: -2 } }),
+  };
+}
+
 export const LEVELS: readonly LevelDef[] = [
   satOnAWall(),
   hadAGreatFall(),
@@ -578,6 +624,7 @@ export const LEVELS: readonly LevelDef[] = [
   heyDiddleDiddle(),
   allTheKingsHorses(),
   chainOfCommand(),
+  ringOfRoses(),
   hangingByAThread(),
   rockABye(),
   seeSawMargeryDaw(),

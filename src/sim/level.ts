@@ -99,7 +99,16 @@ export interface ChestDef {
   ammo?: Partial<Record<StockKind, number>>;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef;
+/** A ring of stage trapdoors: pull the lever and anyone standing on them drops below. */
+export interface TrapDef {
+  kind: "trap";
+  /** Centre of the ring, on the boards. */
+  pos: Vec3;
+  inner: number;
+  outer: number;
+}
+
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef;
 
 /** A giant rat that creeps out of the wings to gnaw the Queen's powder. */
 export interface RatDef {
@@ -124,6 +133,8 @@ export interface CrewDef {
   yaw?: number;
   zone?: Zone;
   patrol?: Vec3[];
+  /** Walking pace on patrol, when crews of different kinds share a path and must keep step. */
+  pace?: number;
 }
 
 export interface ViewDef {
@@ -346,6 +357,12 @@ export class Mason {
   /** The Queen's bouncy four-poster: anything landing on it goes straight back up. Returns the mattress top. */
   bouncyBed(x: number, z: number, opts: { yaw?: number; spring?: number; width?: number; length?: number } = {}): number {
     return this.fixture("bed", x, 0, z, opts.width ?? 2.2, 0.75, opts.length ?? 2.8, { yaw: opts.yaw ?? 0, spring: opts.spring ?? 10.5, soft: 0.15 });
+  }
+
+  /** A ring of trapdoors in the boards, and the stage lever that opens them. */
+  trapRing(x: number, z: number, inner: number, outer: number, lever: { x: number; z: number; yaw?: number }): void {
+    this.pieces.push({ kind: "trap", pos: { x, y: 0, z }, inner, outer });
+    this.fixture("lever", lever.x, 0, lever.z, 0.5, 1.7, 0.4, { yaw: lever.yaw ?? 0, cue: "trap" });
   }
 
   /** A stagehand's wind machine: strike it and a gale blows across the stage for a while. */

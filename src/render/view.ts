@@ -24,6 +24,7 @@ import {
   buildFixture,
   buildRat,
   buildSandbag,
+  buildTrapRing,
   buildTurntable,
   type RatRig,
   type GunRig,
@@ -31,6 +32,7 @@ import {
   type HumptyRig,
   type ManRig,
   type QueenRig,
+  LEVER_THROW,
 } from "./props.js";
 import { buildStage, type StageSet } from "./stage.js";
 import { Company } from "./company.js";
@@ -40,8 +42,10 @@ const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
 const DEG = 180 / Math.PI;
 /** Bodies that last the whole verse: worth batching. Shots and debris come and go too often. */
 const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag"]);
-const STAR_RISE = 3.2;
-const UNBATCHED = new Set(["daze", "sandwich", "mopper"]);
+const SWEAT = new pc.Color(0.55, 0.78, 0.95);
+/** How long a released star rises on stage before flying off to its chip in the HUD. */
+const STAR_RISE = 1.9;
+const UNBATCHED = new Set(["daze", "sandwich", "mopper", "cat"]);
 /** The Queen stands on a podium stage-left of her battery. */
 const QUEEN_SPOT = { x: -4.4, y: 0.42, z: 7.4 };
 
@@ -60,6 +64,8 @@ interface BodyVisual {
   hoard?: pc.Entity;
   /** The wind machine's slatted drum. */
   drum?: pc.Entity;
+  /** The stage lever's handle. */
+  lever?: pc.Entity;
   /** How far the chest lid has opened, 0 to 1. */
   opened?: number;
 }
@@ -69,6 +75,8 @@ interface RisingStar {
   root: pc.Entity;
   from: pc.Vec3;
   age: number;
+  /** Sparks owed to the trail: it sheds them at a steady rate, whatever the frame rate. */
+  trail: number;
 }
 
 interface Puff {
@@ -84,6 +92,8 @@ interface Puff {
   shape?: pc.Vec3;
   /** An expanding ring (the gong's shimmer): grows to `size` instead of blooming. */
   ring?: boolean;
+  /** The pool this particle goes back to when it fades (not destroyed: blasts make hundreds). */
+  pool?: string;
 }
 
 interface Splat {
@@ -97,7 +107,7 @@ export interface ScreenPoint {
   visible: boolean;
 }
 
-export type CameraMode = "title" | "intro" | "play" | "replay";
+export type CameraMode = "title" | "intro" | "play" | "replay" | "finale";
 
 export class StageView {
   readonly app: pc.Application;
@@ -178,7 +188,8 @@ export class StageView {
     this.app.setCanvasFillMode(pc.FILLMODE_NONE);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
     const handheld = matchMedia("(pointer: coarse)").matches;
-    this.app.graphicsDevice.maxPixelRatio = Math.min(window.devicePixelRatio, handheld ? 1.5 : 2);
+    this.ceiling = Math.max(1, Math.min(window.devicePixelRatio, handheld ? 1.5 : 2));
+    this.app.graphicsDevice.maxPixelRatio = this.ceiling;
     this.app.scene.ambientLight = new pc.Color(0.25, 0.245, 0.23);
     this.app.scene.exposure = 1.15;
     this.kit = new Kit(this.app);
@@ -221,6 +232,8 @@ export class StageView {
     this.queen = buildQueen(this.kit, this.world);
     this.queen.root.setLocalPosition(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
     this.queen.root.setLocalEulerAngles(0, 150, 0);
+    this.batch(this.queen.root);
+    this.batch(this.curios.root);
     // Her blunderbuss leans on the podium until vermin appear.
     this.blunderbuss = this.kit.group("blunderbuss", this.world, V(QUEEN_GUN.x, QUEEN_GUN.y, QUEEN_GUN.z));
     this.kit.primitive("stock", "box", this.blunderbuss, V(0, 0, 0.35), { x: 0.12, y: 0.14, z: 0.55 }, this.kit.material("oak-dark", palette.oakDark, 0.16));
@@ -258,6 +271,22 @@ export class StageView {
     this.hintMarker.enabled = false;
 
     const rope = this.kit.material("rope", palette.rope, 0.12);
+    // The Queen's standard, kept in the wings until the Grand Finale.
+    this.queenFlag = this.kit.group("queen-standard", this.world);
+    this.kit.primitive("standard-pole", "cylinder", this.queenFlag, V(0, 1.6, 0), { x: 0.09, y: 3.2, z: 0.09 }, this.kit.material("pole", palette.oakLight, 0.2));
+    this.kit.primitive("standard-finial", "sphere", this.queenFlag, V(0, 3.28, 0), { x: 0.22, y: 0.22, z: 0.22 }, this.kit.material("gold", palette.gold, 0.72, 0.55));
+    this.queenFlagCloth = this.kit.group("standard-cloth", this.queenFlag, V(0.05, 2.75, 0));
+    const green = this.kit.material("queen-green-flag", new pc.Color(0.035, 0.49, 0.29), 0.22, 0, { doubleSided: true });
+    this.kit.primitive("standard-banner", "box", this.queenFlagCloth, V(0.72, 0, 0), { x: 1.4, y: 0.9, z: 0.03 }, green);
+    this.kit.primitive("standard-crest", "cylinder", this.queenFlagCloth, V(0.72, 0, 0.02), { x: 0.44, y: 0.02, z: 0.44 }, this.kit.material("gold", palette.gold, 0.72, 0.55), V(90, 0, 0), false);
+    this.kit.primitive("standard-egg", "sphere", this.queenFlagCloth, V(0.72, 0, 0.04), { x: 0.16, y: 0.22, z: 0.04 }, this.kit.material("egg-shell", palette.egg, 0.55), pc.Vec3.ZERO, false);
+    this.queenFlag.enabled = false;
+
+    this.starLight = new pc.Entity("star-light");
+    this.starLight.addComponent("light", { type: "omni", color: new pc.Color(1, 0.8, 0.35), intensity: 3, range: 9, castShadows: false });
+    this.starLight.enabled = false;
+    this.effects.addChild(this.starLight);
+
     this.rope = this.kit.primitive("fly-rope", "cylinder", this.effects, V(), { x: 0.05, y: 1, z: 0.05 }, rope, pc.Vec3.ZERO, false);
     this.hook = this.kit.group("fly-hook", this.effects);
     this.kit.meshEntity("hook", this.kit.torus(0.16, 0.035, 16, 6), this.kit.material("iron", palette.iron, 0.55, 0.68), this.kit.group("hook-ring", this.hook, V(), V(90, 0, 0)));
@@ -284,7 +313,7 @@ export class StageView {
     this.chains.clear();
     for (const splat of this.splats) splat.root.destroy();
     this.splats.length = 0;
-    for (const puff of this.puffs) puff.entity.destroy();
+    for (const puff of this.puffs) this.retire(puff);
     this.puffs.length = 0;
     this.humpty = undefined;
     this.humptyVisualId = undefined;
@@ -305,8 +334,21 @@ export class StageView {
     this.lastSelected = game.selected;
     this.swap = 0;
     this.company.reset();
+    this.finale = undefined;
+    this.queenFlag.enabled = false;
+    this.queen.root.setPosition(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
+    this.queen.body.setLocalPosition(0, 0, 0);
+    this.trapRing?.root.destroy();
+    this.trapRing = undefined;
+    const trap = game.trapView;
+    if (trap) {
+      this.trapRing = buildTrapRing(this.kit, this.world, trap.inner, trap.outer);
+      this.trapRing.root.setPosition(trap.center.x, 0, trap.center.z);
+      this.batch(this.trapRing.root);
+    }
     for (const star of this.risingStars) star.root.destroy();
     this.risingStars.length = 0;
+    this.starLight.enabled = false;
     this.nextGlint = this.elapsed + 6;
     this.sync(0);
   }
@@ -559,6 +601,7 @@ export class StageView {
         visual.lid.setLocalEulerAngles(-visual.opened * 110, 0, 0);
       }
       if (visual.drum) visual.drum.rotateLocal(game.windy ? 14 : 0.4, 0, 0);
+      if (visual.lever) visual.lever.setLocalEulerAngles(0, 0, game.trapView?.pulled ? -LEVER_THROW : LEVER_THROW);
       if (visual.view.material === "bed") {
         const squash = Math.max(0, 1 - (this.elapsed - this.bedBounceAt) * 4);
         visual.root.setLocalScale(1 + squash * 0.06, 1 - squash * 0.22, 1 + squash * 0.06);
@@ -571,8 +614,51 @@ export class StageView {
     }
   }
 
+  private readonly pace = { time: 0, frames: 0, calm: 0, windows: 0, raisedAt: -99 };
+  /** The finest ratio still worth trying: lowered for good when a step up proves too much. */
+  private ceiling = 1;
+
+  /**
+   * Keep the frame rate up on slower machines: measure two-second windows and step the pixel ratio
+   * down a notch when frames average over ~24 ms, back up after a sustained run of quick ones.
+   */
+  private governPixelRatio(dt: number, realDt: number): void {
+    // Skip hitches (the frame loop caps dt at 0.1) and frozen frames: a hit-stop or the
+    // replay's rewind does its own heavy lifting and says nothing about the steady pace.
+    if (dt <= 0 || realDt <= 0 || realDt >= 0.1) return;
+    const pace = this.pace;
+    pace.time += realDt;
+    pace.frames += 1;
+    if (pace.time < 2) return;
+    const average = pace.time / pace.frames;
+    pace.time = 0;
+    pace.frames = 0;
+    pace.windows += 1;
+    const device = this.app.graphicsDevice;
+    const ratio = device.maxPixelRatio;
+    if (average > 0.024 && ratio > 1) {
+      const lower = Math.max(1, ratio - 0.25);
+      // Too slow straight after stepping up: that step was a mistake, don't try it again.
+      if (pace.windows - pace.raisedAt <= 3) this.ceiling = lower;
+      device.maxPixelRatio = lower;
+      pace.calm = 0;
+      this.resize();
+    } else if (average < 0.0175 && ratio < this.ceiling) {
+      pace.calm += 1;
+      if (pace.calm >= 4) {
+        device.maxPixelRatio = Math.min(this.ceiling, ratio + 0.25);
+        pace.calm = 0;
+        pace.raisedAt = pace.windows;
+        this.resize();
+      }
+    } else {
+      pace.calm = 0;
+    }
+  }
+
   frame(dt: number, realDt: number): void {
     this.elapsed += realDt;
+    this.governPixelRatio(dt, realDt);
     this.animateHumpty(dt);
     this.animateQueen(realDt);
     this.animateGuns(realDt);
@@ -584,6 +670,7 @@ export class StageView {
     this.animateBlunderbuss(realDt);
     this.animateBombs(dt);
     this.animateStars(realDt);
+    this.animateTrap();
     this.curios.update(this.elapsed);
     this.company.update(this.elapsed, Boolean(this.game?.hoisting));
     this.animateEffects(dt);
@@ -640,6 +727,7 @@ export class StageView {
       case "fixture": {
         const fixture = buildFixture(this.kit, root, view.material, view.size);
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
+        if (view.material === "lever") visual.lever = fixture.findByName("lever-arm") as pc.Entity;
         break;
       }
       case "chest": {
@@ -671,7 +759,7 @@ export class StageView {
         break;
     }
     // Things that animate inside (the wind drum, a chest lid) stay out of the batch.
-    if (BATCHED.has(view.kind) && !visual.drum) this.batch(root);
+    if (BATCHED.has(view.kind) && !visual.drum && !visual.lever) this.batch(root);
     return visual;
   }
 
@@ -704,7 +792,13 @@ export class StageView {
         visual.hat.setLocalPosition(0, 1.72, 0);
       }
       if (visual.hat) visual.hat.enabled = hatted;
-      if (hatted) {
+      const dancing = crew.mode === "patrol" && crew.kind === "guard";
+      if (dancing) {
+        // Ring-a-ring o' roses: arms out, hands held, a skip in every step.
+        const skip = Math.sin(this.elapsed * 7 + stride);
+        man.leftArm.setLocalEulerAngles(0, 0, -95 + skip * 10);
+        man.rightArm.setLocalEulerAngles(0, 0, 95 - skip * 10);
+      } else if (hatted) {
         const grope = Math.sin(this.elapsed * 3) * 15;
         man.leftArm.setLocalEulerAngles(-80 + grope, 0, 10);
         man.rightArm.setLocalEulerAngles(-80 - grope, 0, -10);
@@ -804,21 +898,136 @@ export class StageView {
     const wave = nervous && !falling ? Math.sin(t * 6) * 10 : 0;
     rig.arms[0]!.setLocalEulerAngles(0, 0, 35 + (falling ? 70 + flail : wave) + (hoisting ? 90 : 0));
     rig.arms[1]!.setLocalEulerAngles(0, 0, -35 - (falling ? 70 - flail : -wave) - (hoisting ? 90 : 0));
+    rig.crown.setLocalEulerAngles(falling ? Math.sin(t * 25) * 12 : 0, 0, nervous ? Math.sin(t * 11) * 4 : 0);
+    // Left in peace, he keeps himself busy: the paper, a cup of tea, a polish of the crown.
+    const idle = !falling && !nervous && !hoisting && mood === "calm" && !this.humptyTalk && !game.cracked && game.phase !== "won";
+    this.busyWith(rig, idle ? this.idleActivity(t) : undefined, t);
+    // A lit bomb nearby: he sweats.
+    if (!falling && this.elapsed > this.sweatAt && game.humptyPosition && game.fuses.some((fuse) => Math.hypot(fuse.at.x - game.humptyPosition!.x, fuse.at.z - game.humptyPosition!.z) < 4)) {
+      this.sweatAt = this.elapsed + 0.25;
+      const head = rig.root.getPosition();
+      this.spark(V(head.x + (Math.random() < 0.5 ? -0.3 : 0.3), head.y + 0.5, head.z + 0.3), V((Math.random() - 0.5) * 0.6, 0.6, 0.3), SWEAT);
+    }
     const kick = falling ? Math.sin(t * 18) * 35 : hoisting ? Math.sin(t * 8) * 25 : Math.sin(t * 1.7) * 6;
     rig.legs[0]!.setLocalEulerAngles(-70 + kick, 0, 0);
     rig.legs[1]!.setLocalEulerAngles(-70 - kick, 0, 0);
-    rig.crown.setLocalEulerAngles(falling ? Math.sin(t * 25) * 12 : 0, 0, nervous ? Math.sin(t * 11) * 4 : 0);
   }
 
   private humptyTalk = 0;
   private queenTalk = 0;
+  private sweatAt = 0;
+  private idleSince = 0;
+
+  /** Which pastime he's on, if he has been left alone long enough to start one. */
+  private idleActivity(t: number): "paper" | "tea" | "polish" | undefined {
+    if (this.idleSince === 0) this.idleSince = t;
+    const quiet = t - this.idleSince;
+    if (quiet < 4) return undefined;
+    const cycle = Math.floor((quiet - 4) / 7);
+    const within = (quiet - 4) % 7;
+    if (within > 5.2) return undefined;
+    return (["paper", "tea", "polish"] as const)[cycle % 3];
+  }
+
+  private busyWith(rig: HumptyRig, activity: "paper" | "tea" | "polish" | undefined, t: number): void {
+    if (!activity) this.idleSince = this.humptyTalk || this.game?.humptyMood !== "calm" ? 0 : this.idleSince;
+    rig.paper.enabled = activity === "paper";
+    rig.cup.enabled = activity === "tea";
+    rig.cloth.enabled = activity === "polish";
+    if (activity === "paper") {
+      // Both hands forward holding the paper; now and then he lowers it to peek.
+      const peek = Math.max(0, Math.sin(t * 0.9) - 0.7) * 3;
+      rig.arms[0]!.setLocalEulerAngles(0, 65, -5);
+      rig.arms[1]!.setLocalEulerAngles(0, -65, 5);
+      rig.paper.setLocalPosition(0, 0.06 - peek * 0.18, 0.66);
+      rig.paper.setLocalEulerAngles(-8 - peek * 10, Math.sin(t * 0.7) * 4, 0);
+    } else if (activity === "tea") {
+      // A sip, little finger out; then the cup comes down again.
+      const sip = Math.max(0, Math.sin(t * 1.3));
+      rig.arms[1]!.setLocalEulerAngles(0, -55 - sip * 20, -10 + sip * 38);
+    } else if (activity === "polish") {
+      // Up to the crown with a cloth, in little circles.
+      rig.arms[0]!.setLocalEulerAngles(0, Math.sin(t * 8) * 15, 125 + Math.cos(t * 8) * 10);
+      rig.crown.setLocalEulerAngles(Math.sin(t * 8) * 4, 0, Math.cos(t * 8) * 4);
+    }
+  }
 
   talk(speaker: "humpty" | "queen", seconds: number): void {
     if (speaker === "humpty") this.humptyTalk = seconds;
     else this.queenTalk = seconds;
   }
 
+  /** All forty-eight stars: the Queen marches to the broken egg and plants her standard. */
+  startFinale(): void {
+    const at = this.crackAt ?? V(0, 0, -2);
+    this.finale = { age: 0, to: V(at.x + 1.3, 0, at.z + 1.1), nextBurst: 4.6, showered: false };
+    this.queenFlag.enabled = true;
+    this.cameraMode = "finale";
+  }
+
+  get finaleAge(): number {
+    return this.finale?.age ?? 0;
+  }
+
+  private animateFinale(dt: number): boolean {
+    const finale = this.finale;
+    if (!finale) return false;
+    finale.age += dt;
+    const t = finale.age;
+    const queen = this.queen;
+    const podium = V(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
+    const step = V(-3.2, 0, 5.8);
+    const walk = 4.2;
+    let at: pc.Vec3;
+    if (t < 0.8) at = new pc.Vec3().lerp(podium, step, t / 0.8);
+    else if (t < walk) at = new pc.Vec3().lerp(step, finale.to, (t - 0.8) / (walk - 0.8));
+    else at = finale.to.clone();
+    const marching = t < walk;
+    queen.root.setPosition(at.x, at.y + (marching ? Math.abs(Math.sin(t * 9)) * 0.08 : 0), at.z);
+    const heading = marching ? Math.atan2(finale.to.x - step.x, finale.to.z - step.z) * DEG : 200 + Math.sin(t * 1.5) * 10;
+    queen.root.setLocalEulerAngles(0, heading, marching ? Math.sin(t * 9) * 5 : 0);
+    queen.body.setLocalPosition(0, t > walk + 0.6 ? Math.abs(Math.sin(t * 8)) * 0.2 : 0, 0);
+    // She carries the standard aloft, then plants it by the broken egg.
+    const hand = queen.arm.getPosition();
+    if (t < walk + 0.4) {
+      this.queenFlag.setPosition(hand.x + 0.2, Math.max(0, hand.y - 1.2), hand.z);
+      this.queenFlag.setLocalEulerAngles(0, 0, -8);
+      queen.arm.setLocalEulerAngles(0, 0, 100);
+    } else {
+      const plant = Math.min(1, (t - walk - 0.4) / 0.35);
+      this.queenFlag.setPosition(finale.to.x - 0.9, 1.2 - plant * 1.2, finale.to.z - 0.5);
+      this.queenFlag.setLocalEulerAngles(0, 0, (1 - plant) * -8);
+      queen.arm.setLocalEulerAngles(0, 0, 140 + Math.sin(t * 14) * 20);
+      if (plant >= 1 && this.shake < 0.2 && t < walk + 0.9) this.shake = 0.35;
+    }
+    this.queenFlagCloth.setLocalEulerAngles(0, Math.sin(t * 5) * 14, Math.sin(t * 3.3) * 4);
+    queen.head.setLocalEulerAngles(0, marching ? 0 : Math.sin(t * 2) * 12, -7);
+    // Fireworks over the painted sky, and paper confetti from the flies.
+    if (t > finale.nextBurst && t < 13) {
+      finale.nextBurst = t + 0.35 + Math.random() * 0.35;
+      this.firework(V((Math.random() - 0.5) * 18, 8 + Math.random() * 5, -9 + Math.random() * 5));
+    }
+    if (!finale.showered && t > walk + 0.7) {
+      finale.showered = true;
+      this.confetti({ x: finale.to.x, y: 0, z: finale.to.z });
+    }
+    return true;
+  }
+
+  /** A firework: a flash and a ring of coloured sparks. */
+  private firework(at: pc.Vec3): void {
+    const colours = [palette.gold, palette.king, palette.queen, palette.cream, new pc.Color(0.35, 0.5, 0.95)];
+    const colour = colours[Math.floor(Math.random() * colours.length)]!;
+    this.flash({ x: at.x, y: at.y, z: at.z }, 1.2);
+    for (let index = 0; index < 24; index += 1) {
+      const angle = (index / 24) * Math.PI * 2;
+      const lift = (Math.random() - 0.3) * 5;
+      this.spark(at.clone(), V(Math.cos(angle) * 6.5, lift, Math.sin(angle) * 3), colour, 0.3, 1.5, 3);
+    }
+  }
+
   private animateQueen(dt: number): void {
+    if (this.animateFinale(dt)) return;
     const queen = this.queen;
     const t = this.elapsed;
     this.queenPoint = Math.max(0, this.queenPoint - dt * 0.9);
@@ -1041,17 +1250,46 @@ export class StageView {
     return this.kit.material("cotton-smoke", new pc.Color(0.88, 0.87, 0.83), 0.02, 0, { emissive: new pc.Color(0.12, 0.11, 0.1) });
   }
 
-  private puff(position: pc.Vec3, velocity: pc.Vec3, size: number, life: number, gravity = 0, color?: pc.Color): void {
-    if (this.puffs.length > 180) return;
-    const entity = this.kit.primitive("puff", "sphere", this.effects, position, { x: 0.01, y: 0.01, z: 0.01 }, this.puffMaterial(color), pc.Vec3.ZERO, false);
-    this.puffs.push({ entity, velocity, age: 0, life, size, grow: 1, gravity, spin: (Math.random() - 0.5) * 90 });
+  private readonly particlePools = new Map<string, pc.Entity[]>();
+
+  /** A smoke puff, spark or scrap of confetti: from its pool if one is free, made new if not. */
+  private particle(shape: "sphere" | "box", material: pc.StandardMaterial, position: pc.Vec3, scale: { x: number; y: number; z: number }, euler: pc.Vec3 = pc.Vec3.ZERO): { entity: pc.Entity; pool: string } {
+    const pool = `${shape}:${material.name}`;
+    const free = this.particlePools.get(pool)?.pop();
+    if (free) {
+      free.enabled = true;
+      free.setLocalPosition(position);
+      free.setLocalScale(scale.x, scale.y, scale.z);
+      free.setLocalEulerAngles(euler);
+      return { entity: free, pool };
+    }
+    return { entity: this.kit.primitive("particle", shape, this.effects, position, scale, material, euler, false), pool };
   }
 
-  private spark(position: pc.Vec3, velocity: pc.Vec3, color: pc.Color = palette.flash): void {
+  /** A particle has faded: back to its pool (or away, if it wasn't pooled). */
+  private retire(puff: Puff): void {
+    if (!puff.pool) {
+      puff.entity.destroy();
+      return;
+    }
+    puff.entity.enabled = false;
+    const pool = this.particlePools.get(puff.pool) ?? [];
+    if (pool.length < 240) pool.push(puff.entity);
+    else puff.entity.destroy();
+    this.particlePools.set(puff.pool, pool);
+  }
+
+  private puff(position: pc.Vec3, velocity: pc.Vec3, size: number, life: number, gravity = 0, color?: pc.Color): void {
+    if (this.puffs.length > 180) return;
+    const { entity, pool } = this.particle("sphere", this.puffMaterial(color), position, { x: 0.01, y: 0.01, z: 0.01 });
+    this.puffs.push({ entity, pool, velocity, age: 0, life, size, grow: 1, gravity, spin: (Math.random() - 0.5) * 90 });
+  }
+
+  private spark(position: pc.Vec3, velocity: pc.Vec3, color: pc.Color = palette.flash, size = 0.1, life = 0.7 + Math.random() * 0.4, gravity = 12): void {
     if (this.puffs.length > 180) return;
     const material = this.kit.material(`spark-${color.r.toFixed(2)}-${color.g.toFixed(2)}`, color, 0.3, 0, { emissive: new pc.Color(color.r * 0.8, color.g * 0.6, color.b * 0.3) });
-    const entity = this.kit.primitive("spark", "box", this.effects, position.clone(), { x: 0.08, y: 0.08, z: 0.08 }, material, pc.Vec3.ZERO, false);
-    this.puffs.push({ entity, velocity, age: 0, life: 0.7 + Math.random() * 0.4, size: 0.1, grow: 0, gravity: 12, spin: 400 });
+    const { entity, pool } = this.particle("box", material, position, { x: size * 0.8, y: size * 0.8, z: size * 0.8 });
+    this.puffs.push({ entity, pool, velocity, age: 0, life, size, grow: 0, gravity, spin: 400 });
   }
 
   /** The flies let loose a shower of paper confetti over the wreckage. */
@@ -1060,14 +1298,22 @@ export class StageView {
     for (let index = 0; index < 70; index += 1) {
       const colour = colours[index % colours.length]!;
       const material = this.kit.material(`confetti-${index % colours.length}`, colour, 0.4, 0, { emissive: new pc.Color(colour.r * 0.25, colour.g * 0.25, colour.b * 0.25), doubleSided: true });
-      const entity = this.kit.primitive("confetti", "box", this.effects, V(at.x + (Math.random() - 0.5) * 10, 10 + Math.random() * 4, at.z + (Math.random() - 0.5) * 6), { x: 0.16, y: 0.02, z: 0.1 }, material, V(Math.random() * 360, Math.random() * 360, 0), false);
-      this.puffs.push({ entity, velocity: V((Math.random() - 0.5) * 1.2, -0.6 - Math.random(), (Math.random() - 0.5) * 1.2), age: 0, life: 3.5 + Math.random() * 1.5, size: 1, grow: 0, gravity: 1.2, spin: 200 + Math.random() * 300, shape: V(0.16, 0.02, 0.1) });
+      const { entity, pool } = this.particle("box", material, V(at.x + (Math.random() - 0.5) * 10, 10 + Math.random() * 4, at.z + (Math.random() - 0.5) * 6), { x: 0.16, y: 0.02, z: 0.1 }, V(Math.random() * 360, Math.random() * 360, 0));
+      this.puffs.push({ entity, pool, velocity: V((Math.random() - 0.5) * 1.2, -0.6 - Math.random(), (Math.random() - 0.5) * 1.2), age: 0, life: 3.5 + Math.random() * 1.5, size: 1, grow: 0, gravity: 1.2, spin: 200 + Math.random() * 300, shape: V(0.16, 0.02, 0.1) });
     }
   }
 
   private fizzTimer = 0;
   private bedBounceAt = -10;
   private readonly risingStars: RisingStar[] = [];
+  private trapRing: { root: pc.Entity; leaves: pc.Entity[]; pit: pc.Entity } | undefined;
+  /** The Grand Finale: the Queen marches to centre stage and plants her flag. */
+  private finale: { age: number; to: pc.Vec3; nextBurst: number; showered: boolean } | undefined;
+  private readonly queenFlag: pc.Entity;
+  private readonly queenFlagCloth: pc.Entity;
+  /** A warm glow that goes up with a released star. */
+  private readonly starLight: pc.Entity;
+  private starLightAge = 0;
   private nextGlint = 6;
   private windPuffAt = 0;
 
@@ -1089,6 +1335,16 @@ export class StageView {
     }
   }
 
+  /** The trapdoor leaves swing down as the King's men drop, and up again behind them. */
+  private animateTrap(): void {
+    const ring = this.trapRing;
+    const trap = this.game?.trapView;
+    if (!ring || !trap) return;
+    const pit = trap.open > 0.02 ? 1 : 0.001;
+    ring.pit.setLocalScale(pit, pit, pit);
+    for (const leaf of ring.leaves) leaf.setLocalEulerAngles(-trap.open * 92, 0, 0);
+  }
+
   /** A five-pointed gold star, bright enough to see across the stage. */
   private buildStar(parent: pc.Entity): pc.Entity {
     const root = this.kit.group("hidden-star", parent);
@@ -1104,12 +1360,23 @@ export class StageView {
   private releaseStar(at: Vec3): void {
     const root = this.buildStar(this.effects);
     root.setPosition(at.x, at.y, at.z);
-    this.risingStars.push({ root, from: V(at.x, at.y, at.z), age: 0 });
-    this.flash(at, 1.1);
-    for (let index = 0; index < 18; index += 1) {
-      const angle = (index / 18) * Math.PI * 2;
-      this.spark(V(at.x, at.y, at.z), V(Math.cos(angle) * 4, 2 + Math.random() * 3, Math.sin(angle) * 4), palette.gold);
+    root.setLocalScale(0.01, 0.01, 0.01);
+    this.risingStars.push({ root, from: V(at.x, at.y, at.z), age: 0, trail: 0 });
+    this.flash(at, 2.2);
+    this.shockwave(at);
+    this.starLight.setPosition(at.x, at.y + 0.5, at.z);
+    this.starLight.enabled = true;
+    this.starLightAge = 0;
+    for (let index = 0; index < 28; index += 1) {
+      const angle = (index / 28) * Math.PI * 2;
+      this.spark(V(at.x, at.y, at.z), V(Math.cos(angle) * 5, 2 + Math.random() * 4, Math.sin(angle) * 5), palette.gold);
     }
+  }
+
+  /** Where the newest released star is on screen, so the HUD can catch it. */
+  risingStarPoint(): ScreenPoint | undefined {
+    const star = this.risingStars[this.risingStars.length - 1];
+    return star ? this.project(star.root.getPosition()) : undefined;
   }
 
   /** Released stars rise, spinning and twinkling, and leave the stage. The hidden one glints now and then. */
@@ -1123,16 +1390,30 @@ export class StageView {
         this.risingStars.splice(index, 1);
         continue;
       }
-      const lift = k < 0.35 ? (k / 0.35) * 2.2 : 2.2 + Math.pow((k - 0.35) / 0.65, 2) * 12;
-      star.root.setPosition(star.from.x + Math.sin(star.age * 3) * 0.3, star.from.y + lift, star.from.z);
+      // Out it bursts, overshooting, then rises spinning with a trail of sparks; the HUD catches it.
+      const lift = 3.4 * (1 - Math.pow(1 - Math.min(1, k * 1.4), 3));
+      star.root.setPosition(star.from.x + Math.sin(star.age * 4) * 0.25, star.from.y + 0.4 + lift, star.from.z);
       star.root.lookAt(this.camera.getPosition());
-      star.root.rotateLocal(0, 0, star.age * 220);
-      const pulse = (k < 0.1 ? k / 0.1 : 1) * (1.4 + Math.sin(star.age * 18) * 0.15);
-      star.root.setLocalScale(pulse, pulse, pulse);
-      if (Math.random() < 0.45) {
-        const p = star.root.getPosition();
-        this.spark(V(p.x + (Math.random() - 0.5) * 0.6, p.y, p.z + (Math.random() - 0.5) * 0.6), V((Math.random() - 0.5) * 1.5, -1 - Math.random(), (Math.random() - 0.5) * 1.5), palette.gold);
+      star.root.rotateLocal(0, 0, star.age * 300);
+      const grow = k < 0.18 ? Math.sin((k / 0.18) * Math.PI * 0.5) * 1.25 : 1 + Math.sin(star.age * 16) * 0.08;
+      const fade = k > 0.85 ? 1 - (k - 0.85) / 0.15 : 1;
+      const size = 2.6 * grow * fade;
+      star.root.setLocalScale(size, size, size);
+      // About sixty sparks a second, short-lived, and never crowding out a blast or the crack.
+      star.trail += dt * 60;
+      const p = star.root.getPosition();
+      for (; star.trail >= 1; star.trail -= 1) {
+        if (this.puffs.length > 120) continue;
+        this.spark(V(p.x + (Math.random() - 0.5) * 1.2, p.y + (Math.random() - 0.5) * 0.6, p.z + (Math.random() - 0.5) * 1.2), V((Math.random() - 0.5) * 2.5, -1.5 - Math.random() * 2, (Math.random() - 0.5) * 2.5), palette.gold, 0.1, 0.35 + Math.random() * 0.25);
       }
+    }
+    // The star's glow fades as it leaves.
+    if (this.starLight.enabled) {
+      this.starLightAge += dt;
+      const star = this.risingStars[this.risingStars.length - 1];
+      if (star) this.starLight.setPosition(star.root.getPosition());
+      this.starLight.light!.intensity = Math.max(0, 3.2 * (1 - this.starLightAge / (STAR_RISE + 0.2)));
+      if (this.starLightAge > STAR_RISE + 0.2) this.starLight.enabled = false;
     }
     // Wherever the star is hiding, a glint now and then: a clue, not a signpost.
     const game = this.game;
@@ -1165,8 +1446,8 @@ export class StageView {
 
   private flash(at: Vec3, size: number): void {
     const material = this.kit.material("blast", palette.flash, 0.3, 0, { emissive: new pc.Color(1, 0.55, 0.12) });
-    const entity = this.kit.primitive("flash", "sphere", this.effects, V(at.x, at.y, at.z), { x: 0.1, y: 0.1, z: 0.1 }, material, pc.Vec3.ZERO, false);
-    this.puffs.push({ entity, velocity: V(), age: 0, life: 0.22, size, grow: 1, gravity: 0, spin: 0 });
+    const { entity, pool } = this.particle("sphere", material, V(at.x, at.y, at.z), { x: 0.1, y: 0.1, z: 0.1 });
+    this.puffs.push({ entity, pool, velocity: V(), age: 0, life: 0.22, size, grow: 1, gravity: 0, spin: 0 });
   }
 
   private splat(at: Vec3): void {
@@ -1187,7 +1468,7 @@ export class StageView {
       puff.age += dt;
       const k = puff.age / puff.life;
       if (k >= 1) {
-        puff.entity.destroy();
+        this.retire(puff);
         this.puffs.splice(index, 1);
         continue;
       }
@@ -1319,6 +1600,16 @@ export class StageView {
       pitch += (Math.min(pitch, -34) - pitch) * this.follow;
     }
     let ease = Math.min(1, dt * 3);
+    if (this.cameraMode === "finale" && this.finale) {
+      // Follow her down to the egg, then circle the flag slowly.
+      const subject = this.queen.root.getPosition();
+      const settled = Math.min(1, Math.max(0, (this.finale.age - 4.4) / 2));
+      target.set(subject.x - 0.4, 1.6 + settled * 2.6, subject.z - 0.4 - settled * 1.5);
+      yaw = level.yaw + 18 + (this.finale.age > 4.6 ? (this.finale.age - 4.6) * 5 : 0);
+      pitch = -14 + settled * 9;
+      distance = 12 + settled * 5;
+      ease = Math.min(1, dt * 1.6);
+    }
     if (this.cameraMode === "replay") {
       // Down on the boards beside him, turning slowly, like a newsreel.
       const subject = humpty ?? this.crackAt;

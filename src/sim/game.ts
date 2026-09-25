@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { AMMO, arcPoint, arcVelocity, solveLaunch } from "./ballistics.js";
-import { CREW_SPECS, callLunch, createCrewState, crownWithBucket, formation, slotWorld, steerCrew, type CrewState, type Threat } from "./crew.js";
+import { CREW_SPECS, TRAP_TIME, callLunch, createCrewState, crownWithBucket, dropThroughTrap, formation, slotWorld, steerCrew, type CrewState, type Threat } from "./crew.js";
 import { eggHullPoints } from "./egg.js";
 import {
   BUCKET_SIZE,
@@ -20,6 +20,7 @@ import {
   type SandbagDef,
   type SeesawDef,
   type SwingDef,
+  type TrapDef,
   type TurntableDef,
 } from "./level.js";
 import { CURIOS } from "./curios.js";
@@ -65,6 +66,8 @@ export const HUMPTY_REST = 0.55;
 /** Minimum impact speed (m/s) that cracks Humpty against something hard. */
 export const CRACK_SPEED = 6.6;
 export const HUMPTY_MASS = 90;
+/** How much faster the gun reloads while Humpty is in the air. */
+const FALLING_RELOAD = 2.5;
 /** Largest blow (N·s) the chain of a chain shot deals to one body in one pass. */
 const CHAIN_BLOW = 420;
 /** Height of the rail round the music box's seat. */
@@ -273,6 +276,7 @@ export class Game {
   private readonly toppled = new Set<number>();
   private rat: { state: RatState; entity: Entity } | undefined;
   private readonly startPositions = new Map<number, Vec3>();
+  private trap: { def: TrapDef; openedAt: number } | undefined;
   private lastBounce = -10;
   private bounceStreak = 0;
 
@@ -299,6 +303,7 @@ export class Game {
       else if (piece.kind === "bucket") this.addBucket(piece.pos);
       else if (piece.kind === "sandbag") this.addSandbag(piece);
       else if (piece.kind === "chest") this.addChest(piece);
+      else if (piece.kind === "trap") this.trap = { def: piece, openedAt: -99 };
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -349,6 +354,17 @@ export class Game {
     return this.humpty ? Math.max(0, this.humpty.view.position.y - HUMPTY_REST) : 0;
   }
 
+  /** The trapdoor ring, and how far open its leaves are (0 shut, 1 hanging open). */
+  get trapView(): { center: Vec3; inner: number; outer: number; open: number; pulled: boolean } | undefined {
+    const trap = this.trap;
+    if (!trap) return undefined;
+    const since = this.time - trap.openedAt;
+    // Open as they drop, shut while they're below, open again as they climb back out.
+    const leaf = (t: number): number => (t < 0 ? 0 : t < 0.25 ? t / 0.25 : t < 1.2 ? 1 : t < 1.6 ? 1 - (t - 1.2) / 0.4 : 0);
+    const open = Math.max(leaf(since), leaf(since - TRAP_TIME + 0.2));
+    return { center: trap.def.pos, inner: trap.def.inner, outer: trap.def.outer, open, pulled: since >= 0 && since < TRAP_TIME + 1.6 };
+  }
+
   /** Is the wind machine blowing? */
   get windy(): boolean {
     return this.time < this.windUntil;
@@ -366,6 +382,11 @@ export class Game {
     if ("curio" in holder) return CURIOS.find((curio) => curio.id === holder.curio)?.at;
     const rat = this.rat;
     return rat && rat.state.mode !== "off" ? { x: rat.state.x, y: 0.9, z: rat.state.z } : undefined;
+  }
+
+  /** Seconds until the King's men climb back up out of the trapdoor (0 if nobody is down there). */
+  get trapLeft(): number {
+    return Math.max(0, ...this.crews.filter((crew) => crew.mode === "trapped").map((crew) => crew.trapUntil - this.time));
   }
 
   /** Seconds until the King's men are back from lunch (0 if nobody is at lunch). */
@@ -1134,6 +1155,21 @@ export class Game {
     this.score("chest", { x: at.x, y: at.y + 0.5, z: at.z });
   }
 
+  /** The lever is pulled: everyone dancing on the trapdoors drops below the stage. */
+  private springTrap(): boolean {
+    const trap = this.trap;
+    // The leaves are still open, or the men still climbing out: the lever won't budge yet.
+    if (!trap || this.time - trap.openedAt < TRAP_TIME + 1.6) return false;
+    trap.openedAt = this.time;
+    for (const crew of this.crews) {
+      const r = Math.hypot(crew.x - trap.def.pos.x, crew.z - trap.def.pos.z);
+      if (r < trap.def.inner - 0.4 || r > trap.def.outer + 0.4 || crew.mode === "trapped") continue;
+      dropThroughTrap(crew, this.time);
+      this.score("trap", { x: crew.x, y: 1.4, z: crew.z });
+    }
+    return true;
+  }
+
   /** Humpty lands on the royal bed: back up he goes, a little less each time in a row. */
   private bounceHumpty(bed: Entity): void {
     const humpty = this.humpty;
@@ -1456,6 +1492,7 @@ export class Game {
           rotation = multiply(rotation, { x: Math.sin(tilt / 2), y: 0, z: 0, w: Math.cos(tilt / 2) });
           at.y = slot.local.y - (slot.local.y - (slot.role === "horse" ? 0.45 : 0.26)) * crew.toppled;
         }
+        at.y -= crew.sink;
         entity.body.setNextKinematicTranslation(at);
         entity.body.setNextKinematicRotation(rotation);
       });
@@ -1463,7 +1500,8 @@ export class Game {
   }
 
   private stun(crew: CrewState, at: Vec3): void {
-    if (crew.mode === "stunned" || this.won) return;
+    // Nobody can bowl over a man who is already down, or down the trapdoor.
+    if (crew.mode === "stunned" || crew.mode === "trapped" || this.won) return;
     crew.mode = "stunned";
     crew.modeUntil = this.time + (crew.kind === "cart" ? 3.2 : 3.8);
     crew.threatSince = -1;
@@ -1581,12 +1619,13 @@ export class Game {
   private callCue(fixture: Entity, shot: Entity): void {
     const cue = fixture.cue;
     if (!cue || this.time - (fixture.cuedAt ?? -10) < 2) return;
+    if (cue === "trap" && !this.springTrap()) return;
     fixture.cuedAt = this.time;
     if (cue === "lunch") for (const crew of this.crews) callLunch(crew, this.time);
     if (cue === "wind") this.windUntil = this.time + WIND_TIME;
     const p = shot.body.translation();
     this.events.push({ type: "cue", cue, at: { x: p.x, y: p.y, z: p.z } });
-    this.score(cue === "wind" ? "wind" : "gong", { x: p.x, y: p.y, z: p.z });
+    if (cue !== "trap") this.score(cue === "wind" ? "wind" : "gong", { x: p.x, y: p.y, z: p.z });
   }
 
   private handleForces(): void {
@@ -2173,7 +2212,8 @@ export class Game {
   }
 
   private updatePhase(): void {
-    if (this.reload > 0) this.reload = Math.max(0, this.reload - STEP);
+    // While he falls the gun crew works double-quick: time for a parting shot or two, never a volley.
+    if (this.reload > 0) this.reload = Math.max(0, this.reload - STEP * (this.humptyAirborne ? FALLING_RELOAD : 1));
     if (this.phase === "won") {
       if (this.resultAt !== undefined && this.time >= this.resultAt) {
         this.resultAt = undefined;

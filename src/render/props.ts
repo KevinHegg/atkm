@@ -20,6 +20,10 @@ export interface HumptyRig {
   arms: pc.Entity[];
   legs: pc.Entity[];
   crown: pc.Entity;
+  /** Things he busies himself with between shots. */
+  paper: pc.Entity;
+  cup: pc.Entity;
+  cloth: pc.Entity;
 }
 
 export function eggProfile(from = EGG_BASE_T, to = 1, rings = 28): Array<[number, number]> {
@@ -110,7 +114,27 @@ export function buildHumpty(kit: Kit, parent: pc.Entity): HumptyRig {
     kit.primitive("buckle", "box", leg, V(0, -0.28, 0.14), { x: 0.06, y: 0.04, z: 0.01 }, gold);
     legs.push(leg);
   }
-  return { root, body, face, eyes, pupils, lids, brows, mouth, frown, mouthO, arms, legs, crown };
+  // The Daily Yolk, held up in front of him; a teacup; a cloth for polishing the crown.
+  const paper = kit.group("daily-yolk", body, V(0, 0.02, 0.66), V(-8, 0, 0));
+  const newsprint = new pc.Color(0.93, 0.9, 0.82);
+  const sheet: Box[] = [
+    { center: [0, 0, 0], size: [0.78, 0.52, 0.02], color: newsprint },
+    { center: [0, 0.2, 0.012], size: [0.62, 0.06, 0.01], color: palette.ink },
+    { center: [-0.2, -0.02, 0.012], size: [0.3, 0.22, 0.01], color: new pc.Color(0.55, 0.52, 0.46) },
+  ];
+  for (let line = 0; line < 5; line += 1) sheet.push({ center: [0.18, 0.1 - line * 0.07, 0.012], size: [0.3, 0.018, 0.01], color: new pc.Color(0.45, 0.43, 0.4) });
+  kit.meshEntity("newspaper", kit.boxes("daily-yolk", sheet), kit.paintMaterial(0.1), paper, false);
+  paper.enabled = false;
+  const cup = kit.group("teacup", arms[1]!, V(0.34, 0.07, 0.04));
+  const china = kit.material("china", new pc.Color(0.96, 0.95, 0.92), 0.7);
+  kit.primitive("cup", "cylinder", cup, V(0, 0.04, 0), { x: 0.1, y: 0.09, z: 0.1 }, china, pc.Vec3.ZERO, false);
+  kit.primitive("tea", "cylinder", cup, V(0, 0.085, 0), { x: 0.085, y: 0.01, z: 0.085 }, kit.material("tea", new pc.Color(0.45, 0.25, 0.08), 0.8), pc.Vec3.ZERO, false);
+  kit.primitive("saucer", "cylinder", cup, V(0, -0.01, 0), { x: 0.17, y: 0.015, z: 0.17 }, china, pc.Vec3.ZERO, false);
+  cup.enabled = false;
+  const cloth = kit.group("polishing-cloth", arms[0]!, V(-0.36, 0.02, 0));
+  kit.primitive("cloth", "box", cloth, V(), { x: 0.12, y: 0.03, z: 0.14 }, kit.material("cloth-white", new pc.Color(0.95, 0.95, 0.95), 0.1), V(10, 20, 0), false);
+  cloth.enabled = false;
+  return { root, body, face, eyes, pupils, lids, brows, mouth, frown, mouthO, arms, legs, crown, paper, cup, cloth };
 }
 
 function zigzag(angle: number, teeth: number, base: number, depth: number): number {
@@ -609,6 +633,36 @@ function buildCradle(kit: Kit, root: pc.Entity, size: { x: number; y: number; z:
   return root;
 }
 
+/** How far the stage lever leans either way, in degrees. */
+export const LEVER_THROW = 16;
+
+/** A ring of trapdoors in the boards; each leaf hangs from its outer edge. */
+export function buildTrapRing(kit: Kit, parent: pc.Entity, inner: number, outer: number): { root: pc.Entity; leaves: pc.Entity[]; pit: pc.Entity } {
+  const root = kit.group("trap-ring", parent);
+  const count = 16;
+  const mid = (inner + outer) / 2;
+  const length = outer - inner;
+  const width = (2 * Math.PI * mid) / count - 0.04;
+  const plank = kit.material("trap-plank", shade(palette.floor, 1.12), 0.14);
+  const seam = kit.material("floor-seam", palette.floorEdge, 0.08);
+  const pit = kit.group("trap-pit", root);
+  const dark = kit.material("trap-pit", new pc.Color(0.02, 0.018, 0.015), 0.02);
+  const leaves: pc.Entity[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const angle = (index / count) * 360;
+    const spoke = kit.group("trap-spoke", root, V(), V(0, angle, 0));
+    // Both sit just above the painted lawn (whose top is at 0.022).
+    kit.primitive("trap-hole", "box", kit.group("trap-hole-spoke", pit, V(), V(0, angle, 0)), V(0, 0.026, mid), { x: width + 0.06, y: 0.008, z: length }, dark, pc.Vec3.ZERO, false);
+    const hinge = kit.group("trap-hinge", spoke, V(0, 0.036, outer));
+    kit.primitive("trap-leaf", "box", hinge, V(0, 0, -length / 2), { x: width, y: 0.024, z: length }, plank, pc.Vec3.ZERO, false);
+    kit.primitive("trap-seam", "box", hinge, V(width / 2, 0.012, -length / 2), { x: 0.02, y: 0.01, z: length }, seam, pc.Vec3.ZERO, false);
+    leaves.push(hinge);
+  }
+  // Shrunk away rather than disabled, so the ring can sit in a dynamic batch without rebuilds.
+  pit.setLocalScale(0.001, 0.001, 0.001);
+  return { root, leaves, pit };
+}
+
 /** An iron-bound chest of spare powder and shot. The lid swings up when it is forced. */
 export function buildChest(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): { root: pc.Entity; lid: pc.Entity; hoard: pc.Entity } {
   const root = kit.group("chest", parent);
@@ -731,6 +785,21 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
     }
     for (let coil = 0; coil < 6; coil += 1) parts.push({ center: [-x / 2 + 0.3 + coil * ((x - 0.6) / 5), -y / 2 + 0.36, z / 2 + 0.01], size: [0.12, 0.12, 0.02], color: new pc.Color(0.55, 0.56, 0.58) });
     kit.meshEntity("bed", kit.boxes(`bed-${x.toFixed(2)}x${z.toFixed(2)}`, parts), kit.paintMaterial(0.25), root);
+    return root;
+  }
+  if (look === "lever") {
+    // The stage manager's lever: a post, a quadrant and a long iron handle with a red grip.
+    const oak = kit.material("oak-dark", palette.oakDark, 0.16);
+    const iron = kit.material("iron", palette.iron, 0.55, 0.68);
+    kit.primitive("lever-post", "box", root, V(0, -0.2, 0), { x: 0.3, y: y - 0.4, z: 0.3 }, oak);
+    kit.primitive("lever-foot", "box", root, V(0, -y / 2 + 0.06, 0), { x: 0.6, y: 0.12, z: 0.5 }, oak);
+    kit.primitive("lever-quadrant", "cylinder", root, V(0, y / 2 - 0.75, 0.16), { x: 0.5, y: 0.05, z: 0.5 }, iron, V(90, 0, 0));
+    // Short enough, and thrown through a small enough arc, that the red grip stays inside the
+    // fixture's collider: a shot at the knob must strike the lever.
+    const arm = kit.group("lever-arm", root, V(0, y / 2 - 0.75, 0.2));
+    kit.primitive("lever-handle", "cylinder", arm, V(0, 0.32, 0), { x: 0.06, y: 0.64, z: 0.06 }, iron);
+    kit.primitive("lever-grip", "sphere", arm, V(0, 0.66, 0), { x: 0.16, y: 0.16, z: 0.16 }, kit.material("lever-red", palette.king, 0.4));
+    arm.setLocalEulerAngles(0, 0, LEVER_THROW);
     return root;
   }
   if (look === "windmachine") {

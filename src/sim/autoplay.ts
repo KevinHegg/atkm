@@ -144,6 +144,8 @@ export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
   const game = await Game.create(level);
   try {
     const points: Vec3[] = [];
+    // Fixtures that set off a stage cue (the gong, the wind machine, the trapdoor lever).
+    const cues = new Set<string>(level.pieces.flatMap((piece) => (piece.kind === "fixture" && piece.cue ? [piece.look] : [])));
     for (const view of game.bodies) {
       if (view.kind === "block" || view.kind === "keg" || view.kind === "hay") {
         points.push({ ...view.position });
@@ -159,7 +161,7 @@ export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
       if (view.kind === "man" || view.kind === "horse") points.push({ ...view.position });
       if (view.kind === "bucket" || view.kind === "sandbag") points.push({ ...view.position });
       // Stage cues come first: they are the openers of two-shot lines.
-      if (view.kind === "fixture" && view.material === "gong") points.unshift({ ...view.position });
+      if (view.kind === "fixture" && cues.has(view.material)) points.unshift({ ...view.position });
       if (view.kind === "fixture" && (view.material === "bumper" || view.material === "drum")) {
         for (const dy of [-0.5, -0.25, 0, 0.25, 0.5]) points.push({ x: view.position.x, y: view.position.y + dy, z: view.position.z });
       }

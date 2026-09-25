@@ -17,16 +17,21 @@ const BASE = import.meta.env.BASE_URL;
 /** Tray order and the number keys: 1 shot, 2 shell, 3 grape, 4 chain, 5 bomb, 6 the Queen's blunderbuss. */
 const AMMO_ORDER: AmmoKind[] = ["shot", "shell", "grape", "chain", "bomb", "blunderbuss"];
 const STOCK_ORDER: StockKind[] = ["shot", "shell", "grape", "chain", "bomb"];
-const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
-const STORAGE_KEY = "great-fall:progress:v1";
+const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+const numeral = (index: number): string => NUMERALS[index] ?? String(index + 1);
+/** Bumped to wipe everyone's stars when the scoring changed (v1 had a different third star). */
+const STORAGE_KEY = "great-fall:progress:v2";
+const OLD_STORAGE_KEYS = ["great-fall:progress:v1"];
 
-type Screen = "title" | "levels" | "play" | "result" | "replay";
+type Screen = "title" | "levels" | "play" | "result" | "replay" | "finale";
 
 interface Progress {
   stars: Record<string, number>;
   /** Best mayhem per verse. */
   best: Record<string, number>;
   muted: boolean;
+  /** The Grand Finale has been played for this player. */
+  finale?: boolean;
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
@@ -37,10 +42,11 @@ const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
 
 function loadProgress(): Progress {
   try {
+    for (const key of OLD_STORAGE_KEYS) localStorage.removeItem(key);
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted) };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale) };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
@@ -107,6 +113,15 @@ interface Bubble {
   element: HTMLElement;
   speaker: Speaker;
   until: number;
+  /** How far it has been nudged aside from its speaker, eased so it slides rather than jumps. */
+  nudge?: { x: number; y: number };
+}
+
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 }
 
 const bubbles: Bubble[] = [];
@@ -144,12 +159,38 @@ function later(seconds: number, action: () => void): void {
 
 /** The best mayhem before this attempt, so the result can say whether it was beaten. */
 let previousBest = 0;
+/** The forty-eighth star has just been won: the finale plays instead of the usual result. */
+let finalePending = false;
+
+function totalStars(): number {
+  return LEVELS.reduce((sum, level) => sum + (progress.stars[level.id] ?? 0), 0);
+}
+
+/** The Grand Finale: the Queen marches to the broken egg and plants her standard. */
+function startFinale(): void {
+  finalePending = false;
+  progress.finale = true;
+  saveProgress();
+  for (const bubble of [...bubbles]) dismissBubble(bubble);
+  $("#toast").replaceChildren();
+  $("#popups").replaceChildren();
+  show("finale");
+  $("#hud-top").hidden = true;
+  view.startFinale();
+  audio.fanfare();
+  audio.applause(4);
+  window.setTimeout(() => screen === "finale" && audio.fanfare(), 4600);
+  window.setTimeout(() => screen === "finale" && audio.applause(6), 4800);
+  window.setTimeout(() => screen === "finale" && say("queen", "All forty-eight! The stage is MINE.", 4), 5200);
+}
 
 function recordStars(current: Game): void {
   if (!current.cracked) return;
   const id = current.level.id;
   progress.stars[id] = Math.max(progress.stars[id] ?? 0, current.stars().count);
   progress.best[id] = Math.max(progress.best[id] ?? 0, current.mayhem.total);
+  // Marked as seen only once it actually plays (a restart or reload before then keeps it owed).
+  if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = true;
   saveProgress();
 }
 
@@ -169,6 +210,7 @@ function positionBubbles(): void {
   const now = performance.now();
   // Keep speech clear of the verse title and caption at the top.
   const top = bubbles.length ? $("#hud-top").getBoundingClientRect().bottom + 8 : 0;
+  const wanted: Array<{ bubble: Bubble; x: number; y: number; width: number; height: number; visible: boolean }> = [];
   for (const bubble of [...bubbles]) {
     if (now > bubble.until) {
       dismissBubble(bubble);
@@ -183,13 +225,46 @@ function positionBubbles(): void {
     bubble.element.style.visibility = point.visible ? "visible" : "hidden";
     const width = bubble.element.offsetWidth;
     const height = bubble.element.offsetHeight;
-    const x = Math.min(window.innerWidth - width - 8, Math.max(8, point.x - 30));
-    const y = Math.max(top, point.y - height - 14);
-    bubble.element.style.transform = `translate(${x}px, ${y}px)`;
+    wanted.push({
+      bubble,
+      width,
+      height,
+      visible: point.visible,
+      x: Math.min(window.innerWidth - width - 8, Math.max(8, point.x - 30)),
+      y: Math.max(top, point.y - height - 14),
+    });
+  }
+  // Speech never sits on top of other speech or of the big shout in the middle: the topmost
+  // bubble keeps its place, and the rest step aside (sideways round a shout, down below a bubble).
+  const taken: Box[] = [];
+  const shout = $("#toast").firstElementChild;
+  const shoutBox = shout && now < toastUntil ? shout.getBoundingClientRect() : undefined;
+  if (shoutBox) taken.push(shoutBox);
+  wanted.sort((a, b) => a.y - b.y);
+  for (const want of wanted) {
+    let { x, y } = want;
+    for (let tries = 0; tries < 4; tries += 1) {
+      const hit = taken.find((box) => x < box.right + 6 && x + want.width > box.left - 6 && y < box.bottom + 6 && y + want.height > box.top - 6);
+      if (!hit) break;
+      const right = hit.right + 8;
+      const left = hit.left - want.width - 8;
+      if (hit === shoutBox && right + want.width <= window.innerWidth - 8 && (x + want.width / 2 >= (hit.left + hit.right) / 2 || left < 8)) x = right;
+      else if (hit === shoutBox && left >= 8) x = left;
+      else y = hit.bottom + 8;
+    }
+    if (want.visible) taken.push({ left: x, top: y, right: x + want.width, bottom: y + want.height });
+    const nudge = (want.bubble.nudge ??= { x: x - want.x, y: y - want.y });
+    nudge.x += (x - want.x - nudge.x) * 0.25;
+    nudge.y += (y - want.y - nudge.y) * 0.25;
+    want.bubble.element.style.transform = `translate(${(want.x + nudge.x).toFixed(1)}px, ${(want.y + nudge.y).toFixed(1)}px)`;
   }
 }
 
+/** When the current shout has finished its animation (see `.toast-word` in the stylesheet). */
+let toastUntil = 0;
+
 function toast(word: string, small = false, subtitle?: string): void {
+  toastUntil = performance.now() + 1800;
   const host = $("#toast");
   host.replaceChildren();
   const element = document.createElement("span");
@@ -214,6 +289,7 @@ function show(next: Screen): void {
   $("#title-screen").hidden = next !== "title";
   $("#levels-screen").hidden = next !== "levels";
   $("#result-screen").hidden = next !== "result";
+  if (next !== "finale") $("#finale-screen").hidden = true;
   $("#replay-banner").hidden = next !== "replay";
   const playing = next === "play" || next === "result" || next === "replay";
   $("#hud-top").hidden = !playing;
@@ -241,8 +317,10 @@ function renderLevelList(): void {
     const button = document.createElement("button");
     button.type = "button";
     button.disabled = !unlocked(index);
-    button.innerHTML = `<span class="numeral">Verse ${NUMERALS[index]}</span><span class="name"></span><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>`;
+    const best = progress.best[level.id];
+    button.innerHTML = `<span class="numeral">Verse ${numeral(index)}</span><span class="name"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>${best ? `<span class="best">Best ${best.toLocaleString("en-GB")}</span>` : ""}</span>`;
     button.querySelector(".name")!.textContent = button.disabled ? "Locked" : level.title;
+    item.classList.toggle("complete", stars === 3);
     button.addEventListener("click", () => {
       audio.unlock();
       audio.click();
@@ -251,7 +329,9 @@ function renderLevelList(): void {
     item.append(button);
     list.append(item);
   });
-  $("#star-total").textContent = `${total} of ${LEVELS.length * 3} stars`;
+  const all = total === LEVELS.length * 3;
+  $("#star-total").textContent = all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`;
+  $("#star-total").classList.toggle("all", all);
 }
 
 async function loadGame(index: number): Promise<Game> {
@@ -267,6 +347,7 @@ async function loadGame(index: number): Promise<Game> {
   aimTarget = undefined;
   aimedAt = 0;
   resultTimer = 0;
+  finalePending = false;
   view.bind(next);
   return next;
 }
@@ -281,7 +362,7 @@ async function startLevel(index: number): Promise<void> {
     $("#toast").replaceChildren();
     show("play");
     view.setCameraMode("intro");
-    $("#hud-number").textContent = `Verse ${NUMERALS[index]}`;
+    $("#hud-number").textContent = `Verse ${numeral(index)}`;
     $("#hud-title").textContent = level.title;
     $("#great-fall").textContent = String(level.greatFall);
     $("#mayhem-target").textContent = level.mayhem.toLocaleString("en-GB");
@@ -289,7 +370,7 @@ async function startLevel(index: number): Promise<void> {
     previousBest = progress.best[level.id] ?? 0;
     $("#popups").replaceChildren();
     for (const item of document.querySelectorAll<HTMLElement>("#objectives li")) item.classList.remove("lit", "lost");
-    $("#verse-number").textContent = `Verse ${NUMERALS[index]}`;
+    $("#verse-number").textContent = `Verse ${numeral(index)}`;
     $("#verse-title").textContent = level.title;
     $("#verse-lines").innerHTML = "";
     level.verse.forEach((line, lineIndex) => {
@@ -414,7 +495,7 @@ function showResult(): void {
   const stars = current.stars();
   const won = current.cracked;
   recordStars(current);
-  $("#result-kicker").textContent = `Verse ${NUMERALS[levelIndex]} · ${level.title}`;
+  $("#result-kicker").textContent = `Verse ${numeral(levelIndex)} · ${level.title}`;
   $("#result-title").textContent = won ? "Humpty had a great fall" : "All the King's men win";
   $("#result-stars").innerHTML = [0, 1, 2].map((star) => `<i class="star${star < stars.count ? " lit" : ""}"></i>`).join("");
   const notice = review({
@@ -429,7 +510,7 @@ function showResult(): void {
     starFrom: starHolderName(level.star),
   });
   $("#paper-name").textContent = notice.paper;
-  $("#paper-date").textContent = `Verse ${NUMERALS[levelIndex]} · price one penny`;
+  $("#paper-date").textContent = `Verse ${numeral(levelIndex)} · price one penny`;
   $("#paper-headline").textContent = notice.headline;
   $("#paper-body").textContent = notice.body;
   $("#paper-critic").textContent = notice.critic;
@@ -456,6 +537,29 @@ function showResult(): void {
   show("result");
   if (won) audio.fanfare();
   else audio.sadTrombone();
+}
+
+/** The released star flies from the stage up into its chip in the HUD. */
+function flyStarToChip(): void {
+  const from = view.risingStarPoint();
+  const chip = document.querySelector<HTMLElement>("#objectives [data-star=\"star\"]");
+  if (!from?.visible || !chip) return;
+  const to = chip.getBoundingClientRect();
+  const flyer = document.createElement("div");
+  flyer.className = "star-flyer";
+  flyer.style.transform = `translate(${from.x}px, ${from.y}px) translate(-50%, -50%) scale(1.4)`;
+  document.body.append(flyer);
+  requestAnimationFrame(() => {
+    flyer.style.transform = `translate(${to.left + 16}px, ${to.top + to.height / 2}px) translate(-50%, -50%) scale(0.5) rotate(216deg)`;
+    flyer.style.opacity = "0.9";
+  });
+  window.setTimeout(() => {
+    flyer.remove();
+    chip.classList.remove("caught");
+    void chip.offsetWidth;
+    chip.classList.add("caught");
+    audio.tally(200);
+  }, 720);
 }
 
 /** Who hides the star, as a newspaper would put it. */
@@ -567,7 +671,7 @@ const openPopups = new Map<MayhemKind, { element: HTMLElement; points: number; c
 function popup(kind: MayhemKind, points: number, at: Vec3): void {
   const now = performance.now();
   const open = openPopups.get(kind);
-  if (open && now < open.until && (kind === "masonry" || kind === "hay" || kind === "bowled" || kind === "keg")) {
+  if (open && now < open.until && (kind === "masonry" || kind === "hay" || kind === "bowled" || kind === "keg" || kind === "trap")) {
     open.points += points;
     open.count += 1;
     open.element.querySelector("b")!.textContent = `+${open.points}`;
@@ -679,13 +783,16 @@ function updateRingTag(ring: Vec3 | undefined): void {
 /** Timed stage business the player is waiting on: lunch, for now. */
 function updateStatus(): void {
   const status = $("#status");
-  const left = game && screen === "play" ? game.lunchLeft : 0;
-  if (left <= 0) {
+  const lunch = game && screen === "play" ? game.lunchLeft : 0;
+  const trap = game && screen === "play" ? game.trapLeft : 0;
+  if (lunch <= 0 && trap <= 0) {
     status.hidden = true;
     return;
   }
   status.hidden = false;
-  const html = `The King's men are at lunch: back in <b>${Math.ceil(left)}</b> s`;
+  const html = lunch > 0
+    ? `The King's men are at lunch: back in <b>${Math.ceil(lunch)}</b> s`
+    : `The King's men are down the trapdoor: back up in <b>${Math.ceil(trap)}</b> s`;
   if (status.innerHTML !== html) status.innerHTML = html;
 }
 
@@ -849,6 +956,12 @@ window.addEventListener("keydown", (event) => {
     else void startLevel(levelIndex);
   } else if (screen === "levels" && event.key === "Escape") {
     show(levelsReturn);
+  } else if (screen === "finale" && $("#finale-screen").hidden && (event.key === "Enter" || event.key === " " || event.key === "Escape")) {
+    // Skip ahead to the card; the fireworks carry on behind it.
+    event.preventDefault();
+    revealFinaleCard();
+  } else if (screen === "finale" && event.key === "Escape") {
+    show("levels");
   }
   if (event.key === "m" || event.key === "M") toggleMute();
 });
@@ -908,6 +1021,22 @@ $("#levels-back").addEventListener("click", () => {
 $("#next-button").addEventListener("click", () => {
   audio.click();
   void startLevel(Math.min(levelIndex + 1, LEVELS.length - 1));
+});
+/** The curtain-call card over the finale; its first button takes the keyboard. */
+function revealFinaleCard(): void {
+  $("#finale-screen").hidden = false;
+  $<HTMLButtonElement>("#finale-again").focus({ preventScroll: true });
+}
+$("#finale-again").addEventListener("click", () => {
+  audio.click();
+  $("#finale-screen").hidden = true;
+  view.startFinale();
+  audio.fanfare();
+  audio.applause(4);
+});
+$("#finale-verses").addEventListener("click", () => {
+  audio.click();
+  show("levels");
 });
 $("#replay-button").addEventListener("click", () => {
   audio.click();
@@ -1015,6 +1144,15 @@ function handle(event: GameEvent): void {
       }
       break;
     case "cue":
+      if (event.cue === "trap") {
+        audio.trapdoor();
+        if (live) {
+          audio.laugh();
+          toast("A-tishoo!", true, "We all fall down");
+          later(1.4, () => cue("trapdoor", 1, 0));
+        }
+        break;
+      }
       if (event.cue === "wind") {
         audio.gust();
         if (live) {
@@ -1045,8 +1183,12 @@ function handle(event: GameEvent): void {
       audio.starChime();
       if (live) {
         audio.gasp();
+        audio.applause(1.2);
+        // A breath of slow motion so nobody misses it.
+        hitStop = Math.max(hitStop, 0.35);
         toast("A hidden star!", true, "It's yours if he cracks");
         later(1.2, () => cue("star", 1, 0));
+        later(1.55, flyStarToChip);
       }
       break;
     case "bounce":
@@ -1243,6 +1385,7 @@ function tick(realDt: number): void {
   view.frame(realDt * scale, realDt);
   positionBubbles();
   updateFallMeter();
+  if (screen === "finale" && $("#finale-screen").hidden && view.finaleAge > 9.5) revealFinaleCard();
   if (screen === "replay" && replaying) {
     const late = current.steps > replaying.lastStep + 60 * 14;
     if ((current.cracked && current.time - crackedAt > 2.4) || late) endReplay();
@@ -1255,7 +1398,10 @@ function tick(realDt: number): void {
     selected?.classList.toggle("reloading", current.phase === "flight" && current.reload > 0);
     if (resultTimer > 0) {
       resultTimer -= realDt;
-      if (resultTimer <= 0) showResult();
+      if (resultTimer <= 0) {
+        if (finalePending && current.cracked) startFinale();
+        else showResult();
+      }
     }
   }
 }
@@ -1271,6 +1417,8 @@ declare global {
       screen: () => Screen;
       start: (index: number) => Promise<void>;
       advance: (seconds: number) => void;
+      /** Play the Grand Finale now (for testing). */
+      finale: () => void;
     };
   }
 }
@@ -1280,6 +1428,9 @@ window.__GREAT_FALL__ = {
   pointer,
   screen: () => screen,
   start: startLevel,
+  finale: () => {
+    if (screen === "play" || screen === "result") startFinale();
+  },
   /** Fast-forward for automated checks when the tab is not painting frames. */
   advance: (seconds: number) => {
     for (let frame = 0; frame < Math.round(seconds * 60); frame += 1) tick(1 / 60);
