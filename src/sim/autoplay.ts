@@ -1,0 +1,140 @@
+import { Game, STEP } from "./game.js";
+import type { LevelDef } from "./level.js";
+import type { AmmoKind, Vec3 } from "./types.js";
+
+export interface PlannedShot {
+  ammo: AmmoKind;
+  /** World aim point, or an offset from wherever Humpty is when the gun is ready. */
+  at: Vec3;
+  relativeToHumpty?: boolean;
+  /** Extra seconds to wait after the gun is ready before firing. */
+  wait?: number;
+}
+
+function resolveAim(game: Game, shot: PlannedShot): Vec3 | undefined {
+  if (!shot.relativeToHumpty) return shot.at;
+  const humpty = game.humptyPosition;
+  return humpty ? { x: humpty.x + shot.at.x, y: humpty.y + shot.at.y, z: humpty.z + shot.at.z } : undefined;
+}
+
+export interface PlayResult {
+  won: boolean;
+  lost: boolean;
+  time: number;
+  fall: number;
+  stars: number;
+  bowled: number;
+  catches: number;
+  shotsFired: number;
+  landing?: Vec3;
+}
+
+/** Plays a level headlessly with a fixed list of shots. Deterministic for a given build. */
+export async function playOut(level: LevelDef, shots: readonly PlannedShot[], maxTime = 40): Promise<PlayResult> {
+  const game = await Game.create(level);
+  try {
+    let index = 0;
+    let readySince: number | undefined;
+    let landing: Vec3 | undefined;
+    let wasAirborne = false;
+    while (game.time < maxTime) {
+      const shot = shots[index];
+      if (shot && game.phase === "aim" && game.reload <= 0) {
+        readySince ??= game.time;
+        const aim = resolveAim(game, shot);
+        if (game.time - readySince >= (shot.wait ?? 0) && aim) {
+          game.select(shot.ammo);
+          if (game.fire(aim)) {
+            index += 1;
+            readySince = undefined;
+          }
+        }
+      }
+      game.step();
+      if (wasAirborne && !game.humptyAirborne) landing = game.humptyPosition ?? landing;
+      wasAirborne = game.humptyAirborne;
+      for (const event of game.drainEvents()) {
+        if (event.type === "crack") landing = event.at;
+        if (event.type === "result") {
+          const stars = game.stars();
+          return {
+            won: event.won,
+            lost: !event.won,
+            time: game.time,
+            fall: game.stats.fall,
+            stars: stars.count,
+            bowled: game.stats.bowled,
+            catches: game.stats.catches,
+            shotsFired: game.stats.shots,
+            ...(landing ? { landing } : {}),
+          };
+        }
+      }
+      if (index >= shots.length && game.phase !== "won" && game.ammoLeft > 0 && game.phase === "aim" && game.time > 30) break;
+    }
+    return {
+      won: game.cracked,
+      lost: false,
+      time: game.time,
+      fall: game.stats.fall,
+      stars: game.stars().count,
+      bowled: game.stats.bowled,
+      catches: game.stats.catches,
+      shotsFired: game.stats.shots,
+      ...(landing ? { landing } : {}),
+    };
+  } catch (error) {
+    console.error("playOut failed", level.id, JSON.stringify(shots), error);
+    throw error;
+  } finally {
+    game.destroy();
+  }
+}
+
+/** Largest displacement of any body after `seconds` with every body awake and no shots. */
+export async function settleDrift(level: LevelDef, seconds = 6): Promise<{ drift: number; cracked: boolean; humptyDrift: number }> {
+  const game = await Game.create(level);
+  try {
+    for (const body of game.world.bodies.getAll()) if (body.isDynamic()) body.wakeUp();
+    const start = new Map(game.bodies.map((view) => [view.id, { ...view.position }]));
+    const humptyStart = game.humptyPosition;
+    const steps = Math.round(seconds / STEP);
+    for (let step = 0; step < steps; step += 1) game.step();
+    let drift = 0;
+    for (const view of game.bodies) {
+      const from = start.get(view.id);
+      if (!from || view.kind === "man" || view.kind === "litter" || view.kind === "horse") continue;
+      drift = Math.max(drift, Math.hypot(view.position.x - from.x, view.position.y - from.y, view.position.z - from.z));
+    }
+    const humptyNow = game.humptyPosition;
+    const humptyDrift = humptyStart && humptyNow
+      ? Math.hypot(humptyNow.x - humptyStart.x, humptyNow.y - humptyStart.y, humptyNow.z - humptyStart.z)
+      : Infinity;
+    return { drift, cracked: game.cracked, humptyDrift };
+  } finally {
+    game.destroy();
+  }
+}
+
+/** Aim points worth trying: every structural body, Humpty, and the crews. */
+export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
+  const game = await Game.create(level);
+  try {
+    const points: Vec3[] = [];
+    for (const view of game.bodies) {
+      if (view.kind === "block" || view.kind === "keg" || view.kind === "hay") {
+        points.push({ ...view.position });
+      }
+      if (view.kind === "humpty") {
+        points.push({ ...view.position });
+        points.push({ x: view.position.x - 0.35, y: view.position.y, z: view.position.z });
+        points.push({ x: view.position.x + 0.35, y: view.position.y, z: view.position.z });
+        points.push({ x: view.position.x, y: view.position.y - 0.4, z: view.position.z });
+      }
+      if (view.kind === "man" || view.kind === "horse") points.push({ ...view.position });
+    }
+    return points;
+  } finally {
+    game.destroy();
+  }
+}

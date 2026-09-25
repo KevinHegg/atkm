@@ -1,0 +1,538 @@
+import * as pc from "playcanvas";
+import { EGG_BASE_T, eggRadius, eggY } from "../sim/egg.js";
+import { hashUnit, palette, type Kit } from "./kit.js";
+
+const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
+
+// ------------------------------------------------------------------ Humpty
+
+export interface HumptyRig {
+  root: pc.Entity;
+  body: pc.Entity;
+  face: pc.Entity;
+  eyes: pc.Entity[];
+  pupils: pc.Entity[];
+  lids: pc.Entity[];
+  brows: pc.Entity[];
+  mouth: pc.Entity;
+  frown: pc.Entity;
+  mouthO: pc.Entity;
+  arms: pc.Entity[];
+  legs: pc.Entity[];
+  crown: pc.Entity;
+}
+
+export function eggProfile(from = EGG_BASE_T, to = 1, rings = 28): Array<[number, number]> {
+  const profile: Array<[number, number]> = [];
+  for (let ring = 0; ring <= rings; ring += 1) {
+    const t = from + (to - from) * (ring / rings);
+    profile.push([eggRadius(t), eggY(t)]);
+  }
+  return profile;
+}
+
+/** Humpty's cravat (or is it a belt?) sits at his widest point. */
+const CRAVAT_T = -0.12;
+
+export function buildHumpty(kit: Kit, parent: pc.Entity): HumptyRig {
+  const root = kit.group("humpty", parent);
+  const body = kit.group("humpty-body", root);
+  const shell = kit.material("egg-shell", palette.egg, 0.55);
+  kit.meshEntity("egg-shell", kit.lathe("egg", eggProfile(), 36, true), shell, body);
+
+  const cravatY = eggY(CRAVAT_T);
+  const cravatR = eggRadius(CRAVAT_T);
+  const red = kit.material("royal-red", palette.king, 0.3);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  kit.meshEntity("cravat", kit.torus(cravatR + 0.005, 0.045, 36, 6), red, kit.group("cravat-ring", body, V(0, cravatY, 0)));
+  const knot = kit.group("cravat-knot", body, V(0, cravatY - 0.02, cravatR + 0.02));
+  kit.primitive("knot", "sphere", knot, V(0, 0, 0.01), { x: 0.1, y: 0.09, z: 0.07 }, red);
+  kit.primitive("bow-l", "cone", knot, V(-0.1, 0, 0), { x: 0.1, y: 0.16, z: 0.05 }, red, V(0, 0, 90));
+  kit.primitive("bow-r", "cone", knot, V(0.1, 0, 0), { x: 0.1, y: 0.16, z: 0.05 }, red, V(0, 0, -90));
+  kit.primitive("pin", "sphere", knot, V(0, 0, 0.05), { x: 0.035, y: 0.035, z: 0.035 }, gold);
+
+  const face = kit.group("humpty-face", body, V(0, 0.18, 0));
+  const faceZ = (y: number): number => eggRadius((y + 0.18) / 0.7) - 0.02;
+  const eyeWhite = kit.material("eye-white", new pc.Color(1, 1, 0.98), 0.7);
+  const ink = kit.material("ink", palette.ink, 0.42);
+  const eyes: pc.Entity[] = [];
+  const pupils: pc.Entity[] = [];
+  const lids: pc.Entity[] = [];
+  const brows: pc.Entity[] = [];
+  for (const x of [-0.14, 0.14]) {
+    const eye = kit.group("eye", face, V(x, 0.07, faceZ(0.07) - 0.01));
+    kit.primitive("eye-rim", "sphere", eye, V(0, 0, -0.012), { x: 0.205, y: 0.26, z: 0.1 }, ink);
+    kit.primitive("eye-white", "sphere", eye, V(0, 0, 0), { x: 0.18, y: 0.235, z: 0.11 }, eyeWhite);
+    const pupil = kit.primitive("pupil", "sphere", eye, V(0, -0.01, 0.045), { x: 0.085, y: 0.115, z: 0.045 }, ink);
+    kit.primitive("glint", "sphere", pupil, V(0.22, 0.25, 0.4), { x: 0.3, y: 0.3, z: 0.3 }, eyeWhite, pc.Vec3.ZERO, false);
+    const lid = kit.primitive("lid", "sphere", eye, V(0, 0.045, 0.014), { x: 0.19, y: 0.15, z: 0.11 }, shell);
+    lid.enabled = false;
+    const brow = kit.primitive("brow", "box", face, V(x, 0.24, faceZ(0.24) + 0.005), { x: 0.19, y: 0.035, z: 0.03 }, ink, V(0, 0, x < 0 ? -8 : 8));
+    eyes.push(eye);
+    pupils.push(pupil);
+    lids.push(lid);
+    brows.push(brow);
+  }
+  kit.primitive("nose", "cone", face, V(0, -0.06, faceZ(-0.06) + 0.05), { x: 0.08, y: 0.16, z: 0.08 }, kit.material("nose", palette.gold, 0.28), V(90, 0, 0));
+  // Smile and frown are open arcs of the same torus, turned to face the audience.
+  const arc = kit.torus(0.14, 0.026, 18, 6, 110);
+  const mouth = kit.group("mouth", face, V(0, -0.1, faceZ(-0.2) + 0.012));
+  kit.meshEntity("smile", arc, ink, kit.group("smile-arc", mouth, V(), V(90, 0, -35)));
+  const frown = kit.group("frown", face, V(0, -0.33, faceZ(-0.2) + 0.012));
+  kit.meshEntity("frown", arc, ink, kit.group("frown-arc", frown, V(), V(90, 0, 145)));
+  frown.enabled = false;
+  const mouthO = kit.primitive("mouth-o", "sphere", face, V(0, -0.21, faceZ(-0.21) - 0.005), { x: 0.12, y: 0.15, z: 0.06 }, ink);
+  mouthO.enabled = false;
+
+  const crown = kit.group("crown", body, V(0, 0.68, 0));
+  kit.primitive("crown-band", "cylinder", crown, V(0, 0, 0), { x: 0.3, y: 0.09, z: 0.3 }, gold);
+  for (let index = 0; index < 5; index += 1) {
+    const angle = (index / 5) * Math.PI * 2;
+    kit.primitive("crown-point", "cone", crown, V(Math.cos(angle) * 0.11, 0.11, Math.sin(angle) * 0.11), { x: 0.07, y: 0.2, z: 0.07 }, gold);
+  }
+  kit.primitive("crown-jewel", "sphere", crown, V(0, 0.01, 0.15), { x: 0.06, y: 0.06, z: 0.04 }, kit.material("ruby", new pc.Color(0.7, 0.02, 0.05), 0.9));
+
+  const arms: pc.Entity[] = [];
+  const cream = kit.material("glove", palette.cream, 0.2);
+  for (const side of [-1, 1]) {
+    const arm = kit.group(side < 0 ? "arm-l" : "arm-r", body, V(side * 0.46, -0.02, 0.02), V(0, 0, side * -35));
+    kit.primitive("sleeve", "cylinder", arm, V(side * 0.14, 0, 0), { x: 0.09, y: 0.3, z: 0.09 }, red, V(0, 0, 90));
+    kit.primitive("glove", "sphere", arm, V(side * 0.32, 0, 0), { x: 0.13, y: 0.12, z: 0.11 }, cream);
+    arms.push(arm);
+  }
+  const legs: pc.Entity[] = [];
+  const stocking = kit.material("stocking", palette.cream, 0.18);
+  const shoe = kit.material("shoe", palette.ink, 0.5);
+  for (const side of [-1, 1]) {
+    const leg = kit.group(side < 0 ? "leg-l" : "leg-r", body, V(side * 0.17, -0.48, 0.24), V(-70, 0, 0));
+    kit.primitive("shin", "cylinder", leg, V(0, -0.14, 0), { x: 0.07, y: 0.28, z: 0.07 }, stocking);
+    kit.primitive("shoe", "box", leg, V(0, -0.3, 0.05), { x: 0.1, y: 0.07, z: 0.17 }, shoe);
+    kit.primitive("buckle", "box", leg, V(0, -0.28, 0.14), { x: 0.06, y: 0.04, z: 0.01 }, gold);
+    legs.push(leg);
+  }
+  return { root, body, face, eyes, pupils, lids, brows, mouth, frown, mouthO, arms, legs, crown };
+}
+
+function zigzag(angle: number, teeth: number, base: number, depth: number): number {
+  const phase = (angle / (Math.PI * 2)) * teeth;
+  const tri = Math.abs((phase % 1) * 2 - 1);
+  return base + (tri - 0.5) * depth;
+}
+
+export function buildShellPiece(kit: Kit, parent: pc.Entity, piece: "egg-bottom" | "egg-top" | "egg-chip", size: { x: number; y: number; z: number }): pc.Entity {
+  const shell = kit.material("egg-shell-broken", palette.egg, 0.5, 0, { doubleSided: true });
+  const root = kit.group(piece, parent);
+  if (piece === "egg-chip") {
+    kit.primitive("chip", "box", root, V(), size, shell);
+    return root;
+  }
+  const rim = (angle: number): number => zigzag(angle, 7, 0.08, 0.22);
+  if (piece === "egg-bottom") {
+    const mesh = kit.jaggedLathe("egg-cup", eggRadius, eggY, () => EGG_BASE_T, rim);
+    const offset = -size.y / 2 - eggY(EGG_BASE_T);
+    const cup = kit.meshEntity("cup", mesh, shell, root);
+    cup.setLocalPosition(0, offset, 0);
+    kit.primitive("cup-floor", "cylinder", root, V(0, -size.y / 2 + 0.01, 0), { x: eggRadius(EGG_BASE_T) * 2, y: 0.02, z: eggRadius(EGG_BASE_T) * 2 }, shell);
+    kit.primitive("yolk-inside", "sphere", root, V(0, offset - 0.2, 0), { x: 0.74, y: 0.3, z: 0.74 }, kit.material("yolk", palette.yolk, 0.85));
+  } else {
+    const mesh = kit.jaggedLathe("egg-cap", eggRadius, eggY, rim, () => 1);
+    const cap = kit.meshEntity("cap", mesh, shell, root);
+    cap.setLocalPosition(0, -size.y / 2 - eggY(0.08), 0);
+  }
+  return root;
+}
+
+// ------------------------------------------------------------------ Queen
+
+export interface QueenRig {
+  root: pc.Entity;
+  body: pc.Entity;
+  head: pc.Entity;
+  crown: pc.Entity;
+  scepter: pc.Entity;
+  arm: pc.Entity;
+}
+
+export function buildQueen(kit: Kit, parent: pc.Entity): QueenRig {
+  const root = kit.group("queen", parent);
+  const body = kit.group("queen-body", root);
+  body.setLocalScale(1.22, 1.22, 1.22);
+  const velvet = kit.material("queen-velvet", new pc.Color(0.025, 0.12, 0.095), 0.16);
+  const green = kit.material("queen-mad-green", new pc.Color(0.055, 0.34, 0.22), 0.2);
+  const sicklyGreen = kit.material("queen-sickly-green", new pc.Color(0.31, 0.42, 0.095), 0.18);
+  const paleSkin = kit.material("queen-pale-skin", new pc.Color(0.72, 0.61, 0.43), 0.18);
+  const bone = kit.material("queen-bone", new pc.Color(0.86, 0.81, 0.63), 0.25);
+  const black = kit.material("queen-black", palette.ink, 0.08);
+  const tarnishedGold = kit.material("queen-tarnished-gold", new pc.Color(0.57, 0.39, 0.08), 0.5, 0.52);
+  const iron = kit.material("iron", palette.iron, 0.55, 0.68);
+
+  kit.primitive("underskirt", "cone", body, V(0, 0.38, 0.02), { x: 0.78, y: 0.76, z: 0.64 }, velvet);
+  kit.primitive("overgown", "cone", body, V(0, 0.6, -0.03), { x: 0.64, y: 1.16, z: 0.56 }, green);
+  kit.primitive("bodice", "box", body, V(0, 1.07, -0.01), { x: 0.48, y: 0.52, z: 0.34 }, velvet, V(0, 0, -3));
+  kit.primitive("collar", "cylinder", body, V(0, 1.3, 0), { x: 0.43, y: 0.08, z: 0.43 }, bone);
+  kit.primitive("ragged-cape", "box", body, V(0.05, 0.84, 0.24), { x: 0.82, y: 1.03, z: 0.08 }, velvet, V(-8, 0, 4));
+
+  const head = kit.group("queen-head", body, V(0, 1.55, 0), V(0, 0, -7));
+  kit.primitive("head", "sphere", head, V(), { x: 0.4, y: 0.46, z: 0.38 }, paleSkin);
+  for (const [x, y, scale, angle] of [[-0.27, 0.1, 0.2, -24], [0.27, 0.12, 0.23, 29], [-0.18, 0.34, 0.19, -13], [0.17, 0.35, 0.2, 18]] as const) {
+    kit.primitive("wild-hair", "sphere", head, V(x, y, 0.02), { x: scale, y: scale * 1.35, z: scale }, black, V(0, 0, angle));
+  }
+  kit.primitive("left-eye", "sphere", head, V(0.12, 0.07, -0.18), { x: 0.13, y: 0.1, z: 0.045 }, bone);
+  kit.primitive("right-eye", "sphere", head, V(-0.13, 0.05, -0.18), { x: 0.095, y: 0.075, z: 0.04 }, bone);
+  kit.primitive("left-pupil", "sphere", head, V(0.09, 0.08, -0.207), { x: 0.045, y: 0.052, z: 0.025 }, black);
+  kit.primitive("right-pupil", "sphere", head, V(-0.16, 0.035, -0.205), { x: 0.036, y: 0.041, z: 0.023 }, sicklyGreen);
+  kit.primitive("left-brow", "box", head, V(0.12, 0.2, -0.195), { x: 0.18, y: 0.035, z: 0.035 }, black, V(0, 0, 18));
+  kit.primitive("right-brow", "box", head, V(-0.13, 0.17, -0.195), { x: 0.16, y: 0.035, z: 0.035 }, black, V(0, 0, -23));
+  kit.primitive("nose", "cone", head, V(-0.01, -0.03, -0.225), { x: 0.075, y: 0.18, z: 0.075 }, paleSkin, V(-90, 0, 0));
+  kit.primitive("crooked-mouth", "box", head, V(-0.035, -0.18, -0.2), { x: 0.23, y: 0.04, z: 0.035 }, black, V(0, 0, -14));
+
+  const crown = kit.group("queen-crown", head, V(-0.03, 0.42, 0), V(0, 0, -17));
+  kit.primitive("band", "cylinder", crown, V(), { x: 0.39, y: 0.13, z: 0.39 }, tarnishedGold);
+  for (const [index, x] of [-0.28, -0.14, 0, 0.14, 0.28].entries()) {
+    const height = index % 2 === 0 ? 0.42 : 0.3;
+    kit.primitive("point", "cone", crown, V(x, 0.18, 0), { x: 0.11, y: height, z: 0.11 }, tarnishedGold, V(0, 0, (index - 2) * 7));
+  }
+
+  kit.primitive("left-sleeve", "cone", body, V(-0.46, 1.05, 0.02), { x: 0.25, y: 0.65, z: 0.25 }, green, V(0, 0, -28));
+  const arm = kit.group("scepter-arm", body, V(0.4, 1.2, 0.01));
+  kit.primitive("right-sleeve", "cone", arm, V(0.08, -0.2, 0), { x: 0.26, y: 0.7, z: 0.26 }, green, V(0, 0, 31));
+  const scepter = kit.group("scepter", arm, V(0.28, -0.26, 0.01), V(0, 0, -9));
+  kit.primitive("shaft", "cylinder", scepter, V(), { x: 0.055, y: 1.08, z: 0.055 }, tarnishedGold);
+  kit.primitive("cage", "sphere", scepter, V(0, 0.62, 0), { x: 0.22, y: 0.24, z: 0.22 }, iron);
+  for (const angle of [0, 90, 180, 270]) {
+    const rad = (angle * Math.PI) / 180;
+    kit.primitive("spike", "cone", scepter, V(Math.cos(rad) * 0.18, 0.62, Math.sin(rad) * 0.18), { x: 0.08, y: 0.3, z: 0.08 }, tarnishedGold, V(0, 0, angle + 90));
+  }
+  return { root, body, head, crown, scepter, arm };
+}
+
+// ------------------------------------------------------------------ King's men and horses
+
+export interface ManRig {
+  root: pc.Entity;
+  rig: pc.Entity;
+  leftArm: pc.Entity;
+  rightArm: pc.Entity;
+  leftLeg: pc.Entity;
+  rightLeg: pc.Entity;
+  daze: pc.Entity;
+}
+
+export function buildMan(kit: Kit, parent: pc.Entity, variant: "bearer" | "guard" | "driver"): ManRig {
+  const root = kit.group("kings-man", parent);
+  const rig = kit.group("rig", root, V(0, -0.8, 0));
+  const uniform = kit.material("king-cloth", palette.king, 0.16);
+  const ink = kit.material("ink", palette.ink, 0.42);
+  const iron = kit.material("helmet-iron", palette.iron, 0.52, 0.66);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  const white = kit.material("belt-white", new pc.Color(0.86, 0.83, 0.74), 0.2);
+  kit.primitive("torso", "box", rig, V(0, 1.05, 0), { x: 0.46, y: 0.62, z: 0.3 }, uniform);
+  kit.primitive("cross-belt", "box", rig, V(0, 1.06, 0.155), { x: 0.08, y: 0.7, z: 0.02 }, white, V(0, 0, 32));
+  kit.primitive("belt", "box", rig, V(0, 0.78, 0), { x: 0.48, y: 0.08, z: 0.32 }, ink);
+  kit.primitive("buckle", "box", rig, V(0, 0.78, 0.165), { x: 0.08, y: 0.06, z: 0.01 }, gold);
+  kit.primitive("head", "sphere", rig, V(0, 1.55, 0), { x: 0.34, y: 0.38, z: 0.32 }, kit.material("skin", palette.skin, 0.25));
+  kit.primitive("nose", "sphere", rig, V(0, 1.53, 0.16), { x: 0.07, y: 0.07, z: 0.07 }, kit.material("skin-dark", new pc.Color(0.6, 0.38, 0.26), 0.25));
+  for (const x of [-0.07, 0.07]) kit.primitive("eye", "sphere", rig, V(x, 1.6, 0.145), { x: 0.045, y: 0.055, z: 0.03 }, ink);
+  kit.primitive("moustache", "box", rig, V(0, 1.49, 0.15), { x: 0.16, y: 0.035, z: 0.04 }, ink);
+  if (variant === "guard") {
+    kit.primitive("bearskin", "cylinder", rig, V(0, 1.84, -0.01), { x: 0.34, y: 0.42, z: 0.34 }, ink);
+    kit.primitive("bearskin-top", "sphere", rig, V(0, 2.05, -0.01), { x: 0.34, y: 0.2, z: 0.34 }, ink);
+    kit.primitive("chinstrap", "box", rig, V(0, 1.45, 0.02), { x: 0.36, y: 0.03, z: 0.02 }, gold);
+  } else {
+    const helmet = kit.primitive("helmet", "sphere", rig, V(0, 1.7, -0.01), { x: 0.38, y: 0.2, z: 0.36 }, iron);
+    kit.primitive("brim", "cylinder", rig, V(0, 1.66, -0.01), { x: 0.5, y: 0.02, z: 0.5 }, iron);
+    kit.primitive("ridge", "box", helmet, V(0, 0.4, 0), { x: 0.11, y: 0.22, z: 0.48 }, uniform);
+  }
+  const leftArm = kit.group("arm-l", rig, V(-0.3, 1.3, 0));
+  kit.primitive("sleeve", "cylinder", leftArm, V(0, -0.27, 0), { x: 0.12, y: 0.56, z: 0.12 }, uniform);
+  kit.primitive("hand", "sphere", leftArm, V(0, -0.56, 0), { x: 0.11, y: 0.11, z: 0.11 }, kit.material("skin", palette.skin, 0.25));
+  const rightArm = kit.group("arm-r", rig, V(0.3, 1.3, 0));
+  kit.primitive("sleeve", "cylinder", rightArm, V(0, -0.27, 0), { x: 0.12, y: 0.56, z: 0.12 }, uniform);
+  kit.primitive("hand", "sphere", rightArm, V(0, -0.56, 0), { x: 0.11, y: 0.11, z: 0.11 }, kit.material("skin", palette.skin, 0.25));
+  if (variant === "guard") {
+    kit.primitive("pike", "cylinder", rightArm, V(0, -0.2, 0.08), { x: 0.035, y: 2.1, z: 0.035 }, kit.material("pike-shaft", palette.oakLight, 0.16));
+    kit.primitive("pike-head", "cone", rightArm, V(0, 0.92, 0.08), { x: 0.09, y: 0.24, z: 0.03 }, iron);
+  }
+  const leftLeg = kit.group("leg-l", rig, V(-0.12, 0.74, 0));
+  kit.primitive("leg", "cylinder", leftLeg, V(0, -0.36, 0), { x: 0.13, y: 0.72, z: 0.13 }, ink);
+  kit.primitive("boot", "box", leftLeg, V(0, -0.7, 0.05), { x: 0.14, y: 0.1, z: 0.24 }, ink);
+  const rightLeg = kit.group("leg-r", rig, V(0.12, 0.74, 0));
+  kit.primitive("leg", "cylinder", rightLeg, V(0, -0.36, 0), { x: 0.13, y: 0.72, z: 0.13 }, ink);
+  kit.primitive("boot", "box", rightLeg, V(0, -0.7, 0.05), { x: 0.14, y: 0.1, z: 0.24 }, ink);
+  const daze = kit.group("daze", rig, V(0, 2.1, 0));
+  for (let index = 0; index < 3; index += 1) {
+    const angle = (index / 3) * Math.PI * 2;
+    kit.primitive("star", "sphere", daze, V(Math.cos(angle) * 0.3, 0, Math.sin(angle) * 0.3), { x: 0.09, y: 0.09, z: 0.09 }, kit.material("daze-star", palette.gold, 0.6, 0, { emissive: new pc.Color(0.5, 0.35, 0.02) }), pc.Vec3.ZERO, false);
+  }
+  daze.enabled = false;
+  return { root, rig, leftArm, rightArm, leftLeg, rightLeg, daze };
+}
+
+export interface HorseRig {
+  root: pc.Entity;
+  body: pc.Entity;
+  legs: pc.Entity[];
+  head: pc.Entity;
+  tail: pc.Entity;
+}
+
+export function buildHorse(kit: Kit, parent: pc.Entity): HorseRig {
+  const root = kit.group("horse", parent);
+  const body = kit.group("horse-body", root, V(0, -1.05, 0));
+  const coat = kit.material("horse-coat", new pc.Color(0.9, 0.87, 0.8), 0.2);
+  const mane = kit.material("horse-mane", new pc.Color(0.3, 0.27, 0.24), 0.1);
+  const ink = kit.material("ink", palette.ink, 0.42);
+  const red = kit.material("king-cloth", palette.king, 0.16);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  kit.primitive("barrel", "capsule", body, V(0, 1.25, 0), { x: 0.62, y: 1.55, z: 0.7 }, coat, V(90, 0, 0));
+  kit.primitive("caparison", "box", body, V(0, 1.12, -0.05), { x: 0.7, y: 0.55, z: 1.2 }, red);
+  kit.primitive("caparison-trim", "box", body, V(0, 0.86, -0.05), { x: 0.72, y: 0.06, z: 1.22 }, gold);
+  kit.primitive("saddle-crown", "sphere", body, V(0, 1.43, -0.05), { x: 0.2, y: 0.12, z: 0.2 }, gold);
+  const legs: pc.Entity[] = [];
+  for (const [x, z] of [[-0.2, 0.55], [0.2, 0.55], [-0.2, -0.55], [0.2, -0.55]] as const) {
+    const leg = kit.group("leg", body, V(x, 1.0, z));
+    kit.primitive("leg", "cylinder", leg, V(0, -0.45, 0), { x: 0.15, y: 0.9, z: 0.15 }, coat);
+    kit.primitive("hoof", "cylinder", leg, V(0, -0.9, 0), { x: 0.17, y: 0.1, z: 0.17 }, ink);
+    legs.push(leg);
+  }
+  const head = kit.group("head", body, V(0, 1.55, 0.72));
+  kit.primitive("neck", "box", head, V(0, 0.28, 0.12), { x: 0.28, y: 0.7, z: 0.34 }, coat, V(30, 0, 0));
+  kit.primitive("mane", "box", head, V(0, 0.35, -0.02), { x: 0.1, y: 0.7, z: 0.14 }, mane, V(30, 0, 0));
+  kit.primitive("skull", "box", head, V(0, 0.62, 0.36), { x: 0.26, y: 0.26, z: 0.52 }, coat, V(20, 0, 0));
+  kit.primitive("muzzle", "box", head, V(0, 0.52, 0.6), { x: 0.24, y: 0.2, z: 0.2 }, kit.material("horse-muzzle", new pc.Color(0.7, 0.62, 0.58), 0.2));
+  for (const x of [-0.08, 0.08]) kit.primitive("ear", "cone", head, V(x, 0.82, 0.22), { x: 0.07, y: 0.18, z: 0.05 }, coat);
+  for (const x of [-0.14, 0.14]) kit.primitive("eye", "sphere", head, V(x, 0.68, 0.4), { x: 0.05, y: 0.06, z: 0.06 }, ink);
+  kit.primitive("plume", "cone", head, V(0, 0.98, 0.18), { x: 0.1, y: 0.3, z: 0.1 }, red);
+  kit.primitive("bridle", "box", head, V(0, 0.6, 0.42), { x: 0.28, y: 0.04, z: 0.3 }, gold, V(20, 0, 0));
+  const tail = kit.group("tail", body, V(0, 1.35, -0.78));
+  kit.primitive("tail", "cone", tail, V(0, -0.25, -0.05), { x: 0.14, y: 0.6, z: 0.14 }, mane, V(160, 0, 0));
+  return { root, body, legs, head, tail };
+}
+
+export function buildLitterBed(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const root = kit.group("litter", parent);
+  const straw = kit.material("straw", palette.straw, 0.08);
+  const pole = kit.material("pole", palette.oakLight, 0.2);
+  const red = kit.material("king-cloth", palette.king, 0.16);
+  kit.primitive("mattress", "box", root, V(0, 0.02, 0), { x: size.x * 0.92, y: size.y, z: size.z * 0.86 }, straw);
+  for (const x of [-size.x / 2, size.x / 2]) {
+    kit.primitive("pole", "cylinder", root, V(x, 0.02, 0), { x: 0.07, y: size.z + 0.9, z: 0.07 }, pole, V(90, 0, 0));
+  }
+  kit.primitive("blanket", "box", root, V(0, size.y / 2 + 0.02, -size.z * 0.2), { x: size.x * 0.94, y: 0.03, z: size.z * 0.35 }, red);
+  kit.primitive("pillow", "sphere", root, V(0, size.y / 2 + 0.04, size.z * 0.34), { x: 0.5, y: 0.14, z: 0.3 }, kit.material("pillow", palette.cream, 0.2));
+  return root;
+}
+
+export function buildCartBed(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): { root: pc.Entity; wheels: pc.Entity[] } {
+  const root = kit.group("cart", parent);
+  const dark = kit.material("oak-dark", palette.oakDark, 0.16);
+  const oak = kit.material("oak", palette.oak, 0.2);
+  const straw = kit.material("straw", palette.straw, 0.08);
+  const red = kit.material("king-cloth", palette.king, 0.16);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  kit.primitive("tray", "box", root, V(0, -0.05, 0), { x: size.x, y: 0.12, z: size.z }, dark);
+  for (const x of [-size.x / 2, size.x / 2]) kit.primitive("side", "box", root, V(x, 0.08, 0), { x: 0.08, y: 0.3, z: size.z }, red);
+  kit.primitive("side-trim", "box", root, V(size.x / 2 + 0.045, 0.08, 0), { x: 0.02, y: 0.06, z: size.z * 0.9 }, gold);
+  kit.primitive("side-trim", "box", root, V(-size.x / 2 - 0.045, 0.08, 0), { x: 0.02, y: 0.06, z: size.z * 0.9 }, gold);
+  kit.primitive("hay-load", "box", root, V(0, 0.12, 0), { x: size.x * 0.9, y: 0.24, z: size.z * 0.92 }, straw);
+  for (const [x, z] of [[-0.3, -0.5], [0.35, 0.3], [0, -0.1]] as const) kit.primitive("hay-mound", "sphere", root, V(x, 0.24, z), { x: 0.7, y: 0.25, z: 0.6 }, straw);
+  const wheels: pc.Entity[] = [];
+  for (const x of [-size.x / 2 - 0.12, size.x / 2 + 0.12]) {
+    const wheel = kit.group("wheel", root, V(x, -0.3, -0.1), V(0, 0, 90));
+    kit.meshEntity("rim", kit.torus(0.44, 0.05, 20, 6), dark, kit.group("rim-axis", wheel, V(), V(0, 0, 0)));
+    for (let spoke = 0; spoke < 4; spoke += 1) kit.primitive("spoke", "box", wheel, V(), { x: 0.05, y: 0.04, z: 0.86 }, oak, V(0, spoke * 45, 0));
+    kit.primitive("hub", "cylinder", wheel, V(), { x: 0.14, y: 0.14, z: 0.14 }, gold);
+    wheels.push(wheel);
+  }
+  for (const x of [-0.35, 0.35]) kit.primitive("shaft", "cylinder", root, V(x, 0.05, size.z / 2 + 0.7), { x: 0.06, y: 1.5, z: 0.06 }, oak, V(90, 0, 0));
+  return { root, wheels };
+}
+
+// ------------------------------------------------------------------ Masonry and stores
+
+type Box = { center: readonly [number, number, number]; size: readonly [number, number, number]; color: pc.Color };
+
+const shade = (color: pc.Color, amount: number): pc.Color =>
+  new pc.Color(Math.min(1, color.r * amount), Math.min(1, color.g * amount), Math.min(1, color.b * amount));
+
+/** Masonry and timber are baked into one vertex-coloured mesh per size and tone. */
+export function buildBlock(kit: Kit, parent: pc.Entity, material: string, size: { x: number; y: number; z: number }, seed: string): pc.Entity {
+  const root = kit.group(`block-${material}`, parent);
+  const tone = Math.floor(hashUnit(seed) * 4);
+  const key = `${material}-${tone}-${size.x.toFixed(2)}x${size.y.toFixed(2)}x${size.z.toFixed(2)}`;
+  const { x, y, z } = size;
+  const boxes: Box[] = [];
+  let gloss = 0.17;
+  if (material === "stone") {
+    gloss = 0.07;
+    const color = new pc.Color(0.38 + tone * 0.025, 0.37 + tone * 0.022, 0.33 + tone * 0.018);
+    boxes.push({ center: [0, 0, 0], size: [x * 0.985, y * 0.97, z * 0.985], color });
+    const face = shade(color, 1.12);
+    for (const side of [-1, 1]) {
+      boxes.push({ center: [0, 0, side * z * 0.5], size: [x * 0.86, y * 0.8, 0.02], color: face });
+      boxes.push({ center: [side * x * 0.5, 0, 0], size: [0.02, y * 0.8, z * 0.86], color: face });
+    }
+    boxes.push({ center: [0, y * 0.49, 0], size: [x * 0.86, 0.02, z * 0.86], color: face });
+  } else if (material === "brick") {
+    gloss = 0.1;
+    const color = new pc.Color(0.44 + tone * 0.03, 0.19 + tone * 0.015, 0.12);
+    boxes.push({ center: [0, 0, 0], size: [x * 0.985, y * 0.97, z * 0.985], color });
+    const courses = Math.max(1, Math.round(y / 0.25));
+    const mortar = new pc.Color(0.66, 0.6, 0.5);
+    for (let course = 1; course < courses; course += 1) {
+      boxes.push({ center: [0, -y / 2 + (course * y) / courses, 0], size: [x * 1.001, 0.025, z * 1.001], color: mortar });
+    }
+  } else {
+    const base = material === "plank" ? palette.oakLight : material === "beam" ? palette.oakDark : palette.oak;
+    const color = shade(base, 0.88 + tone * 0.06);
+    boxes.push({ center: [0, 0, 0], size: [x * 0.99, y * 0.96, z * 0.97], color });
+    const grain = palette.oakDark;
+    const long = x >= z;
+    const length = (long ? x : z) * 0.84;
+    const across = long ? z : x;
+    for (const offset of [-0.22, 0.05, 0.26]) {
+      const o = offset * across;
+      boxes.push(long
+        ? { center: [0, y * 0.48 + 0.004, o], size: [length, 0.012, 0.014], color: grain }
+        : { center: [o, y * 0.48 + 0.004, 0], size: [0.014, 0.012, length], color: grain });
+    }
+    for (const side of [-1, 1]) {
+      const h = y * 0.2;
+      boxes.push(long
+        ? { center: [0, h * side * 0.8, side * z * 0.485 + side * 0.004], size: [length, 0.012, 0.012], color: grain }
+        : { center: [side * x * 0.495 + side * 0.004, h * side * 0.8, 0], size: [0.012, 0.012, length], color: grain });
+    }
+    const end = shade(palette.oakLight, 0.95 + tone * 0.03);
+    for (const side of [-1, 1]) {
+      boxes.push(long
+        ? { center: [side * x * 0.495, 0, 0], size: [0.014, y * 0.86, z * 0.84], color: end }
+        : { center: [0, 0, side * z * 0.485], size: [x * 0.84, y * 0.86, 0.014], color: end });
+    }
+  }
+  kit.meshEntity("block", kit.boxes(key, boxes), kit.paintMaterial(gloss), root);
+  return root;
+}
+
+export function buildKeg(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const root = kit.group("keg", parent);
+  const staves = kit.material("keg-staves", new pc.Color(0.36, 0.2, 0.08), 0.2);
+  const iron = kit.material("iron", palette.iron, 0.55, 0.68);
+  const red = kit.material("powder-red", new pc.Color(0.72, 0.08, 0.04), 0.3);
+  const r = size.x / 2;
+  const h = size.y;
+  const profile: Array<[number, number]> = [];
+  for (let index = 0; index <= 10; index += 1) {
+    const t = index / 10;
+    profile.push([r * (0.84 + 0.16 * Math.sin(t * Math.PI)), -h / 2 + t * h]);
+  }
+  kit.meshEntity("barrel", kit.lathe("keg-body", profile, 18, true), staves, root);
+  kit.primitive("lid", "cylinder", root, V(0, h / 2 - 0.01, 0), { x: r * 1.66, y: 0.02, z: r * 1.66 }, kit.material("keg-lid", new pc.Color(0.44, 0.26, 0.1), 0.2));
+  for (const y of [-h * 0.38, h * 0.38]) kit.meshEntity("hoop", kit.torus(r * 0.9, 0.022, 20, 5), iron, kit.group("hoop-ring", root, V(0, y, 0)));
+  kit.meshEntity("band", kit.torus(r * 1.0, 0.05, 20, 5), red, kit.group("band-ring", root, V(0, 0, 0)));
+  kit.primitive("fuse", "cylinder", root, V(0.1, h / 2 + 0.08, 0), { x: 0.03, y: 0.16, z: 0.03 }, kit.material("fuse", new pc.Color(0.88, 0.38, 0.055), 0.2), V(0, 0, -18));
+  return root;
+}
+
+export function buildHay(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }, seed: string): pc.Entity {
+  const root = kit.group("hay", parent);
+  const variation = hashUnit(seed);
+  const straw = kit.material(`straw-${Math.floor(variation * 3)}`, new pc.Color(0.8 + variation * 0.06, 0.64 + variation * 0.06, 0.29), 0.06);
+  const dark = kit.material("straw-dark", palette.strawDark, 0.05);
+  const twine = kit.material("twine", palette.rope, 0.1);
+  kit.primitive("bale", "box", root, V(), { x: size.x * 0.97, y: size.y * 0.95, z: size.z * 0.95 }, straw);
+  for (const x of [-size.x * 0.28, size.x * 0.28]) {
+    kit.primitive("twine", "box", root, V(x, 0, 0), { x: 0.035, y: size.y * 0.97, z: size.z * 0.97 }, twine, pc.Vec3.ZERO, false);
+  }
+  for (let index = 0; index < 5; index += 1) {
+    const angle = variation * 10 + index * 1.7;
+    kit.primitive("tuft", "cone", root, V(Math.cos(angle) * size.x * 0.4, size.y * 0.48, Math.sin(angle) * size.z * 0.35), { x: 0.05, y: 0.16, z: 0.05 }, dark, V(Math.sin(angle) * 40, 0, Math.cos(angle) * 40), false);
+  }
+  return root;
+}
+
+// ------------------------------------------------------------------ Ordnance
+
+export function buildProjectile(kit: Kit, parent: pc.Entity, kind: string, size: { x: number; y: number; z: number }): pc.Entity {
+  const root = kit.group(kind, parent);
+  const iron = kit.material("shot-iron", palette.iron, 0.62, 0.76);
+  if (kind === "shell") {
+    kit.primitive("shell", "sphere", root, V(), size, kit.material("mortar-shell", new pc.Color(0.18, 0.19, 0.17), 0.35, 0.54));
+    kit.primitive("band", "cylinder", root, V(), { x: size.x * 1.07, y: 0.05, z: size.z * 1.07 }, iron);
+    kit.primitive("fuse", "cylinder", root, V(0, size.y * 0.55, 0), { x: 0.035, y: 0.2, z: 0.035 }, kit.material("fuse", new pc.Color(0.88, 0.38, 0.055), 0.2));
+    kit.primitive("spark", "sphere", root, V(0, size.y * 0.55 + 0.12, 0), { x: 0.1, y: 0.1, z: 0.1 }, kit.material("spark", palette.gold, 0.4, 0, { emissive: new pc.Color(1, 0.6, 0.1) }), pc.Vec3.ZERO, false);
+    return root;
+  }
+  kit.primitive("ball", "sphere", root, V(), size, iron);
+  if (kind === "shot") kit.primitive("casting-mark", "cylinder", root, V(0, size.y * 0.48, 0), { x: 0.08, y: 0.025, z: 0.08 }, kit.material("bronze", palette.bronze, 0.46, 0.5));
+  return root;
+}
+
+export function buildCrown(kit: Kit, parent: pc.Entity): pc.Entity {
+  const root = kit.group("fallen-crown", parent);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  kit.primitive("band", "cylinder", root, V(0, -0.05, 0), { x: 0.3, y: 0.09, z: 0.3 }, gold);
+  for (let index = 0; index < 5; index += 1) {
+    const angle = (index / 5) * Math.PI * 2;
+    kit.primitive("point", "cone", root, V(Math.cos(angle) * 0.11, 0.06, Math.sin(angle) * 0.11), { x: 0.07, y: 0.2, z: 0.07 }, gold);
+  }
+  return root;
+}
+
+// ------------------------------------------------------------------ The Queen's battery
+
+export interface GunRig {
+  root: pc.Entity;
+  yaw: pc.Entity;
+  pitch: pc.Entity;
+  recoil: pc.Entity;
+  wheels: pc.Entity[];
+}
+
+export function buildCannon(kit: Kit, parent: pc.Entity): GunRig {
+  const root = kit.group("demi-culverin", parent);
+  const dark = kit.material("oak-dark", palette.oakDark, 0.16);
+  const iron = kit.material("iron", palette.iron, 0.55, 0.68);
+  const bronze = kit.material("bronze-barrel", palette.bronze, 0.66, 0.58);
+  const green = kit.material("queen-green", new pc.Color(0.035, 0.49, 0.29), 0.22);
+  const yaw = kit.group("yaw", root);
+  kit.primitive("trail", "box", yaw, V(0, 0.28, 0.95), { x: 0.5, y: 0.22, z: 1.9 }, dark, V(-10, 0, 0));
+  for (const x of [-0.3, 0.3]) kit.primitive("cheek", "box", yaw, V(x, 0.72, 0.05), { x: 0.1, y: 0.55, z: 0.9 }, dark);
+  kit.primitive("axle", "cylinder", yaw, V(0, 0.55, 0), { x: 0.1, y: 1.3, z: 0.1 }, iron, V(0, 0, 90));
+  const wheels: pc.Entity[] = [];
+  for (const x of [-0.62, 0.62]) {
+    const wheel = kit.group("wheel", yaw, V(x, 0.55, 0), V(0, 0, 90));
+    kit.meshEntity("rim", kit.torus(0.5, 0.06, 22, 6), dark, wheel);
+    for (let spoke = 0; spoke < 4; spoke += 1) kit.primitive("spoke", "box", wheel, V(), { x: 0.05, y: 0.05, z: 1 }, dark, V(0, spoke * 45, 0));
+    kit.primitive("hub", "cylinder", wheel, V(), { x: 0.16, y: 0.16, z: 0.16 }, iron);
+    wheels.push(wheel);
+  }
+  kit.primitive("queen-mark", "box", yaw, V(0.36, 0.72, 0.2), { x: 0.02, y: 0.3, z: 0.4 }, green, pc.Vec3.ZERO, false);
+  const pitch = kit.group("pitch", yaw, V(0, 1.02, 0));
+  const recoil = kit.group("recoil", pitch);
+  kit.primitive("barrel", "cylinder", recoil, V(0, 0, -0.35), { x: 0.3, y: 2.3, z: 0.3 }, bronze, V(90, 0, 0));
+  kit.primitive("muzzle", "cylinder", recoil, V(0, 0, -1.5), { x: 0.4, y: 0.2, z: 0.4 }, bronze, V(90, 0, 0));
+  kit.primitive("reinforce", "cylinder", recoil, V(0, 0, 0.35), { x: 0.38, y: 0.3, z: 0.38 }, bronze, V(90, 0, 0));
+  kit.primitive("breech", "sphere", recoil, V(0, 0, 0.8), { x: 0.42, y: 0.42, z: 0.42 }, bronze);
+  kit.primitive("cascabel", "sphere", recoil, V(0, 0, 1.06), { x: 0.14, y: 0.14, z: 0.14 }, bronze);
+  kit.primitive("trunnion", "cylinder", recoil, V(), { x: 0.12, y: 0.62, z: 0.12 }, iron, V(0, 0, 90));
+  return { root, yaw, pitch, recoil, wheels };
+}
+
+export function buildMortar(kit: Kit, parent: pc.Entity): GunRig {
+  const root = kit.group("bed-mortar", parent);
+  const dark = kit.material("oak-dark", palette.oakDark, 0.16);
+  const light = kit.material("oak-light", palette.oakLight, 0.16);
+  const bronze = kit.material("bronze-barrel", palette.bronze, 0.66, 0.58);
+  const iron = kit.material("iron", palette.iron, 0.55, 0.68);
+  const yaw = kit.group("yaw", root);
+  kit.primitive("bed", "box", yaw, V(0, 0.16, 0.1), { x: 1.1, y: 0.32, z: 1.4 }, dark);
+  for (const x of [-0.46, 0.46]) kit.primitive("rail", "box", yaw, V(x, 0.42, 0.1), { x: 0.14, y: 0.3, z: 1.2 }, light);
+  const pitch = kit.group("pitch", yaw, V(0, 0.78, 0));
+  const recoil = kit.group("recoil", pitch);
+  kit.primitive("barrel", "cylinder", recoil, V(0, 0, -0.18), { x: 0.5, y: 0.8, z: 0.5 }, bronze, V(90, 0, 0));
+  kit.primitive("muzzle", "cylinder", recoil, V(0, 0, -0.55), { x: 0.62, y: 0.16, z: 0.62 }, bronze, V(90, 0, 0));
+  kit.primitive("bore", "cylinder", recoil, V(0, 0, -0.64), { x: 0.34, y: 0.04, z: 0.34 }, iron, V(90, 0, 0));
+  kit.primitive("chamber", "sphere", recoil, V(0, 0, 0.22), { x: 0.52, y: 0.52, z: 0.52 }, bronze);
+  kit.primitive("trunnion", "cylinder", recoil, V(), { x: 0.13, y: 0.9, z: 0.13 }, iron, V(0, 0, 90));
+  return { root, yaw, pitch, recoil, wheels: [] };
+}

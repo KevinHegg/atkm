@@ -1,0 +1,233 @@
+import type { AmmoKind } from "./sim/types.js";
+import { RECORDED } from "./lines.js";
+
+/** Procedural foley for the theatre, plus the recorded royal voices. */
+export class TheatreAudio {
+  private context: AudioContext | undefined;
+  private master: GainNode | undefined;
+  private noise: AudioBuffer | undefined;
+  private muted = false;
+  private readonly clips = new Map<string, Promise<AudioBuffer | undefined>>();
+  private readonly last = new Map<string, number>();
+  private readonly base: string;
+
+  constructor(base: string) {
+    this.base = base;
+  }
+
+  get isMuted(): boolean {
+    return this.muted;
+  }
+
+  /** Browsers require a gesture before audio can start. */
+  unlock(): void {
+    if (!this.context) {
+      const Context = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Context) return;
+      this.context = new Context();
+      this.master = this.context.createGain();
+      this.master.gain.value = this.muted ? 0 : 0.5;
+      const compressor = this.context.createDynamicsCompressor();
+      compressor.threshold.value = -14;
+      compressor.ratio.value = 4;
+      this.master.connect(compressor).connect(this.context.destination);
+      const length = this.context.sampleRate;
+      this.noise = this.context.createBuffer(1, length, this.context.sampleRate);
+      const data = this.noise.getChannelData(0);
+      for (let index = 0; index < length; index += 1) data[index] = Math.random() * 2 - 1;
+    }
+    void this.context.resume();
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (this.master && this.context) this.master.gain.setTargetAtTime(muted ? 0 : 0.5, this.context.currentTime, 0.05);
+  }
+
+  private ready(): { ctx: AudioContext; out: GainNode } | undefined {
+    if (!this.context || !this.master || this.muted || this.context.state !== "running") return undefined;
+    return { ctx: this.context, out: this.master };
+  }
+
+  private throttle(key: string, ms: number): boolean {
+    const now = performance.now();
+    if (now - (this.last.get(key) ?? 0) < ms) return false;
+    this.last.set(key, now);
+    return true;
+  }
+
+  private burst(options: { duration: number; volume: number; filter: BiquadFilterType; frequency: number; q?: number; sweepTo?: number; delay?: number }): void {
+    const audio = this.ready();
+    if (!audio || !this.noise) return;
+    const { ctx, out } = audio;
+    const start = ctx.currentTime + (options.delay ?? 0);
+    const source = ctx.createBufferSource();
+    source.buffer = this.noise;
+    source.playbackRate.value = 0.8 + Math.random() * 0.4;
+    const filter = ctx.createBiquadFilter();
+    filter.type = options.filter;
+    filter.frequency.setValueAtTime(options.frequency, start);
+    if (options.sweepTo) filter.frequency.exponentialRampToValueAtTime(options.sweepTo, start + options.duration);
+    filter.Q.value = options.q ?? 0.8;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(options.volume, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + options.duration);
+    source.connect(filter).connect(gain).connect(out);
+    source.start(start, Math.random() * 0.5);
+    source.stop(start + options.duration + 0.05);
+  }
+
+  private tone(frequency: number, duration: number, volume: number, type: OscillatorType = "sine", options: { to?: number; delay?: number; attack?: number } = {}): void {
+    const audio = this.ready();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const start = ctx.currentTime + (options.delay ?? 0);
+    const oscillator = ctx.createOscillator();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, start);
+    if (options.to) oscillator.frequency.exponentialRampToValueAtTime(options.to, start + duration);
+    const gain = ctx.createGain();
+    const attack = options.attack ?? 0.005;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(volume, start + attack);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+    oscillator.connect(gain).connect(out);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.05);
+  }
+
+  fire(ammo: AmmoKind): void {
+    if (ammo === "shell") {
+      this.tone(90, 0.35, 0.8, "sine", { to: 40 });
+      this.burst({ duration: 0.35, volume: 0.7, filter: "lowpass", frequency: 900, sweepTo: 120 });
+      this.tone(1500, 1.9, 0.07, "sine", { to: 500, delay: 0.25, attack: 0.3 });
+      return;
+    }
+    this.tone(70, 0.5, 1, "sine", { to: 32 });
+    this.burst({ duration: 0.6, volume: 0.9, filter: "lowpass", frequency: 2400, sweepTo: 160 });
+    this.burst({ duration: 0.08, volume: 0.5, filter: "highpass", frequency: 2500 });
+    if (ammo === "chain") this.tone(300, 0.6, 0.06, "sawtooth", { to: 180, delay: 0.1 });
+  }
+
+  impact(material: string, strength: number): void {
+    if (!this.throttle(`impact-${material}`, 45)) return;
+    const volume = Math.min(0.7, 0.12 + strength * 0.6);
+    if (material === "stone" || material === "brick") {
+      this.burst({ duration: 0.18, volume, filter: "bandpass", frequency: 380 + Math.random() * 120, q: 1.4 });
+      this.tone(95 + Math.random() * 20, 0.16, volume * 0.6, "triangle");
+    } else if (material === "straw") {
+      this.burst({ duration: 0.22, volume: volume * 0.7, filter: "lowpass", frequency: 900 });
+    } else if (material === "egg") {
+      this.tone(620, 0.12, volume * 0.6, "sine", { to: 480 });
+      this.tone(930, 0.08, volume * 0.3, "sine");
+    } else if (material === "powder") {
+      this.tone(180, 0.2, volume * 0.7, "triangle", { to: 120 });
+    } else if (["shot", "chain", "grape", "shell"].includes(material)) {
+      this.burst({ duration: 0.2, volume: volume * 0.8, filter: "lowpass", frequency: 500 });
+      this.tone(60, 0.18, volume * 0.8, "sine", { to: 40 });
+    } else {
+      const pitch = 220 + Math.random() * 180;
+      this.burst({ duration: 0.12, volume, filter: "bandpass", frequency: pitch * 3, q: 3 });
+      this.tone(pitch, 0.1, volume * 0.5, "triangle", { to: pitch * 0.8 });
+    }
+  }
+
+  explode(big: boolean): void {
+    this.tone(55, big ? 1.2 : 0.8, 1, "sine", { to: 25 });
+    this.burst({ duration: big ? 1.6 : 1.1, volume: 1, filter: "lowpass", frequency: 3000, sweepTo: 90 });
+    this.burst({ duration: 0.12, volume: 0.6, filter: "highpass", frequency: 1800 });
+  }
+
+  crack(): void {
+    this.burst({ duration: 0.09, volume: 0.9, filter: "highpass", frequency: 3000 });
+    this.tone(1300, 0.06, 0.4, "square", { to: 700 });
+    this.burst({ duration: 0.45, volume: 0.7, filter: "lowpass", frequency: 700, sweepTo: 120, delay: 0.05 });
+    this.tone(130, 0.3, 0.5, "sine", { to: 60, delay: 0.05 });
+  }
+
+  fanfare(): void {
+    const notes = [392, 494, 587, 784];
+    notes.forEach((note, index) => {
+      this.tone(note, 0.3, 0.18, "square", { delay: 0.9 + index * 0.13 });
+      this.tone(note * 1.5, 0.3, 0.06, "triangle", { delay: 0.9 + index * 0.13 });
+    });
+    this.tone(784, 0.9, 0.2, "square", { delay: 0.9 + notes.length * 0.13 });
+    this.tone(1175, 0.9, 0.08, "triangle", { delay: 0.9 + notes.length * 0.13 });
+  }
+
+  sadTrombone(): void {
+    const notes = [294, 277, 262, 247];
+    notes.forEach((note, index) => {
+      const last = index === notes.length - 1;
+      this.tone(note, last ? 1.1 : 0.4, 0.2, "sawtooth", { delay: index * 0.42, attack: 0.04, ...(last ? { to: note * 0.92 } : {}) });
+    });
+  }
+
+  boing(): void {
+    this.tone(160, 0.5, 0.35, "sine", { to: 520 });
+    this.tone(320, 0.3, 0.1, "triangle", { to: 900, delay: 0.05 });
+  }
+
+  bowled(): void {
+    if (!this.throttle("bowled", 150)) return;
+    this.tone(420, 0.12, 0.3, "triangle", { to: 300 });
+    this.tone(900, 0.5, 0.12, "sine", { to: 250, delay: 0.1 });
+  }
+
+  whoosh(): void {
+    if (!this.throttle("whoosh", 400)) return;
+    this.burst({ duration: 0.8, volume: 0.25, filter: "bandpass", frequency: 400, sweepTo: 1600, q: 1.5 });
+  }
+
+  creak(): void {
+    for (let index = 0; index < 6; index += 1) {
+      this.tone(110 + index * 12, 0.25, 0.08, "triangle", { to: 150 + index * 10, delay: index * 0.38, attack: 0.08 });
+      this.burst({ duration: 0.04, volume: 0.15, filter: "bandpass", frequency: 2200, q: 4, delay: index * 0.38 + 0.2 });
+    }
+  }
+
+  click(): void {
+    this.tone(660, 0.05, 0.12, "triangle");
+  }
+
+  reload(): void {
+    this.burst({ duration: 0.05, volume: 0.2, filter: "bandpass", frequency: 1800, q: 3 });
+    this.burst({ duration: 0.05, volume: 0.2, filter: "bandpass", frequency: 1400, q: 3, delay: 0.09 });
+  }
+
+  /** Plays a recorded line if one exists; returns false so the caller can mime instead. */
+  voice(text: string): boolean {
+    const file = RECORDED[text];
+    const audio = this.ready();
+    if (!file || !audio) return false;
+    let clip = this.clips.get(file);
+    if (!clip) {
+      clip = fetch(`${this.base}audio/${file}`)
+        .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(String(response.status)))))
+        .then((data) => audio.ctx.decodeAudioData(data))
+        .catch(() => undefined);
+      this.clips.set(file, clip);
+    }
+    void clip.then((buffer) => {
+      const live = this.ready();
+      if (!buffer || !live) return;
+      const source = live.ctx.createBufferSource();
+      source.buffer = buffer;
+      const gain = live.ctx.createGain();
+      gain.gain.value = 1.4;
+      source.connect(gain).connect(live.out);
+      source.start();
+    });
+    return true;
+  }
+
+  /** Nonsense mumble for lines without a recording, like a puppet talking. */
+  mumble(speaker: "humpty" | "queen", text: string): void {
+    const syllables = Math.min(10, Math.max(2, Math.round(text.length / 7)));
+    const base = speaker === "queen" ? 190 : 150;
+    for (let index = 0; index < syllables; index += 1) {
+      const pitch = base * (0.85 + Math.random() * 0.4);
+      this.tone(pitch, 0.09, 0.07, speaker === "queen" ? "sawtooth" : "triangle", { to: pitch * (0.8 + Math.random() * 0.4), delay: index * 0.11, attack: 0.02 });
+    }
+  }
+}

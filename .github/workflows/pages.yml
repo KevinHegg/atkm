@@ -1,9 +1,10 @@
-name: Publish theatre preview
+name: Publish The Great Fall
 
 on:
   push:
     branches:
-      - core-legibility-reset
+      - main
+      - great-fall
   workflow_dispatch:
 
 permissions:
@@ -22,15 +23,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the theatre
+      - name: Check out the game
         uses: actions/checkout@v4
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - name: Build the static preview
-        run: npm ci && npm run build
+      - name: Test and build
+        run: npm ci && npm run typecheck && npm test && npm run build
         env:
           GITHUB_ACTIONS: true
       - name: Configure Pages

@@ -1,30 +1,28 @@
 {
-  "name": "all-the-kings-men",
-  "version": "0.1.0",
+  "name": "the-great-fall",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx server/index.ts",
-    "generate:public-replays": "tsx scripts/generate-public-replays.ts",
+    "dev": "vite --host 127.0.0.1 --port 5173",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
+    "solve": "tsx scripts/solve-levels.ts",
     "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
     "check": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.18.2",
-    "dotenv": "^16.6.1",
     "lucide": "^0.468.0",
-    "playcanvas": "^2.21.3",
-    "vite": "^6.1.0",
-    "ws": "^8.18.0"
+    "playcanvas": "^2.21.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
-    "@types/ws": "^8.5.13",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
   },
   "engines": {
     "node": ">=20"

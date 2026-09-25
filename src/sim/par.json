@@ -1,0 +1,101 @@
+{
+  "sat-on-a-wall": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0,
+        "y": 3.25,
+        "z": -1
+      },
+      "wait": 0
+    }
+  ],
+  "had-a-great-fall": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0,
+        "y": 0.35,
+        "z": -4.3
+      },
+      "wait": 0
+    }
+  ],
+  "all-the-kings-men": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0,
+        "y": 4.85,
+        "z": -1.5
+      },
+      "wait": 0
+    }
+  ],
+  "over-the-wall": [
+    {
+      "ammo": "shell",
+      "at": {
+        "x": 0,
+        "y": 2.63,
+        "z": -2.6
+      },
+      "wait": 0
+    }
+  ],
+  "the-powder-room": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0,
+        "y": 4.51,
+        "z": -1.4
+      },
+      "wait": 0
+    }
+  ],
+  "all-the-kings-horses": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0,
+        "y": 5.45,
+        "z": -1.6
+      },
+      "wait": 0
+    }
+  ],
+  "chain-of-command": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0,
+        "y": 6.23,
+        "z": -1.8
+      },
+      "wait": 0
+    }
+  ],
+  "the-keep": [
+    {
+      "ammo": "shell",
+      "at": {
+        "x": -0.55,
+        "y": 1.93,
+        "z": -2.2
+      },
+      "wait": 0
+    }
+  ],
+  "the-encore": [
+    {
+      "ammo": "shell",
+      "at": {
+        "x": 0,
+        "y": 2.48,
+        "z": -2.4
+      },
+      "wait": 2.5
+    }
+  ]
+}

@@ -2,143 +2,97 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#101717" />
-    <title>All the King's Men</title>
-    <link rel="stylesheet" href="/client/style.css?build=__BUILD_ID__" />
+    <meta name="description" content="Humpty Dumpty sat on a wall. You have a cannon. A toy-theatre physics game." />
+    <title>The Great Fall</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <main id="app">
-      <section id="stage-shell" aria-label="The siege theatre">
-        <div id="stage"></div>
+      <div id="stage"></div>
+      <div id="bubbles" aria-live="polite"></div>
+      <div id="fall-meter" hidden><strong>0.0</strong><span>m</span><em>fall</em></div>
 
-        <header id="title-card">
-          <span>A penny dreadful in perpetual motion</span>
-          <h1>All the King's Men</h1>
-        </header>
-
-        <div id="stage-score" aria-live="polite">
-          <div class="stage-team red"><span>Red holds</span><strong id="red-doctrine">Rescue doctrine</strong></div>
-          <div class="stage-clock"><span id="stage-phase">Planning</span><strong id="stage-time">10:00</strong><small id="stage-turn">Turn 1 of 10</small></div>
-          <div class="stage-team green"><span>Green assaults</span><strong id="green-doctrine">Breach doctrine</strong></div>
+      <header id="hud-top" hidden>
+        <div class="verse-tag">
+          <span id="hud-number">Verse I</span>
+          <strong id="hud-title">Sat on a Wall</strong>
         </div>
-
-        <nav id="stage-controls" aria-label="Stage controls">
-          <button type="button" data-stage-command="pause" aria-label="Pause match" title="Pause match"><i data-lucide="pause"></i></button>
-          <button type="button" data-stage-command="fit" aria-label="Fit the battlefield" title="Fit the battlefield"><i data-lucide="maximize-2"></i></button>
-          <button type="button" data-stage-command="diagnostics" aria-label="Show physical diagnostics" title="Physical diagnostics"><i data-lucide="gauge"></i></button>
-          <button type="button" data-stage-command="restart" aria-label="Restart match" title="Restart match"><i data-lucide="rotate-ccw"></i></button>
+        <ol id="objectives" aria-label="Stars for this verse">
+          <li data-star="cracked"><i></i><span>Crack him</span></li>
+          <li data-star="spare"><i></i><span>A shot to spare</span></li>
+          <li data-star="great"><i></i><span>Fall <b id="great-fall">3</b> m or more</span></li>
+        </ol>
+        <nav id="hud-buttons" aria-label="Game">
+          <button type="button" data-action="menu" title="Verses (Esc)" aria-label="Verses"><i data-lucide="scroll-text"></i></button>
+          <button type="button" data-action="restart" title="Restart (R)" aria-label="Restart"><i data-lucide="rotate-ccw"></i></button>
+          <button type="button" data-action="camera" title="Reset view (C)" aria-label="Reset view"><i data-lucide="scan"></i></button>
+          <button type="button" data-action="mute" title="Sound (M)" aria-label="Toggle sound"><i data-lucide="volume-2" class="sound-on"></i><i data-lucide="volume-x" class="sound-off"></i></button>
         </nav>
+      </header>
 
-        <section id="engineering-overlay" hidden aria-label="Physical diagnostics">
-          <header><strong>Physical authority</strong><button type="button" data-stage-command="diagnostics" aria-label="Close diagnostics"><i data-lucide="x"></i></button></header>
-          <dl id="engineering-values"></dl>
-        </section>
+      <footer id="hud-bottom" hidden>
+        <p id="hint"></p>
+        <div id="tray-row">
+          <div id="ammo-tray" role="toolbar" aria-label="Ammunition"></div>
+          <button type="button" id="fire-button" hidden><span>Fire!</span></button>
+        </div>
+      </footer>
 
-        <div id="connection-state"><span></span><strong id="connection-label">connecting</strong></div>
+      <div id="toast" aria-live="assertive"></div>
+
+      <section id="verse-card" hidden>
+        <p class="kicker" id="verse-number">Verse I</p>
+        <h2 id="verse-title">Sat on a Wall</h2>
+        <p class="couplet" id="verse-lines"></p>
+        <p class="hint" id="verse-hint"></p>
+        <p class="ammo-list" id="verse-ammo"></p>
+        <button type="button" id="verse-go">Begin</button>
       </section>
 
-      <aside id="battle-ledger" aria-label="Battle ledger">
-        <header id="ledger-nav">
-          <nav aria-label="Battle views" role="tablist">
-            <button type="button" class="ledger-tab active" data-ledger-view="watch" role="tab" aria-selected="true" title="Watch battle"><i data-lucide="eye"></i><span>Watch</span></button>
-            <button type="button" class="ledger-tab" data-ledger-view="archive" role="tab" aria-selected="false" title="Replay archive"><i data-lucide="history"></i><span>Archive</span></button>
-            <button type="button" class="ledger-tab" data-ledger-view="command" role="tab" aria-selected="false" title="Command battle"><i data-lucide="swords"></i><span>Command</span></button>
-          </nav>
-          <button id="ledger-toggle" type="button" aria-label="Collapse battle ledger" aria-expanded="true" title="Collapse battle ledger"><i data-lucide="panel-right-close"></i></button>
-          <div id="compact-status" aria-live="polite">
-            <span id="compact-phase">Planning</span>
-            <strong id="compact-clock">10:00</strong>
-            <div id="compact-controls">
-              <div data-compact-view="watch">
-                <button type="button" data-replay-command="rewind" aria-label="Back ten seconds" title="Back ten seconds"><i data-lucide="rewind"></i></button>
-                <button type="button" class="primary" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
-                <button type="button" data-replay-command="fast-forward" aria-label="Forward ten seconds" title="Forward ten seconds"><i data-lucide="fast-forward"></i></button>
-              </div>
-              <div data-compact-view="archive" hidden>
-                <button type="button" data-archive-command="previous" aria-label="Previous replay" title="Previous replay"><i data-lucide="skip-back"></i></button>
-                <button type="button" class="primary" data-archive-command="watch" aria-label="Watch selected replay" title="Watch selected replay"><i data-lucide="play"></i></button>
-                <button type="button" data-archive-command="next" aria-label="Next replay" title="Next replay"><i data-lucide="skip-forward"></i></button>
-              </div>
-              <div data-compact-view="command" hidden>
-                <button type="button" data-compact-team="king" aria-label="Command Red" title="Command Red"><b>R</b></button>
-                <button type="button" data-compact-team="queen" aria-label="Command Green" title="Command Green"><b>G</b></button>
-                <button type="button" class="primary" data-compact-command="seal" aria-label="Seal current order" title="Seal current order"><i data-lucide="shield-check"></i></button>
-              </div>
-            </div>
+      <section id="title-screen" class="screen">
+        <div class="playbill">
+          <p class="kicker">The Royal Penny Theatre presents</p>
+          <h1>The Great Fall</h1>
+          <p class="tagline">Humpty Dumpty sat on a wall.<br />You have a cannon.</p>
+          <div class="actions">
+            <button type="button" id="play-button" class="primary" disabled>Loading…</button>
+            <button type="button" id="verses-button" disabled>Choose a verse</button>
           </div>
-        </header>
+          <p class="controls">Point to aim &middot; click to fire &middot; drag to look around &middot; 1&ndash;4 changes shot</p>
+        </div>
+      </section>
 
-        <section id="watch-view" class="ledger-view" data-ledger-panel="watch">
-          <div id="transport" class="view-controls" aria-label="Playback controls">
-            <div class="transport-line"><strong id="replay-name">Live siege</strong><span id="replay-time">00:00 / 00:00</span></div>
-            <input id="replay-scrubber" type="range" min="0" max="0" step="1" value="0" aria-label="Replay position" />
-            <div class="transport-buttons">
-              <button type="button" data-replay-command="rewind" aria-label="Back ten seconds" title="Back ten seconds"><i data-lucide="rewind"></i><span>10</span></button>
-              <button type="button" class="primary" data-replay-command="play" aria-label="Play replay" title="Play replay"><i data-lucide="play"></i></button>
-              <button type="button" data-replay-command="fast-forward" aria-label="Forward ten seconds" title="Forward ten seconds"><i data-lucide="fast-forward"></i><span>10</span></button>
-              <select id="replay-speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option><option value="8">8x</option></select>
-              <button type="button" data-replay-command="live" aria-label="Return to live battle" title="Return to live battle"><i data-lucide="radio"></i></button>
-            </div>
-          </div>
-
-          <header class="view-heading">
-            <div><span id="watch-kicker">Live theatre</span><h2 id="watch-title">Siege command</h2></div>
-            <output id="match-status">waiting</output>
+      <section id="levels-screen" class="screen" hidden>
+        <div class="playbill wide">
+          <header>
+            <h2>The Verses</h2>
+            <button type="button" id="levels-back">Back</button>
           </header>
+          <ol id="level-list"></ol>
+          <p class="controls" id="star-total"></p>
+        </div>
+      </section>
 
-          <section id="objective-strip" aria-label="Battle objectives">
-            <div class="red"><b>Red</b><span>Hold Humpty through the tenth bell.</span></div>
-            <div class="green"><b>Green</b><span>Crack Humpty before the final order resolves.</span></div>
-          </section>
-
-          <section id="target-board" aria-labelledby="target-heading">
-            <header class="section-heading"><h2 id="target-heading">The hill</h2><span id="position-label">Humpty at crown</span></header>
-            <div id="target-list"></div>
-          </section>
-
-          <section id="order-board" aria-labelledby="orders-heading">
-            <header class="section-heading"><h2 id="orders-heading">Simultaneous orders</h2><span id="order-countdown">revealing</span></header>
-            <div id="order-list"></div>
-          </section>
-
-          <section id="unit-board" aria-labelledby="units-heading">
-            <header class="section-heading"><h2 id="units-heading">Equipment</h2><span>integrity · ammunition</span></header>
-            <div id="unit-list"></div>
-          </section>
-
-          <section id="record-board" aria-labelledby="record-heading">
-            <header class="section-heading"><h2 id="record-heading">Battle record</h2><span id="record-count">0 turns</span></header>
-            <ol id="battle-record" aria-live="polite"></ol>
-          </section>
-        </section>
-
-        <section id="archive-view" class="ledger-view" data-ledger-panel="archive" hidden>
-          <div class="view-controls archive-controls"><button type="button" data-archive-command="previous" aria-label="Previous replay" title="Previous replay"><i data-lucide="skip-back"></i></button><button type="button" class="primary" data-archive-command="watch"><i data-lucide="play"></i><span>Watch selected</span></button><button type="button" data-archive-command="next" aria-label="Next replay" title="Next replay"><i data-lucide="skip-forward"></i></button></div>
-          <header class="view-heading"><div><span>Recorded battles</span><h2>Replay archive</h2></div><output id="archive-status">loading</output></header>
-          <p class="view-intro">Three seeded doctrines, ten simultaneous turns, and every revealed order preserved.</p>
-          <ol id="archive-list"></ol>
-          <p id="archive-feedback" role="status">Loading public battle records.</p>
-        </section>
-
-        <section id="command-view" class="ledger-view" data-ledger-panel="command" hidden>
-          <form id="command-form" class="view-controls">
-            <div class="team-switch" role="group" aria-label="Commanding side">
-              <button type="button" class="active red" data-command-team="king">Red</button>
-              <button type="button" class="green" data-command-team="queen">Green</button>
-            </div>
-            <label>Unit<select id="command-unit"></select></label>
-            <label>Order<select id="command-action"></select></label>
-            <label>Target<select id="command-target"></select></label>
-            <button id="seal-order" type="submit" class="seal"><i data-lucide="shield-check"></i><span>Seal order</span></button>
-          </form>
-          <header class="view-heading"><div><span>Ten-second planning window</span><h2>Battle command</h2></div><output id="command-status">waiting</output></header>
-          <p id="command-feedback" class="view-intro" role="status">Choose one formed unit, one legal order, and one visible target.</p>
-          <section class="command-rules"><h3>Turn contract</h3><p>Both orders stay hidden until the reveal. Damage, ammunition, cooldowns, cover, and rescue effects resolve together.</p></section>
-          <div id="command-roster"></div>
-        </section>
-      </aside>
+      <section id="result-screen" class="screen" hidden>
+        <div class="playbill">
+          <p class="kicker" id="result-kicker">Verse I</p>
+          <h2 id="result-title">Humpty had a great fall</h2>
+          <div id="result-stars" aria-label="Stars"></div>
+          <p class="couplet" id="result-line"></p>
+          <dl id="result-stats"></dl>
+          <div class="actions">
+            <button type="button" id="next-button" class="primary">Next verse</button>
+            <button type="button" id="retry-button">Try again</button>
+            <button type="button" id="menu-button">Verses</button>
+          </div>
+        </div>
+      </section>
     </main>
-    <script type="module" src="/client/main.ts?build=__BUILD_ID__"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

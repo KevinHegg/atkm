@@ -1,81 +1,59 @@
-# All the King's Men Siege Rules
+# The Great Fall — working rules
 
-## Main Game
+## The game
 
-The primary game is a simultaneous-order siege tactics game. It is not a
-machine-construction game. Green has ten one-minute turns to crack Humpty; Red
-wins if Humpty retains integrity through the tenth resolution or Green exhausts
-its operational siege train.
+A single-player browser physics game in a toy theatre. The player is the Queen's
+gunner. Each verse (level) is a diorama with Humpty perched high; the goal is to
+make him fall far enough to crack. The King's men (stretcher crews, horse carts,
+guards) and soft things (hay) protect him. Safe landings are undone by the
+stagehands' hoist, which costs the player that shot.
 
-Each turn has four explicit phases:
+Core promises:
 
-1. both commanders secretly choose one legal unit, order, and target;
-2. both orders are revealed together;
-3. defense, fire, damage, ammunition, cooldowns, and rescue effects resolve;
-4. the public battle record captures both orders and the result.
+- Only a hard impact cracks Humpty. Projectile contact never cracks him directly,
+  and crew contact never cracks him.
+- The aim arc is honest: it is the real launch solution, and it stops at the first
+  collider the shot will touch.
+- Every verse must stand still until the first shot and must have a recorded
+  winning line in `src/sim/par.json`.
 
-The fixed field force is:
+## Source of truth
 
-- Red: Royal Sappers, Rescue Capstan, Gabion Rescue Cart;
-- Green: Demi-Culverin, Bed Mortar, Matchlock Company.
-
-The four public target classes are the tower foundation, exposed tower face,
-Humpty, and enemy equipment. The straw-lined rescue litter may turn one lethal
-fall into a second chance; it cannot be rearmed after that save. A rescue
-capstan may steady the crown or haul at ground level, but it must never lift a
-fallen Humpty back onto the tower.
-
-## Source Of Truth
-
-- `shared/siege-equipment.ts`: canonical equipment, ammunition, affordances,
-  three-person crews, stations, tools, and operating drills;
-- `server/core/siege-rules.ts`: unit catalog, legal orders, deterministic
-  commanders, counterplay, damage, ammunition, and victory rules;
-- `server/core/battle-director.ts`: planning/reveal/resolution timing and public
-  match state;
-- `shared/core-protocol.ts`: snapshots, commands, units, orders, and replays;
-- `server/core/physics.ts`: the single Rapier 3D battlefield and physical
-  effects;
-- `client/main.ts`, `client/style.css`, `client/lab-world.ts`: battle ledger,
-  replay transport, command surface, and PlayCanvas presentation;
-- `scripts/generate-public-replays.ts`: the three GitHub Pages battles.
+- `src/sim/game.ts`: physics world, projectiles, the crack rule, explosions,
+  hoist, phases, stars;
+- `src/sim/crew.ts`: King's men movement, landing prediction, stun/recover;
+- `src/sim/levels.ts` with `src/sim/level.ts`: verse layouts via the `Mason` builder;
+- `src/sim/ballistics.ts`: ammunition specs and launch solutions;
+- `src/render/*`: PlayCanvas presentation (kit, props, stage, view);
+- `src/main.ts`: screens, HUD, input, speech, frame loop;
+- `src/audio.ts`, `src/lines.ts`: sound and dialogue.
 
 ## Commands
 
 - Development: `npm run dev`
-- Type checking and lint contract: `npm run typecheck`, `npm run lint`
+- Type checking: `npm run typecheck`
 - Tests: `npm test`
-- Rebuild public battles: `npm run generate:public-replays`
+- Difficulty report / par solutions: `npm run solve`, `npm run solve -- --write`
+- Trace a single shot: `npx tsx scripts/trace.ts <verse-id> <ammo> x y z [wait]`
 - Production build: `npm run build`
 - Full acceptance: `npm run check`
 
-## Non-Negotiable Rules
+## Non-negotiable rules
 
-- Rapier 3D on the server remains the only gameplay physics world.
-- PlayCanvas consumes snapshots and never creates gameplay authority.
-- Orders must name an advertised unit, action, and target. Invalid, disabled,
-  cooling, or spent equipment cannot act.
-- Names are contracts, not skins. Strategy, agent context, crew stations,
-  visible tools, animation, ammunition, targets, and physical effects must all
-  derive from the same canonical equipment definition.
-- A cannon shot, mortar shell, volley, rescue pull, cart deployment, or sapper
-  effect may begin only when its visible drill reaches its declared effect
-  stage.
-- Both valid orders resolve simultaneously. Destroying a unit during an
-  exchange does not erase the order it already fired.
-- Ammunition, integrity, cooldowns, cover, and the rescue-litter save are finite and
-  visible.
-- Seeded commanders must be deterministic. An LLM may later add commander voice
-  or select from valid advertised orders, but it may not create rules, private
-  actions, hidden forces, or outcomes.
-- Physics provides movement, projectiles, collisions, and spectacle; tactical
-  state decides the legible battle result.
-- GitHub Pages is a static replay theatre. Do not imply that it hosts the local
-  Node/WebSocket simulation or accepts live orders.
-
-## Legacy Engineering Lab
-
-The nine-family, 24-piece-per-team kit, four connection classes, fixtures, and
-construction actions remain in the repository for isolated engineering tests.
-They are not part of the primary match, are not spawned in battle mode, and
-must not be restored to the main interface without a separate design decision.
+- `src/sim` never imports PlayCanvas or touches the DOM. It must run headless in
+  Node for tests and the solver.
+- `src/render` reads simulation state and events; it never moves physics bodies or
+  changes rules.
+- The simulation steps at a fixed `STEP` (1/60 s). Slow motion and hit-stop change
+  how many steps run per real second, never the step size.
+- Never remove or create Rapier bodies inside an event-queue drain or query
+  callback. Record what happened and act after the drain; Rapier holds world
+  borrows during callbacks.
+- Shared meshes in `Kit` are reference-held on creation; do not destroy them.
+- Keep the look: chunky primitives, the oak/iron/bronze/crimson/verdigris palette,
+  warm key light, the toy-theatre stage. Visual variety goes into props and
+  scenery, not new rendering techniques.
+- After changing physics constants, level layouts or crew behaviour, run
+  `npm run solve -- --write` and `npm test`. A verse without a par line is broken.
+- Browser storage holds only per-player progress (stars, mute) and must tolerate
+  being unavailable.
