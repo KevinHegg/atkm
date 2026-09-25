@@ -630,11 +630,14 @@ test("the chain shot's arc stops where its whirling balls will first strike", as
   const game = await Game.create(levelById("the-encore")!);
   await stepUntilReady(game);
   game.select("chain");
-  // Just clear of the low wall down front for a round shot, but not for a chain's balls.
+  // A clear line for a round shot, but not for a chain's balls whirling either side of it.
   const target = { x: 2.5, y: 0.8, z: -1.4 };
-  assert.ok((game.aim(target, "shot").hit?.z ?? 0) < 0, "round shot clears the wall");
+  assert.ok((game.aim(target, "shot").hit?.z ?? 0) < 0, "round shot flies clear to the back");
+  // A ball clips the guard beside the line of flight (and bowls him over), well short of that.
   const preview = game.aim(target, "chain");
-  assert.ok(preview.hit && preview.hit.z > 0.5, `the chain's arc ends at the wall (z ${preview.hit?.z.toFixed(2)})`);
+  assert.ok(preview.hit && preview.hit.z > 0.5, `the chain's arc ends early (z ${preview.hit?.z.toFixed(2)})`);
+  // Aiming chain shot doesn't leave round shot's arc thinking it's a chain.
+  assert.ok((game.aim(target, "shot").hit?.z ?? 0) < 0, "round shot's arc is unchanged after a chain preview");
   game.destroy();
 });
 
@@ -654,4 +657,24 @@ test("once he's down safe with nothing left to fire, the curtain doesn't wait fo
   assert.ok(events.some((event) => event.type === "caught"));
   const bag = game.world.bodies.getAll().find((body) => body.isDynamic() && body.linvel().x ** 2 + body.linvel().z ** 2 > 0.35 ** 2);
   assert.ok(bag, "the sandbag is still swinging when the curtain falls");
+});
+
+test("pointing at a swing rope aims at the rope, and chain shot's arc marks the cut it will make", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("hanging-by-a-thread")!);
+  await stepUntilReady(game);
+  game.select("chain");
+  const rope = game.ropeViews[3]!;
+  const on = { x: rope.bottom.x + (rope.top.x - rope.bottom.x) * 0.6, y: rope.bottom.y + (rope.top.y - rope.bottom.y) * 0.6, z: rope.bottom.z + (rope.top.z - rope.bottom.z) * 0.6 };
+  // A ray from the front of the house that passes a few centimetres beside the rope snaps onto it.
+  const eye = { x: 0.3, y: 9, z: 18 };
+  const toward = { x: on.x + 0.04 - eye.x, y: on.y - eye.y, z: on.z - eye.z };
+  const length = Math.hypot(toward.x, toward.y, toward.z);
+  const picked = game.raycast(eye, { x: toward.x / length, y: toward.y / length, z: toward.z / length })!;
+  assert.ok(Math.hypot(picked.x - on.x, picked.y - on.y, picked.z - on.z) < 0.1, "the aim point is on the rope");
+  const preview = game.aim(picked, "chain");
+  assert.ok(preview.cuts?.some((cut) => Math.hypot(cut.x - on.x, cut.y - on.y, cut.z - on.z) < 0.3), "the cut is marked");
+  assert.ok(game.fire(picked));
+  assert.ok((await run(game, 2)).some((event) => event.type === "rope-cut"), "and the chain cuts it");
+  game.destroy();
 });

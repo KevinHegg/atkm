@@ -14,8 +14,10 @@ Core promises:
   and crew contact never cracks him.
 - The aim arc is honest: it is the real launch solution, and it stops at the first
   collider the shot will touch. Off a bumper it continues with the true bounce. Chain
-  shot sweeps a disc (`CHAIN_REACH`) set square to its launch, so its arc stops where a
-  ball first clips something.
+  shot's arc follows both whirling balls (`chainOffset` predicts them to a few cm), so it
+  stops where a ball first clips something, and marks each rope its chain will cut.
+  Pointing picks curio sensors and snaps onto ropes, so a player can aim at either;
+  the arc marks a curio it flies through. Only mark what the physics will do.
 - Only chain shot cuts rope and maypoles; nothing else moves a maypole. Curios never
   change a verse's physics (they pay mayhem once and may hide its star). The rat never steals the last charge, and the blunderbuss never spends
   a verse's shot.

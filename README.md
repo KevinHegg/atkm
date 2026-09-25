@@ -18,7 +18,8 @@ npm run dev
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Add `?all` to the URL to
 unlock every verse.
 
-- **Aim:** point at anything. A dotted arc shows the shot, and a red ring means it hits Humpty.
+- **Aim:** point at anything, including the curios in the scenery (a gold ring shows the shot
+  will pass through one). A dotted arc shows the shot, and a red ring means it hits Humpty.
   Off a bronze bumper the arc keeps going, so you can line up a bank shot. The gold ring on the
   rug marks the gun that will fire, and you can see what it's loaded with in its mouth.
 - **Fire:** click. On touch screens, drag to aim and tap **Fire**.
@@ -65,7 +66,8 @@ unlock every verse.
   - **Grapeshot** sprays small balls that bowl over the King's men.
   - **Chain shot** is two spinning balls on a chain. The chain is a blade: it knocks the
     blocks it sweeps through and it cuts rope and maypoles. Its aim arc stops where a
-    whirling ball will first clip something, not just where the middle of the chain would.
+    whirling ball will first clip something, and a gold ring marks each rope it will cut.
+    Point at a rope to aim right at it.
   - **Fizzing bombs** are lobbed from the mortar. The fuse is lit when the bomb lands; it
     bounces and rolls, then goes off wherever it has got to.
 - **Powder kegs** explode when struck hard, and set off their neighbours. Stone and brick
@@ -149,6 +151,7 @@ src/render/   PlayCanvas presentation, reads the sim and never writes it
 src/main.ts   screens, HUD, input, speech bubbles, replays, the frame loop
 src/review.ts the morning papers, written from the bill of damages
 src/audio.ts  procedural foley, a music box, a theatre audience, the recorded royal voices
+              (the stage dips under anyone speaking)
 src/lines.ts  who says what, and when
 ```
 

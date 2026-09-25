@@ -2,6 +2,7 @@ import * as pc from "playcanvas";
 import { AMMO } from "../sim/ballistics.js";
 import { CANNON_PIVOT, MORTAR_PIVOT, QUEEN_GUN, type AimPreview, type CrewView, type Game } from "../sim/game.js";
 import type { AmmoKind, BodyView, GameEvent, StockKind, Vec3 } from "../sim/types.js";
+import { yAxisTo } from "../sim/geometry.js";
 import { Kit, palette } from "./kit.js";
 import {
   buildBlock,
@@ -140,6 +141,7 @@ export class StageView {
   private readonly puffs: Puff[] = [];
   private readonly splats: Splat[] = [];
   private readonly arcDots: pc.Entity[] = [];
+  private readonly passRings: pc.Entity[] = [];
   private readonly reticle: pc.Entity;
   private readonly reticleHot: pc.Entity;
   /** Chain shot's sweep: a bar across the reticle as wide as the chain. */
@@ -259,6 +261,14 @@ export class StageView {
     this.reticleHot = this.kit.group("reticle-hot", this.effects);
     this.kit.meshEntity("reticle-ring-hot", this.kit.torus(0.62, 0.05, 28, 6), hot, this.reticleHot, false);
     this.reticleHot.enabled = false;
+    // Where the shot flies through a curio, or a chain will cut a rope: rings turned to the house.
+    const passRing = this.kit.torus(0.3, 0.035, 24, 6);
+    for (let index = 0; index < 5; index += 1) {
+      const ring = this.kit.group("reticle-pass", this.effects);
+      this.kit.meshEntity("reticle-ring-pass", passRing, dot, ring, false);
+      ring.enabled = false;
+      this.passRings.push(ring);
+    }
 
     const tip = this.kit.material("astrologer", new pc.Color(0.3, 0.85, 0.65), 0.4, 0, { emissive: new pc.Color(0.08, 0.45, 0.3) });
     this.hintMarker = this.kit.group("astrologer-hint", this.effects);
@@ -1117,18 +1127,31 @@ export class StageView {
       for (const dot of this.arcDots) dot.enabled = false;
       this.reticle.enabled = false;
       this.reticleHot.enabled = false;
+      for (const ring of this.passRings) ring.enabled = false;
       this.chainSpan.enabled = false;
       return;
     }
-    // Chain shot sweeps a chain's width, level and across the line of flight.
-    const chain = game?.selected === "chain" && aim.hit;
-    this.chainSpan.enabled = Boolean(chain);
-    if (chain && aim.hit) {
-      const last = aim.points[Math.max(0, aim.points.length - 2)]!;
-      const heading = Math.atan2(aim.hit.x - last.x, aim.hit.z - last.z) * DEG;
-      this.chainSpan.setPosition(aim.hit.x, aim.hit.y, aim.hit.z);
+    // Chain shot sweeps a chain's width, level and across the line of flight: shown where it
+    // first cuts a rope, or else where it lands.
+    const chainAt = game?.selected === "chain" ? (aim.cuts?.[0] ?? aim.hit) : undefined;
+    this.chainSpan.enabled = Boolean(chainAt);
+    if (chainAt) {
+      const a = aim.points[0]!;
+      const heading = Math.atan2(chainAt.x - a.x, chainAt.z - a.z) * DEG;
+      this.chainSpan.setPosition(chainAt.x, chainAt.y, chainAt.z);
       this.chainSpan.setEulerAngles(0, heading, Math.sin(this.elapsed * 5) * 8);
     }
+    const marks = [...(aim.passes ? [aim.passes.at] : []), ...(aim.cuts ?? [])];
+    this.passRings.forEach((ring, index) => {
+      const at = marks[index];
+      ring.enabled = Boolean(at);
+      if (!at) return;
+      const pulse = 1 + Math.sin(this.elapsed * 7 + index) * 0.12;
+      ring.setPosition(at.x, at.y, at.z);
+      ring.lookAt(this.camera.getPosition());
+      ring.rotateLocal(90, 0, 0);
+      ring.setLocalScale(pulse, pulse, pulse);
+    });
     const spacing = 0.42;
     const offset = (this.elapsed * 1.6) % spacing;
     let dotIndex = 0;
@@ -1156,9 +1179,13 @@ export class StageView {
     this.reticle.enabled = Boolean(hit);
     if (hit) {
       const pulse = 1 + Math.sin(this.elapsed * 7) * 0.12;
-      this.reticle.setPosition(hit.x, hit.y + 0.03, hit.z);
+      // Lie flat on whatever it strikes (a wall, the backdrop, the top of a block), just proud of it.
+      const n = aim.hitNormal ?? { x: 0, y: 1, z: 0 };
+      this.reticle.setPosition(hit.x + n.x * 0.04, hit.y + n.y * 0.04, hit.z + n.z * 0.04);
       this.reticle.setLocalScale(pulse, pulse, pulse);
-      this.reticle.setEulerAngles(0, this.elapsed * 40, 0);
+      const q = yAxisTo(n);
+      this.reticle.setRotation(q.x, q.y, q.z, q.w);
+      this.reticle.rotateLocal(0, this.elapsed * 40, 0);
       const humpty = game?.humptyPosition;
       const onHumpty = aim.hitKind === "humpty";
       this.reticleHot.enabled = onHumpty;

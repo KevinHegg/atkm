@@ -24,7 +24,7 @@ import {
   type TurntableDef,
 } from "./level.js";
 import { CURIOS } from "./curios.js";
-import { add, closestOnSegment, distanceToSegment, rotate, segmentDistance, yAxisTo } from "./geometry.js";
+import { add, closestBetweenSegments, closestOnSegment, distanceToSegment, rotate, segmentDistance, yAxisTo } from "./geometry.js";
 import { FALL_POINTS, MayhemTally, type MayhemKind } from "./mayhem.js";
 import { createRat, scareRat, stepRat, type RatState } from "./rat.js";
 import {
@@ -70,12 +70,28 @@ export const HUMPTY_MASS = 90;
 const FALLING_RELOAD = 2.5;
 /** Largest blow (N·s) the chain of a chain shot deals to one body in one pass. */
 const CHAIN_BLOW = 420;
-/** Chain shot: the rope between the balls, and how far a ball can whirl from their middle. */
+/**
+ * Chain shot: two balls fired side by side, one kicked forward and one back, on a chain. They fly
+ * apart until the chain goes taut, then whirl round their middle at a steady rate, in the plane
+ * they were fired in (`chainOffset` predicts it to within a few centimetres of the physics).
+ */
 const CHAIN_LENGTH = 1.25;
+const CHAIN_SPREAD = 0.45;
+const CHAIN_SPIN = 6.5;
 const SHOT_RADIUS_CHAIN = 0.17;
-const CHAIN_REACH = CHAIN_LENGTH / 2 + SHOT_RADIUS_CHAIN;
+/** How far a chain scythes on after one of its balls first glances off something. */
+const CHAIN_FOLLOW = 0.45;
 /** Shared by every aim preview; made once Rapier has loaded. */
-let chainDisc: RAPIER.Cylinder | undefined;
+let chainBall: RAPIER.Ball | undefined;
+
+/** Where the first chain ball sits from the pair's middle, t s after firing: across and forward. */
+function chainOffset(t: number): { across: number; forward: number } {
+  const taut = Math.sqrt(CHAIN_LENGTH ** 2 - (2 * CHAIN_SPREAD) ** 2) / (2 * CHAIN_SPIN);
+  if (t < taut) return { across: CHAIN_SPREAD, forward: CHAIN_SPIN * t };
+  const start = Math.atan2(CHAIN_SPIN * taut, CHAIN_SPREAD);
+  const turn = start + ((2 * CHAIN_SPIN * Math.cos(start)) / CHAIN_LENGTH) * (t - taut);
+  return { across: (CHAIN_LENGTH / 2) * Math.cos(turn), forward: (CHAIN_LENGTH / 2) * Math.sin(turn) };
+}
 /** A forced chest: one to replace the shot that opened it, and two more for the emptiest racks. */
 const CHEST_EXTRA = 2;
 /** Height of the rail round the music box's seat. */
@@ -192,6 +208,12 @@ export interface AimPreview {
   points: Vec3[];
   hit: Vec3 | undefined;
   hitKind: BodyKind | undefined;
+  /** Which way the struck surface faces, so the marker can lie flat on it. */
+  hitNormal?: Vec3;
+  /** A curio in the scenery the shot flies through on its way (shots pass through and set it off). */
+  passes?: { at: Vec3; what: "curio" };
+  /** Chain shot: where its chain will cut each rope it scythes through before it stops. */
+  cuts?: Vec3[];
   reachable: boolean;
   from: Vec3;
   velocity: Vec3;
@@ -468,19 +490,32 @@ export class Game {
     return this.events.splice(0, this.events.length);
   }
 
-  /** First thing a ray from the camera touches, for aiming. */
+  /**
+   * First thing a ray from the camera touches, for aiming: solid things, the curios in the scenery,
+   * and ropes (which are too thin to point at exactly, so the ray snaps to one it passes close by).
+   */
   raycast(origin: Vec3, direction: Vec3, maxDistance = 200): Vec3 | undefined {
     const ray = new RAPIER.Ray(origin, direction);
     const hit = this.world.castRay(ray, maxDistance, true, undefined, undefined, undefined, undefined, (collider) => {
       const owner = this.byCollider.get(collider.handle);
       return !owner || owner.view.kind !== "shard";
     });
-    if (!hit) return undefined;
-    return {
-      x: origin.x + direction.x * hit.timeOfImpact,
-      y: origin.y + direction.y * hit.timeOfImpact,
-      z: origin.z + direction.z * hit.timeOfImpact,
-    };
+    let reach = hit ? hit.timeOfImpact : maxDistance;
+    let point: Vec3 | undefined = hit ? add(origin, { x: direction.x * reach, y: direction.y * reach, z: direction.z * reach }) : undefined;
+    const end = add(origin, { x: direction.x * maxDistance, y: direction.y * maxDistance, z: direction.z * maxDistance });
+    for (const rope of this.ropeViews) {
+      const near = closestBetweenSegments(origin, end, rope.bottom, rope.top);
+      const along = near.s * maxDistance;
+      // About a rope's thickness either side, at the distances the stage is seen from.
+      if (near.distance > 0.02 * Math.sqrt(along) + 0.05 || along >= reach) continue;
+      reach = along;
+      point = {
+        x: rope.bottom.x + (rope.top.x - rope.bottom.x) * near.t,
+        y: rope.bottom.y + (rope.top.y - rope.bottom.y) * near.t,
+        z: rope.bottom.z + (rope.top.z - rope.bottom.z) * near.t,
+      };
+    }
+    return point;
   }
 
   /**
@@ -503,33 +538,91 @@ export class Game {
     let step = 0;
     const dt = 0.03;
     const range = kind === "blunderbuss" ? 40 : 220;
+    let hitNormal: Vec3 | undefined;
     const flags = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS;
-    // Chain shot whirls its balls round in the plane it was fired in, and that plane keeps its
-    // heading all the way; the arc must stop where a ball or the chain first touches, not just
-    // where the middle does, or a shot skimming a wall "passes" and then drops short.
-    const sweep = kind === "chain" ? this.chainSweep(velocity) : undefined;
+    const filter = groups(G.PROJ, ALL & ~G.PROJ & ~G.DEBRIS);
+    // Chain shot's balls whirl up to a chain's length apart: the arc must stop where either ball
+    // strikes, not just where their middle would, or a shot skimming a wall "passes" and drops short.
+    const forward = normalise(velocity);
+    const across = normalise({ x: -forward.z, y: 0, z: forward.x });
+    const ballAt = (centre: Vec3, t: number, sign: number): Vec3 => {
+      const o = chainOffset(t);
+      return {
+        x: centre.x + sign * (across.x * o.across + forward.x * o.forward),
+        y: centre.y + sign * (across.y * o.across + forward.y * o.forward),
+        z: centre.z + sign * (across.z * o.across + forward.z * o.forward),
+      };
+    };
+    const ball = kind === "chain" ? (chainBall ??= new RAPIER.Ball(SHOT_RADIUS_CHAIN)) : undefined;
+    // What the player is pointing at, if it's a curio shots fly through.
+    const through = this.passThrough(target, kind);
+    let passes: AimPreview["passes"];
+    const ropes = kind === "chain" ? this.ropeViews : [];
+    const cuts: Vec3[] = [];
+    const cut = new Set<number>();
+    // Aimed right at a rope, a chain that gets within reach of it cuts it, even past an egg or a post.
+    const aimedRope = ropes.findIndex((rope) => distanceToSegment(target, rope.bottom, rope.top) < 0.05);
+    let flown = 0;
     for (let index = 1; index < range; index += 1) {
       step += 1;
+      flown += dt;
       const previous = points[points.length - 1]!;
       const next = arcPoint(origin, launch, step * dt);
       const segment = { x: next.x - previous.x, y: next.y - previous.y, z: next.z - previous.z };
       const length = lengthOf(segment);
       const direction = { x: segment.x / length, y: segment.y / length, z: segment.z / length };
       const ray = new RAPIER.Ray(previous, direction);
-      const contact = this.world.castRayAndGetNormal(ray, length, true, flags, groups(G.PROJ, ALL & ~G.PROJ & ~G.DEBRIS));
-      if (sweep) {
-        const swept = this.world.castShape(previous, sweep.rotation, segment, sweep.disc, 0, 1, true, flags, groups(G.PROJ, ALL & ~G.PROJ & ~G.DEBRIS));
-        if (swept && (!contact || swept.time_of_impact * length < contact.timeOfImpact)) {
-          const at = {
-            x: previous.x + segment.x * swept.time_of_impact,
-            y: previous.y + segment.y * swept.time_of_impact,
-            z: previous.z + segment.z * swept.time_of_impact,
-          };
-          points.push(at);
-          hit = at;
-          hitKind = this.byCollider.get(swept.collider.handle)?.view.kind;
-          break;
+      const contact = this.world.castRayAndGetNormal(ray, length, true, flags, filter);
+      // How far along this step the shot gets before it strikes something (1: all the way).
+      let stop = contact ? contact.timeOfImpact / length : Infinity;
+      let ballHit: { handle: number; normal: Vec3 } | undefined;
+      if (ball && bounces === 0) {
+        for (const sign of [1, -1]) {
+          const a = ballAt(previous, flown - dt, sign);
+          const b = ballAt(next, flown, sign);
+          const swept = this.world.castShape(a, { x: 0, y: 0, z: 0, w: 1 }, { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, ball, 0, 1, true, flags, filter);
+          if (swept && swept.time_of_impact < stop) {
+            stop = swept.time_of_impact;
+            // The ball's outward normal points at what it touched; that surface faces back at it.
+            ballHit = { handle: swept.collider.handle, normal: { x: -swept.normal1.x, y: -swept.normal1.y, z: -swept.normal1.z } };
+          }
         }
+      }
+      const reached = Math.min(1, stop);
+      const along = (u: number): Vec3 => ({ x: previous.x + segment.x * u, y: previous.y + segment.y * u, z: previous.z + segment.z * u });
+      if (ball && bounces === 0 && ropes.length) {
+        // The chain between the balls cuts any rope it passes within a hand's breadth of (as cutRopes
+        // does). A ball glancing off a post or an egg doesn't stop the chain dead: it scythes on a
+        // little way, so look a short way past a ball's first touch too.
+        const scythe = ballHit ? Math.min(1, reached + CHAIN_FOLLOW / Math.max(length, 1e-3)) : reached;
+        for (let k = 1; k <= 6; k += 1) {
+          const u = Math.min(scythe, k / 6);
+          const centre = along(u);
+          const when = flown - dt + dt * u;
+          const a = ballAt(centre, when, 1);
+          const b = ballAt(centre, when, -1);
+          ropes.forEach((rope, index) => {
+            if (cut.has(index)) return;
+            const near = closestBetweenSegments(a, b, rope.bottom, rope.top);
+            if (near.distance >= 0.25) return;
+            cut.add(index);
+            cuts.push({
+              x: rope.bottom.x + (rope.top.x - rope.bottom.x) * near.t,
+              y: rope.bottom.y + (rope.top.y - rope.bottom.y) * near.t,
+              z: rope.bottom.z + (rope.top.z - rope.bottom.z) * near.t,
+            });
+          });
+          if (u >= scythe) break;
+        }
+      }
+      if (through && !passes && distance(closestOnSegment(through.at, previous, along(reached)).point, through.at) < 0.12) passes = through;
+      if (ballHit) {
+        const at = along(reached);
+        points.push(at);
+        hit = at;
+        hitKind = this.byCollider.get(ballHit.handle)?.view.kind;
+        hitNormal = ballHit.normal;
+        break;
       }
       if (contact) {
         const at = {
@@ -556,21 +649,25 @@ export class Game {
         }
         hit = at;
         hitKind = owner?.view.kind;
+        hitNormal = { x: contact.normal.x, y: contact.normal.y, z: contact.normal.z };
         break;
       }
       points.push(next);
       if (next.y < -1) break;
     }
-    return { points, hit, hitKind, reachable: solution.reachable, from, velocity };
+    const last = points[points.length - 1]!;
+    if (aimedRope >= 0 && !cut.has(aimedRope) && distance(last, target) < CHAIN_LENGTH) cuts.unshift({ ...target });
+    return { points, hit, hitKind, ...(hitNormal ? { hitNormal } : {}), ...(passes ? { passes } : {}), ...(cuts.length ? { cuts } : {}), reachable: solution.reachable, from, velocity };
   }
 
-  /** The disc a chain shot's balls and chain sweep out, set square to its launch. */
-  private chainSweep(velocity: Vec3): { disc: RAPIER.Cylinder; rotation: Quat } {
-    const forward = normalise(velocity);
-    const side = normalise({ x: -forward.z, y: 0, z: forward.x });
-    const axis = normalise(cross(side, forward));
-    chainDisc ??= new RAPIER.Cylinder(SHOT_RADIUS_CHAIN, CHAIN_REACH);
-    return { disc: chainDisc, rotation: yAxisTo(axis.y < 0 ? { x: -axis.x, y: -axis.y, z: -axis.z } : axis) };
+  /** Is the aim point on a curio? Shots fly straight through them, setting them off. */
+  private passThrough(target: Vec3, kind: AmmoKind): AimPreview["passes"] {
+    if (kind === "blunderbuss") return undefined;
+    for (const curio of CURIOS) {
+      const inside = Math.abs(target.x - curio.at.x) <= curio.size.x / 2 + 0.05 && Math.abs(target.y - curio.at.y) <= curio.size.y / 2 + 0.05 && Math.abs(target.z - curio.at.z) <= curio.size.z / 2 + 0.05;
+      if (inside) return { at: { ...target }, what: "curio" };
+    }
+    return undefined;
   }
 
   // ---------------------------------------------------------------- commands
@@ -621,17 +718,17 @@ export class Game {
     } else {
       const forward = normalise(velocity);
       const side = normalise({ x: -forward.z, y: 0, z: forward.x });
-      const spin = 6.5;
+      const spin = CHAIN_SPIN;
       const a = this.addProjectile(
         "chain",
-        { x: from.x + side.x * 0.45, y: from.y, z: from.z + side.z * 0.45 },
+        { x: from.x + side.x * CHAIN_SPREAD, y: from.y, z: from.z + side.z * CHAIN_SPREAD },
         { x: velocity.x + forward.x * spin, y: velocity.y + forward.y * spin, z: velocity.z + forward.z * spin },
         0.17,
         14,
       );
       const b = this.addProjectile(
         "chain",
-        { x: from.x - side.x * 0.45, y: from.y, z: from.z - side.z * 0.45 },
+        { x: from.x - side.x * CHAIN_SPREAD, y: from.y, z: from.z - side.z * CHAIN_SPREAD },
         { x: velocity.x - forward.x * spin, y: velocity.y - forward.y * spin, z: velocity.z - forward.z * spin },
         0.17,
         14,

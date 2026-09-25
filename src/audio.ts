@@ -1,10 +1,17 @@
 import type { AmmoKind } from "./sim/types.js";
 import { RECORDED } from "./lines.js";
 
+/** How far the stage foley dips while someone speaks. */
+const DUCKED = 0.35;
+
 /** Procedural foley for the theatre, plus the recorded royal voices. */
 export class TheatreAudio {
   private context: AudioContext | undefined;
   private master: GainNode | undefined;
+  /** Everything but the voices: dipped while someone is speaking, so the words come through. */
+  private stage: GainNode | undefined;
+  private voices: GainNode | undefined;
+  private duckUntil = 0;
   private noise: AudioBuffer | undefined;
   private muted = false;
   private readonly clips = new Map<string, Promise<AudioBuffer | undefined>>();
@@ -31,6 +38,10 @@ export class TheatreAudio {
       compressor.threshold.value = -14;
       compressor.ratio.value = 4;
       this.master.connect(compressor).connect(this.context.destination);
+      this.stage = this.context.createGain();
+      this.stage.connect(this.master);
+      this.voices = this.context.createGain();
+      this.voices.connect(this.master);
       const length = this.context.sampleRate;
       this.noise = this.context.createBuffer(1, length, this.context.sampleRate);
       const data = this.noise.getChannelData(0);
@@ -44,9 +55,27 @@ export class TheatreAudio {
     if (this.master && this.context) this.master.gain.setTargetAtTime(muted ? 0 : 0.5, this.context.currentTime, 0.05);
   }
 
-  private ready(): { ctx: AudioContext; out: GainNode } | undefined {
-    if (!this.context || !this.master || this.muted || this.context.state !== "running") return undefined;
-    return { ctx: this.context, out: this.master };
+  private ready(): { ctx: AudioContext; out: GainNode; voices: GainNode } | undefined {
+    if (!this.context || !this.stage || !this.voices || this.muted || this.context.state !== "running") return undefined;
+    return { ctx: this.context, out: this.stage, voices: this.voices };
+  }
+
+  /** Someone is speaking for `seconds`: bring the stage down under them, then back up. */
+  private duck(seconds: number): void {
+    const ctx = this.context;
+    const stage = this.stage;
+    if (!ctx || !stage) return;
+    const start = ctx.currentTime;
+    const until = start + seconds;
+    if (until <= this.duckUntil) return;
+    // From wherever it is now (already down, on its way down, or on its way back up).
+    const gain = stage.gain;
+    gain.cancelScheduledValues(start);
+    gain.setValueAtTime(gain.value, start);
+    gain.linearRampToValueAtTime(DUCKED, start + 0.08);
+    gain.setValueAtTime(DUCKED, until);
+    gain.linearRampToValueAtTime(1, until + 0.4);
+    this.duckUntil = until;
   }
 
   private throttle(key: string, ms: number): boolean {
@@ -77,10 +106,11 @@ export class TheatreAudio {
     source.stop(start + options.duration + 0.05);
   }
 
-  private tone(frequency: number, duration: number, volume: number, type: OscillatorType = "sine", options: { to?: number; delay?: number; attack?: number } = {}): void {
+  private tone(frequency: number, duration: number, volume: number, type: OscillatorType = "sine", options: { to?: number; delay?: number; attack?: number; voice?: boolean } = {}): void {
     const audio = this.ready();
     if (!audio) return;
-    const { ctx, out } = audio;
+    const { ctx } = audio;
+    const out = options.voice ? audio.voices : audio.out;
     const start = ctx.currentTime + (options.delay ?? 0);
     const oscillator = ctx.createOscillator();
     oscillator.type = type;
@@ -482,8 +512,9 @@ export class TheatreAudio {
       source.buffer = buffer;
       const gain = live.ctx.createGain();
       gain.gain.value = 1.4;
-      source.connect(gain).connect(live.out);
+      source.connect(gain).connect(live.voices);
       source.start();
+      this.duck(buffer.duration);
     });
     return true;
   }
@@ -494,7 +525,8 @@ export class TheatreAudio {
     const base = speaker === "queen" ? 190 : speaker === "king" ? 105 : 150;
     for (let index = 0; index < syllables; index += 1) {
       const pitch = base * (0.85 + Math.random() * 0.4);
-      this.tone(pitch, 0.09, 0.07, speaker === "queen" ? "sawtooth" : "triangle", { to: pitch * (0.8 + Math.random() * 0.4), delay: index * 0.11, attack: 0.02 });
+      this.tone(pitch, 0.09, 0.07, speaker === "queen" ? "sawtooth" : "triangle", { to: pitch * (0.8 + Math.random() * 0.4), delay: index * 0.11, attack: 0.02, voice: true });
     }
+    this.duck(syllables * 0.11 + 0.1);
   }
 }

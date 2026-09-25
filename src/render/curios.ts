@@ -82,7 +82,7 @@ export class Curios {
     // house: a carved gable, a painted dial at five to midnight, a pendulum and pine-cone weights.
     const clockAt = at("cuckoo");
     const flies = 17;
-    this.clockSwing = kit.group("cuckoo-flown", this.root, V(clockAt.x, flies, clockAt.z), V(0, 22, 0));
+    this.clockSwing = kit.group("cuckoo-flown", this.root, V(clockAt.x, flies, clockAt.z), V(0, 8, 0));
     const clock = kit.group("cuckoo-clock", this.clockSwing, V(0, clockAt.y - flies, 0));
     const wood = kit.material("oak-dark", palette.oakDark, 0.16);
     const light = kit.material("oak", palette.oak, 0.18);
@@ -219,7 +219,7 @@ export class Curios {
     this.cuckoo.setLocalPosition(0, 0.44, 0.05 + out * 0.4);
     this.clockDoor.setLocalEulerAngles(0, out > 0.05 ? -100 : 0, 0);
     const swing = cuckoo < 4 ? Math.sin(cuckoo * 2.6) * 2.2 * (1 - cuckoo / 4) : 0;
-    this.clockSwing.setLocalEulerAngles(swing, 22, swing * 0.5);
+    this.clockSwing.setLocalEulerAngles(swing, 8, swing * 0.5);
     // Ding, dong, bell; pussy's in the well.
     const well = age("well");
     this.bell.setLocalEulerAngles(well < 2.5 ? Math.sin(well * 14) * 30 * (1 - well / 2.5) : 0, 0, 0);

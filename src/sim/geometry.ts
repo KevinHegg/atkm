@@ -25,6 +25,11 @@ export function distanceToSegment(p: Vec3, a: Vec3, b: Vec3): number {
 
 /** Closest distance between segments p1-q1 and p2-q2. */
 export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number {
+  return closestBetweenSegments(p1, q1, p2, q2).distance;
+}
+
+/** The nearest pair of points on segments p1-q1 and p2-q2, as fractions along each, and their gap. */
+export function closestBetweenSegments(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): { s: number; t: number; distance: number } {
   const d1 = sub(q1, p1);
   const d2 = sub(q2, p2);
   const r = sub(p1, p2);
@@ -33,7 +38,7 @@ export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number 
   const f = dot(d2, r);
   let s = 0;
   let t = 0;
-  if (a < 1e-9 && e < 1e-9) return Math.hypot(r.x, r.y, r.z);
+  if (a < 1e-9 && e < 1e-9) return { s: 0, t: 0, distance: Math.hypot(r.x, r.y, r.z) };
   if (a < 1e-9) {
     t = Math.max(0, Math.min(1, f / e));
   } else {
@@ -56,7 +61,7 @@ export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number 
   }
   const c1 = { x: p1.x + d1.x * s, y: p1.y + d1.y * s, z: p1.z + d1.z * s };
   const c2 = { x: p2.x + d2.x * t, y: p2.y + d2.y * t, z: p2.z + d2.z * t };
-  return Math.hypot(c1.x - c2.x, c1.y - c2.y, c1.z - c2.z);
+  return { s, t, distance: Math.hypot(c1.x - c2.x, c1.y - c2.y, c1.z - c2.z) };
 }
 
 /** The point on segment a-b nearest to p, and how far along (0…1) it lies. */
