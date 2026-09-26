@@ -17,13 +17,13 @@ export type AmmoKind = "shot" | "shell" | "grape" | "chain" | "bomb" | "blunderb
 /** Ordnance the level stocks; the Queen's blunderbuss is always to hand when vermin appear. */
 export type StockKind = Exclude<AmmoKind, "blunderbuss">;
 
-export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole";
+export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole" | "domino";
 
 /** Static scenery in the playing area: it stops shots but never moves. */
-export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever" | "vane" | "pier" | "lintel" | "counterweight" | "portcullis" | "carousel";
+export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever" | "vane" | "pier" | "lintel" | "counterweight" | "portcullis" | "carousel" | "chock";
 
 /** Stage cues: strike one and the theatre does something that helps the Queen. */
-export type CueKind = "lunch" | "wind" | "trap" | "gate";
+export type CueKind = "lunch" | "wind" | "trap" | "gate" | "release";
 
 /** Where a verse hides its star: in one of the King's crews, a curio, or the rat. */
 export type StarHolder = { crew: string } | { curio: CurioId } | { rat: true };

@@ -176,26 +176,33 @@ function allTheKingsHorses(): LevelDef {
   m.keg(0.95, -2.55);
   // A stage weight hangs over the cart road: push it and it swings like a wrecking ball.
   m.sandbag(3.3, 1.2, -2.8);
-  m.chest(-7.4, -2.2, { yaw: 0.3 });
+  m.chest(-8.4, -0.7, { yaw: 0.3 });
+  // Up the stage-left corner, a barrel waits at the head of a ramp down onto the cart road. Its
+  // chock is hidden from the guns behind a hedge; a run of dominoes leads round to it.
+  m.barrelRamp({ x: -10, y: 1.5, z: -4.3 }, { x: -7.2, y: 0.06, z: -4.3 }, { chock: 0.85 });
+  m.hedge(-8.55, -1.6, 2.7, 2.6);
+  // Every domino falls clear of the barrel's road; the last one lands on the end of the chock.
+  m.dominoes([{ x: -6.2, z: 1.2 }, { x: -6.2, z: -0.6 }, { x: -6.35, z: -1.3 }, { x: -6.75, z: -1.95 }, { x: -7.35, z: -2.45 }, { x: -8.75, z: -2.6 }], [0.9, 1.1, 1.3, 1.5, 1.7, 1.8, 1.9, 2]);
   return {
     id: "all-the-kings-horses",
     title: "All the King's Horses",
     verse: ["All the King's horses came thundering near,", "with a cart full of straw and a very large ear."],
-    hint: "The horse cart catches everything. Scatter it — grapeshot, or a keg as it passes — then knock Humpty off.",
+    hint: "The horse cart catches everything. Scatter it (grapeshot, a keg as it passes, or topple the dominoes and let loose the barrel) then knock Humpty off.",
     ammo: { grape: 2, shot: 3 },
     greatFall: 4.5,
-    mayhem: 800,
-    star: { crew: "cart" },
+    mayhem: 850,
+    star: { crew: "guard-a" },
     humpty: perchAt(0, top, -1.6),
     pieces: m.pieces,
     crews: [
       {
         id: "cart",
         kind: "cart",
-        home: { x: -6, y: 0, z: -5 },
+        home: { x: -3.4, y: 0, z: -5 },
         yaw: Math.PI / 2,
         zone: { minX: -11, maxX: 11, minZ: -8.3, maxZ: -3.2 },
-        patrol: [{ x: -6.5, y: 0, z: -5 }, { x: 6.5, y: 0, z: -5 }],
+        // It turns round well clear of the dominoes up the stage-left corner.
+        patrol: [{ x: -3.4, y: 0, z: -5 }, { x: 6.5, y: 0, z: -5 }],
       },
       { id: "guard-a", kind: "guard", home: { x: -3.6, y: 0, z: 1.6 }, yaw: 0 },
       { id: "guard-b", kind: "guard", home: { x: 3.6, y: 0, z: 1.6 }, yaw: 0 },

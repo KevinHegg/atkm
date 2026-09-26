@@ -1183,6 +1183,15 @@ function handle(event: GameEvent): void {
       }
       break;
     case "cue":
+      if (event.cue === "release") {
+        audio.clang();
+        audio.tumble();
+        if (live) {
+          toast("Look out below!", true, "The barrel is rolling");
+          later(0.8, () => cue("barrel", 1, 0));
+        }
+        break;
+      }
       if (event.cue === "gate") {
         audio.portcullis();
         if (live) {

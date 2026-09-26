@@ -28,6 +28,7 @@ export type MayhemKind =
   | "gate"
   | "chute"
   | "combo"
+  | "barrel"
   | "tower"
   | "crack";
 
@@ -63,6 +64,7 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   gate: { points: 40, bill: "Portcullises raised", shout: "Up she goes!" },
   chute: { points: 60, bill: "Bombs down the chute", shout: "Wheee!" },
   combo: { points: 0, bill: "Trick shots", shout: "Combo!" },
+  barrel: { points: 40, bill: "Barrels sent rolling", shout: "Look out below!" },
   tower: { points: 75, bill: "The royal box, rattled", shout: "Steady on!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };

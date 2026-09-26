@@ -810,3 +810,22 @@ test("nudged to the very edge of his perch, Humpty teeters", async () => {
   assert.ok(events.some((event) => event.type === "teeter"), "he teeters");
   game.destroy();
 });
+
+test("a run of dominoes knocks the chock from under a barrel, which rolls off with its fuse lit", async () => {
+  const game = await Game.create(arena((mason) => {
+    mason.barrelRamp({ x: -10, y: 1.5, z: -4.3 }, { x: -7.2, y: 0.06, z: -4.3 }, { chock: 0.85 });
+    mason.dominoes([{ x: -6.2, z: 1.2 }, { x: -6.2, z: -0.6 }, { x: -6.35, z: -1.3 }, { x: -6.75, z: -1.95 }, { x: -7.35, z: -2.45 }, { x: -8.75, z: -2.6 }], [0.9, 1.1, 1.3, 1.5, 1.7, 1.8, 1.9, 2]);
+    return perchAt(6, 1, -8);
+  }, { ammo: { shot: 1 } }));
+  await stepUntilReady(game);
+  const first = game.bodies.filter((body) => body.material === "domino").sort((a, b) => b.position.z - a.position.z)[0]!;
+  const barrel = game.bodies.find((body) => body.kind === "keg")!;
+  const start = barrel.position.x;
+  assert.ok(game.fire({ x: first.position.x, y: first.size.y * 0.8, z: first.position.z }));
+  const events = await run(game, 7);
+  assert.ok(events.some((event) => event.type === "cue" && event.cue === "release"), "the last domino knocks out the chock");
+  assert.ok(events.some((event) => event.type === "mayhem" && event.kind === "barrel"));
+  const blast = events.find((event) => event.type === "explode");
+  assert.ok(blast && blast.type === "explode" && blast.at.x > start + 6, `the barrel rolls well down the stage before it goes off (x ${blast && blast.type === "explode" ? blast.at.x.toFixed(1) : "?"})`);
+  game.destroy();
+});

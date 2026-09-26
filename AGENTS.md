@@ -33,6 +33,10 @@ Core promises:
   slides. The chute (`Mason.chute`) is a fixed trough with a scoring sensor in its hopper.
   The aim arc leaves the carousel out of its casts and sweeps the ball against its paddles
   where they will be when the shot arrives (`paddleHit`); keep that true if you change it.
+- Dominoes (`Mason.dominoes`, material `domino`) are ordinary blocks, except that one
+  toppling onto a stage cue calls it, as a shot would. `Mason.barrelRamp` lays a keg on its
+  side behind a chock (cue `release`); its fuse lights once it's rolling. Keep every domino's
+  fall, and the cart's turning circle, clear of the barrel's road.
 - Bodies start asleep so verses stand still. Anything moving briskly wakes whatever it is
   still touching (`wakeSupported`), so nothing is left hanging when its support is shot away.
 - Each stock shot opens a combo tally (`Game.combo`); it closes at the next shot, at the crack

@@ -38,7 +38,8 @@ export type Cue =
   | "chute"
   | "vane"
   | "teeter"
-  | "combo";
+  | "combo"
+  | "barrel";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -189,6 +190,10 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   bounce: {
     speaker: "humpty",
     lines: ["Wheeeee— I mean, stop that.", "This bed is FAR too bouncy!", "Up I go! And, er, down?"],
+  },
+  barrel: {
+    speaker: "humpty",
+    lines: ["Is that a barrel? Is that a LIT barrel?", "Somebody stop that barrel! Somebody else!", "Gentlemen, I believe we are being bowled at."],
   },
   combo: {
     speaker: "queen",

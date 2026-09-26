@@ -369,7 +369,7 @@ export class StageView {
     this.chutes.length = 0;
     for (const piece of game.level.pieces) {
       if (piece.kind !== "chute") continue;
-      const chute = buildChute(this.kit, this.world, piece.path, piece.width);
+      const chute = buildChute(this.kit, this.world, piece.path, piece.width, piece.hopper !== false);
       this.batch(chute);
       this.chutes.push(chute);
     }
@@ -1442,6 +1442,13 @@ export class StageView {
     const emit = this.fizzTimer > 0.05;
     if (emit) this.fizzTimer = 0;
     for (const visual of this.visuals.values()) {
+      // A barrel off its chock fizzes at one end as it rolls.
+      if (visual.view.kind === "keg" && visual.view.fuse !== undefined) {
+        if (!emit) continue;
+        const end = visual.root.getPosition().clone().add(visual.root.up.clone().mulScalar(0.42));
+        this.spark(end, V((Math.random() - 0.5) * 2, 1.5 + Math.random() * 1.5, (Math.random() - 0.5) * 2), palette.gold);
+        continue;
+      }
       if (visual.view.kind !== "bomb") continue;
       const left = visual.view.fuse ?? 3;
       const swell = left < 0.8 ? 1 + Math.abs(Math.sin(this.elapsed * 30)) * (0.8 - left) * 0.35 : 1;

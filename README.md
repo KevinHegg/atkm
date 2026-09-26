@@ -99,6 +99,10 @@ unlock every verse.
   hopper rolls down the trough, fuse fizzing, to wherever it leads. The mulberry-bush
   carousel's cut-out children bat shots about as they turn; its aim arc shows where they
   will be when the shot arrives, so wait for the arc to swing round, then fire.
+- **Dominoes and the barrel ramp.** In All the King's Horses, a run of dominoes curls round
+  behind a hedge to the chock of a barrel ramp. Topple the first and the last knocks the chock
+  out: a powder keg rolls down onto the cart road, fuse fizzing, bowls whatever is in its way
+  and goes off wherever it has got to. (Striking the chock yourself works too.)
 - **Bumpers and screens.** Bronze bumpers bounce round shot cleanly. Painted screens
   and hedges hide what's behind them, including hay.
 - **The rat.** In later verses a giant rat creeps out of the wings to gnaw the Queen's

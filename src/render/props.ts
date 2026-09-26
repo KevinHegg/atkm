@@ -405,6 +405,26 @@ export function buildBlock(kit: Kit, parent: pc.Entity, material: string, size: 
     kit.meshEntity("anvil", kit.boxes(`anvil-${x.toFixed(2)}`, boxes), kit.paintMaterial(0.55), root);
     return root;
   }
+  if (material === "domino") {
+    // An ivory domino with a black rule across the middle and pips on both faces.
+    gloss = 0.45;
+    const ivory = new pc.Color(0.93, 0.9, 0.82);
+    const ink = new pc.Color(0.08, 0.07, 0.07);
+    boxes.push({ center: [0, 0, 0], size: [x, y, z], color: ivory });
+    const pip = Math.min(x, y) * 0.13;
+    const counts = [1 + (tone % 3), 2 + ((tone + 1) % 4)];
+    for (const face of [-1, 1]) {
+      const zf = face * (z / 2 + 0.005);
+      boxes.push({ center: [0, 0, zf], size: [x * 0.8, 0.03, 0.01], color: ink });
+      for (const [half, count] of counts.entries()) {
+        const cy = (half === 0 ? 1 : -1) * y * 0.25;
+        const spots = [[0, 0], [-1, -1], [1, 1], [-1, 1], [1, -1], [-1, 0], [1, 0]].slice(count % 2 ? 0 : 1, (count % 2 ? 0 : 1) + count);
+        for (const [dx, dy] of spots) boxes.push({ center: [dx! * x * 0.25, cy + dy! * y * 0.12, zf], size: [pip, pip, 0.01], color: ink });
+      }
+    }
+    kit.meshEntity("domino", kit.boxes(`domino-${tone}-${x.toFixed(2)}x${y.toFixed(2)}x${z.toFixed(2)}`, boxes), kit.paintMaterial(gloss), root);
+    return root;
+  }
   if (material === "post") {
     gloss = 0.6;
     boxes.push({ center: [0, 0, 0], size: [x, y, z], color: shade(palette.gold, 0.85) });
@@ -687,7 +707,7 @@ export function buildCarousel(kit: Kit, parent: pc.Entity, def: { inner: number;
 }
 
 /** The chute: a plank trough down `path` on its trestles, and a hopper over the top end. */
-export function buildChute(kit: Kit, parent: pc.Entity, path: ReadonlyArray<{ x: number; y: number; z: number }>, width: number): pc.Entity {
+export function buildChute(kit: Kit, parent: pc.Entity, path: ReadonlyArray<{ x: number; y: number; z: number }>, width: number, hopper = true): pc.Entity {
   const root = kit.group("chute", parent);
   const plank = kit.material("oak", palette.oak, 0.18);
   const dark = kit.material("oak-dark", palette.oakDark, 0.16);
@@ -709,7 +729,7 @@ export function buildChute(kit: Kit, parent: pc.Entity, path: ReadonlyArray<{ x:
     }
   }
   // The hopper: low on the side facing the guns, a tall backstop behind.
-  for (const board of hopperBoards(path, width)) place("hopper-board", board.center, board.rotation, board.size, plank);
+  if (hopper) for (const board of hopperBoards(path, width)) place("hopper-board", board.center, board.rotation, board.size, plank);
   return root;
 }
 
@@ -924,6 +944,17 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
     for (let index = 0; index <= bars; index += 1) {
       kit.primitive("spike", "cone", root, V(-x / 2 + (index * x) / bars, -y / 2 - 0.1, 0), { x: 0.1, y: 0.2, z: 0.1 }, kit.material("iron", palette.iron, 0.55, 0.68), V(180, 0, 0), false);
     }
+    return root;
+  }
+  if (look === "chock") {
+    // A stout red-painted stop-board holding the barrel, with a rope handle to haul it out by.
+    const parts: Box[] = [
+      { center: [0, 0, 0], size: [x, y, z], color: palette.king },
+      { center: [0, y / 2 - 0.04, 0], size: [x + 0.04, 0.08, z + 0.04], color: palette.gold },
+      { center: [0, -y * 0.1, z / 2 + 0.01], size: [x * 0.6, 0.06, 0.02], color: palette.cream },
+    ];
+    kit.meshEntity("chock", kit.boxes(`chock-${x.toFixed(2)}x${y.toFixed(2)}`, parts), kit.paintMaterial(0.3), root);
+    kit.primitive("chock-handle", "cylinder", root, V(0, y / 2 + 0.12, 0), { x: 0.3, y: 0.04, z: 0.3 }, kit.material("rope", palette.rope, 0.12), V(90, 0, 0), false);
     return root;
   }
   if (look === "counterweight") {

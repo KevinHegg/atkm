@@ -150,7 +150,7 @@ const GROUPS = {
   debris: groups(G.DEBRIS, G.STATIC | G.BLOCK | G.DEBRIS | G.CREW | G.BED),
 };
 
-const DENSITY: Record<string, number> = { maypole: 560, oak: 520, plank: 480, beam: 560, brick: 900, stone: 1250, post: 600, canopy: 150, anvil: 4500 };
+const DENSITY: Record<string, number> = { domino: 520, maypole: 560, oak: 520, plank: 480, beam: 560, brick: 900, stone: 1250, post: 600, canopy: 150, anvil: 4500 };
 
 interface Entity {
   view: BodyView;
@@ -179,6 +179,10 @@ interface Entity {
   cuedAt?: number;
   /** A springy bed's launch speed. */
   spring?: number;
+  /** A barrel-ramp keg: its fuse lights (for this many seconds) once it starts rolling. */
+  rollFuse?: number;
+  /** A domino: falling onto a stage cue sets it off, just as a shot would. */
+  domino?: boolean;
   /** Rocked by the wind machine. */
   windy?: boolean;
 }
@@ -355,7 +359,7 @@ export class Game {
     const fixtures: Entity[] = [];
     for (const piece of level.pieces) {
       if (piece.kind === "block") this.addBlock(piece.material, piece.pos, piece.size, piece.yaw);
-      else if (piece.kind === "keg") this.addKeg(piece.pos);
+      else if (piece.kind === "keg") this.addKeg(piece.pos, piece.lie, piece.fuse);
       else if (piece.kind === "hay") this.addHay(piece.pos, piece.yaw);
       else if (piece.kind === "fixture") fixtures.push(this.addFixture(piece));
       else if (piece.kind === "bucket") this.addBucket(piece.pos);
@@ -468,7 +472,8 @@ export class Game {
   get fuses(): Array<{ at: Vec3; left: number }> {
     const fuses: Array<{ at: Vec3; left: number }> = [];
     for (const entity of this.entities.values()) {
-      if (entity.view.kind === "bomb" && entity.fuseAt !== undefined) fuses.push({ at: { ...entity.view.position }, left: Math.max(0, entity.fuseAt - this.time) });
+      const lit = entity.view.kind === "bomb" || (entity.view.kind === "keg" && entity.rollFuse !== undefined);
+      if (lit && entity.fuseAt !== undefined) fuses.push({ at: { ...entity.view.position }, left: Math.max(0, entity.fuseAt - this.time) });
     }
     return fuses;
   }
@@ -1071,8 +1076,9 @@ export class Game {
         desc
           .setTranslation(at.x, at.y, at.z)
           .setRotation(rotation)
-          // Slick and dead: a bomb drops in without bouncing out, and slides down smartly.
-          .setFriction(0)
+          // Slick and dead: a bomb drops in without bouncing out, and slides down smartly. A barrel
+          // ramp keeps some grip, so its barrel rolls.
+          .setFriction(def.slick === false ? 0.6 : 0)
           .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
           .setRestitution(0)
           .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
@@ -1092,6 +1098,7 @@ export class Game {
         board(RAPIER.ColliderDesc.cuboid(0.04, 0.2, long), add(add(mid, scale(frame.across, side * (half + 0.04))), scale(frame.up, 0.16)), frame.rotation);
       }
     }
+    if (def.hopper === false) return;
     // The hopper: a low near side, a tall far side and a back, the downhill end left open.
     for (const plank of hopperBoards(def.path, def.width)) board(RAPIER.ColliderDesc.cuboid(plank.size.x / 2, plank.size.y / 2, plank.size.z / 2), plank.center, plank.rotation);
     const lift = hopperFrame(def.path).mouth;
@@ -1155,6 +1162,15 @@ export class Game {
     return 1 - (t - GATE_RISE - GATE_TIME) / GATE_FALL;
   }
 
+  /** The chock is knocked out from under a barrel: away it goes, and the barrel with it. */
+  private knockChock(chock: Entity): void {
+    const at = { ...chock.view.position };
+    this.remove(chock);
+    for (const entity of this.entities.values()) {
+      if (entity.rollFuse !== undefined && distance(entity.view.position, at) < 2) entity.body.wakeUp();
+    }
+  }
+
   /** The counterweight is struck: up goes the portcullis. Not while it is still up or coming down. */
   private raiseGate(): boolean {
     if (!this.gate || this.gateLift() > 0) return false;
@@ -1169,6 +1185,14 @@ export class Game {
 
   /** The machines that turn on their own: struck weathercocks, the carousel, the portcullis. */
   private updateMachines(): void {
+    // A barrel off its chock: once it's rolling, its fuse is lit.
+    for (const entity of this.entities.values()) {
+      if (entity.rollFuse === undefined || entity.fuseAt !== undefined || entity.body.isSleeping()) continue;
+      if (lengthOf(entity.body.linvel()) > 1) entity.fuseAt = this.time + entity.rollFuse;
+    }
+    for (const entity of this.entities.values()) {
+      if (entity.rollFuse !== undefined && entity.fuseAt !== undefined) entity.view.fuse = Math.max(0, entity.fuseAt - this.time);
+    }
     for (const vane of this.vanes) {
       if (vane.angle === vane.target) continue;
       const left = vane.target - vane.angle;
@@ -1742,12 +1766,14 @@ export class Game {
         .setCollisionGroups(GROUPS.block),
       body,
     );
-    return this.register("block", material, size, body, [collider], { structural: true });
+    return this.register("block", material, size, body, [collider], { structural: true, ...(material === "domino" ? { domino: true } : {}) });
   }
 
-  private addKeg(pos: Vec3): Entity {
+  private addKeg(pos: Vec3, lie?: number, fuse?: number): Entity {
+    // A keg on a barrel ramp lies on its side, its staves across the way it will roll.
+    const rotation = lie === undefined ? { x: 0, y: 0, z: 0, w: 1 } : yAxisTo({ x: Math.cos(lie), y: 0, z: -Math.sin(lie) });
     const body = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setCcdEnabled(true).setSleeping(true),
+      RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).setRotation(rotation).setCcdEnabled(true).setSleeping(true),
     );
     const collider = this.world.createCollider(
       RAPIER.ColliderDesc.cylinder(KEG_HALF_HEIGHT, KEG_RADIUS)
@@ -1759,7 +1785,7 @@ export class Game {
         .setContactForceEventThreshold(55 * 20 / STEP),
       body,
     );
-    return this.register("keg", "powder", { x: KEG_RADIUS * 2, y: KEG_HALF_HEIGHT * 2, z: KEG_RADIUS * 2 }, body, [collider], { structural: true });
+    return this.register("keg", "powder", { x: KEG_RADIUS * 2, y: KEG_HALF_HEIGHT * 2, z: KEG_RADIUS * 2 }, body, [collider], { structural: true, ...(fuse !== undefined ? { rollFuse: fuse } : {}) });
   }
 
   private addHay(pos: Vec3, yaw: number): Entity {
@@ -1984,6 +2010,13 @@ export class Game {
       for (const [mine, other] of [[first, second], [second, first]] as const) {
         const shot = this.byCollider.get(mine);
         if (shot?.spring && this.humpty && this.byCollider.get(other) === this.humpty) this.bounceHumpty(shot);
+        // A toppling domino that lands on a stage cue (the chock under a barrel, say) calls it.
+        if (shot?.domino && this.log.length) {
+          const cueFixture = this.byCollider.get(other);
+          const v = shot.body.angvel();
+          if (cueFixture?.cue && Math.hypot(v.x, v.y, v.z) > 0.5) this.callCue(cueFixture, shot);
+          continue;
+        }
         if (!shot?.ammo || shot.view.removed) continue;
         if (shot.view.kind === "bomb" && shot.fuseAt === undefined && !this.curios.has(other) && !this.hoppers.has(other)) shot.fuseAt = this.time + BOMB_FUSE;
         const hopper = this.hoppers.get(other);
@@ -2040,12 +2073,13 @@ export class Game {
     if (!cue || this.time - (fixture.cuedAt ?? -10) < 2) return;
     if (cue === "trap" && !this.springTrap()) return;
     if (cue === "gate" && !this.raiseGate()) return;
+    if (cue === "release") this.knockChock(fixture);
     fixture.cuedAt = this.time;
     if (cue === "lunch") for (const crew of this.crews) callLunch(crew, this.time);
     if (cue === "wind") this.windUntil = this.time + WIND_TIME;
     const p = shot.body.translation();
     this.events.push({ type: "cue", cue, at: { x: p.x, y: p.y, z: p.z } });
-    if (cue !== "trap") this.score(cue === "wind" ? "wind" : cue === "gate" ? "gate" : "gong", { x: p.x, y: p.y, z: p.z });
+    if (cue !== "trap") this.score(cue === "wind" ? "wind" : cue === "gate" ? "gate" : cue === "release" ? "barrel" : "gong", { x: p.x, y: p.y, z: p.z });
   }
 
   private handleForces(): void {

@@ -12,6 +12,10 @@ export interface BlockDef {
 export interface KegDef {
   kind: "keg";
   pos: Vec3;
+  /** Lying on its side, ready to roll this way (radians, like a fixture's yaw). */
+  lie?: number;
+  /** A fuse that lights once it's rolling, and burns this many seconds. */
+  fuse?: number;
 }
 
 export interface HayDef {
@@ -121,6 +125,10 @@ export interface ChuteDef {
   kind: "chute";
   path: Vec3[];
   width: number;
+  /** A hopper over the head of the trough (chutes have one; a barrel ramp doesn't). */
+  hopper?: boolean;
+  /** Slick boards for a bomb to slide on; a barrel ramp has ordinary ones to roll on. */
+  slick?: boolean;
 }
 
 /**
@@ -486,6 +494,53 @@ export class Mason {
     // Trestles under each bend, so it stands on the boards.
     for (const point of path.slice(0, -1)) {
       if (point.y > 0.5) this.fixture("post", point.x, 0, point.z, 0.18, point.y - 0.1, 0.18);
+    }
+  }
+
+  /**
+   * A barrel ramp: a plank trough from `top` down to `foot`, a powder keg lying across its head and
+   * a chock holding it. Strike the chock and the keg rolls, its fuse lit, wherever the ramp sends it.
+   */
+  barrelRamp(top: Vec3, foot: Vec3, opts: { fuse?: number; chock?: number } = {}): void {
+    const width = 1.1;
+    this.pieces.push({ kind: "chute", path: [top, foot], width, hopper: false, slick: false });
+    if (top.y > 0.5) this.fixture("post", top.x, 0, top.z, 0.2, top.y - 0.1, 0.2);
+    const run = Math.hypot(foot.x - top.x, foot.z - top.z) || 1;
+    const along = { x: (foot.x - top.x) / run, z: (foot.z - top.z) / run };
+    const slope = (top.y - foot.y) / run;
+    const heading = Math.atan2(along.x, along.z);
+    const at = (d: number, lift: number): Vec3 => ({ x: top.x + along.x * d, y: top.y - slope * d + lift, z: top.z + along.z * d });
+    const keg = at(0.5, KEG_RADIUS + 0.03);
+    this.pieces.push({ kind: "keg", pos: keg, lie: heading, fuse: opts.fuse ?? 3.2 });
+    // The chock is a stout board standing up above the trough's sides, so a shot can reach it.
+    const chock = at(0.5 + KEG_RADIUS + 0.16, 0);
+    // It reaches out past the trough on both sides: `chock` is how far, for a domino to catch its end.
+    this.fixture("chock", chock.x, chock.y - 0.05, chock.z, width + 2 * (opts.chock ?? 0.3), 0.85, 0.2, { yaw: heading, cue: "release" });
+  }
+
+  /**
+   * A run of dominoes along `path` (points on the boards), from its start, growing through
+   * `heights`: each stands about half its own height from the one before, facing along the path,
+   * so each topples the next (a domino can fell one about half as tall again as itself).
+   */
+  dominoes(path: Array<{ x: number; z: number }>, heights: number[], material: BlockMaterial = "domino"): void {
+    const legs = path.slice(1).map((point, index) => ({ from: path[index]!, to: point, length: Math.hypot(point.x - path[index]!.x, point.z - path[index]!.z) }));
+    const pointAt = (distance: number): { x: number; z: number; yaw: number } => {
+      let rest = distance;
+      for (const leg of legs) {
+        if (rest <= leg.length || leg === legs[legs.length - 1]) {
+          const k = Math.min(1, rest / (leg.length || 1));
+          return { x: leg.from.x + (leg.to.x - leg.from.x) * k, z: leg.from.z + (leg.to.z - leg.from.z) * k, yaw: Math.atan2(leg.to.x - leg.from.x, leg.to.z - leg.from.z) };
+        }
+        rest -= leg.length;
+      }
+      return { x: path[0]!.x, z: path[0]!.z, yaw: 0 };
+    };
+    let along = 0;
+    for (const [index, height] of heights.entries()) {
+      const spot = pointAt(along);
+      this.block(material, spot.x, 0, spot.z, 0.7, height, 0.12, spot.yaw);
+      along += height * 0.5 + 0.12;
     }
   }
 
