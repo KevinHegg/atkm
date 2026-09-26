@@ -4,6 +4,7 @@ import { CURIO_LINES, LINES, type Cue, type Speaker } from "./lines.js";
 import { review } from "./review.js";
 import { StageView } from "./render/view.js";
 import { AMMO } from "./sim/ballistics.js";
+import { CHALLENGES } from "./sim/challenges.js";
 import { BOMB_FUSE, Game, HUMPTY_REST, STEP } from "./sim/game.js";
 import { HUMPTY_BASE } from "./sim/level.js";
 import { MAYHEM, type MayhemKind } from "./sim/mayhem.js";
@@ -32,6 +33,8 @@ interface Progress {
   muted: boolean;
   /** The Grand Finale has been played for this player. */
   finale?: boolean;
+  /** Side challenges done, per verse. */
+  challenges?: Record<string, true>;
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
@@ -46,12 +49,12 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale) };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {} };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
   }
-  return { stars: {}, best: {}, muted: false };
+  return { stars: {}, best: {}, muted: false, challenges: {} };
 }
 
 function saveProgress(): void {
@@ -199,6 +202,7 @@ function recordStars(current: Game): void {
   const id = current.level.id;
   progress.stars[id] = Math.max(progress.stars[id] ?? 0, current.stars().count);
   progress.best[id] = Math.max(progress.best[id] ?? 0, current.mayhem.total);
+  if (current.challengeMet) (progress.challenges ??= {})[id] = true;
   // Marked as seen only once it actually plays (a restart or reload before then keeps it owed).
   if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = true;
   saveProgress();
@@ -320,6 +324,7 @@ function renderLevelList(): void {
   const list = $("#level-list");
   list.replaceChildren();
   let total = 0;
+  let challenges = 0;
   LEVELS.forEach((level, index) => {
     const stars = progress.stars[level.id] ?? 0;
     total += stars;
@@ -328,7 +333,9 @@ function renderLevelList(): void {
     button.type = "button";
     button.disabled = !unlocked(index);
     const best = progress.best[level.id];
-    button.innerHTML = `<span class="numeral">Verse ${numeral(index)}</span><span class="name"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>${best ? `<span class="best">Best ${best.toLocaleString("en-GB")}</span>` : ""}</span>`;
+    const challenged = Boolean(progress.challenges?.[level.id]);
+    if (challenged) challenges += 1;
+    button.innerHTML = `<span class="numeral">Verse ${numeral(index)}</span><span class="name"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>${best ? `<span class="best">Best ${best.toLocaleString("en-GB")}</span>` : ""}${challenged ? `<i class="rosette lit" title="Side challenge done"></i>` : ""}</span>`;
     button.querySelector(".name")!.textContent = button.disabled ? "Locked" : level.title;
     item.classList.toggle("complete", stars === 3);
     button.addEventListener("click", () => {
@@ -340,7 +347,7 @@ function renderLevelList(): void {
     list.append(item);
   });
   const all = total === LEVELS.length * 3;
-  $("#star-total").textContent = all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`;
+  $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "");
   $("#star-total").classList.toggle("all", all);
   $("#build-tag").textContent = `v${__BUILD__.version} · ${__BUILD__.commit} · ${__BUILD__.date}`;
 }
@@ -389,6 +396,7 @@ async function startLevel(index: number): Promise<void> {
       $("#verse-lines").append(document.createTextNode(line));
     });
     $("#verse-hint").textContent = level.hint;
+    showChallenge($("#verse-challenge"), level, Boolean(progress.challenges?.[level.id]));
     $("#verse-ammo").textContent = STOCK_ORDER.filter((kind) => (level.ammo[kind] ?? 0) > 0)
       .map((kind) => `${level.ammo[kind]} × ${AMMO[kind].name}`)
       .join("  ·  ");
@@ -509,6 +517,7 @@ function showResult(): void {
   $("#result-kicker").textContent = `Verse ${numeral(levelIndex)} · ${level.title}`;
   $("#result-title").textContent = won ? "Humpty had a great fall" : "All the King's men win";
   $("#result-stars").innerHTML = [0, 1, 2].map((star) => `<i class="star${star < stars.count ? " lit" : ""}"></i>`).join("");
+  showChallenge($("#result-challenge"), level, won && current.challengeMet, won && current.challengeMet ? "Side challenge done" : undefined);
   const notice = review({
     won,
     fall: current.stats.fall,
@@ -548,6 +557,16 @@ function showResult(): void {
   show("result");
   if (won) audio.fanfare();
   else audio.sadTrombone();
+}
+
+/** A verse's side challenge on a card: its rosette, lit once it's been done. */
+function showChallenge(element: HTMLElement, level: LevelDef, done: boolean, heading = done ? "Side challenge (done)" : "Side challenge"): void {
+  const challenge = CHALLENGES[level.id];
+  element.hidden = !challenge;
+  if (!challenge) return;
+  element.classList.toggle("done", done);
+  element.querySelector(".rosette")!.classList.toggle("lit", done);
+  element.querySelector("span")!.textContent = `${heading}: ${challenge.text}`;
 }
 
 /** The released star flies from the stage up into its chip in the HUD. */
@@ -1124,6 +1143,15 @@ function handle(event: GameEvent): void {
       audio.creak();
       if (live) later(1.4, () => cue("hoist", 0.6, 5));
       break;
+    case "challenge":
+      if (live) {
+        later(1.3, () => {
+          audio.flourish();
+          toast("Side challenge done!", true, CHALLENGES[current.level.id]?.text);
+        });
+        later(2.6, () => cue("challenge", 0.8, 0));
+      }
+      break;
     case "revolved":
       audio.clunk();
       if (live) later(0.5, () => cue("revolved", 0.8, 0));
@@ -1323,6 +1351,14 @@ function handle(event: GameEvent): void {
         audio.squeak();
         audio.laugh();
         if (live) cue("ratScared", 1, 4);
+      } else if (event.action === "trapped") {
+        audio.snap();
+        audio.squeak();
+        if (live) {
+          audio.laugh();
+          toast("Snap!", true, "The rat went for the cheese");
+          later(0.8, () => cue("mousetrap", 1, 0));
+        }
       }
       if (live) renderTray();
       break;

@@ -36,6 +36,7 @@ export type MayhemKind =
   | "revolve"
   | "pie"
   | "mouse"
+  | "mousetrap"
   | "tower"
   | "crack";
 
@@ -79,6 +80,7 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   revolve: { points: 60, bill: "Revolving stage turned", shout: "Round she goes!" },
   pie: { points: 90, bill: "Pies opened before the King", shout: "Sing a song of sixpence!" },
   mouse: { points: 60, bill: "Mice sent down the clock", shout: "Hickory dickory!" },
+  mousetrap: { points: 80, bill: "Rats caught in the act", shout: "Snap!" },
   tower: { points: 75, bill: "The royal box, rattled", shout: "Steady on!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };

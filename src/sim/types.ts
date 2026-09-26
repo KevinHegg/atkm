@@ -54,7 +54,8 @@ export type BodyKind =
   | "bucket"
   | "sandbag"
   | "chest"
-  | "peel";
+  | "peel"
+  | "mousetrap";
 
 export type Phase = "aim" | "flight" | "hoist" | "won" | "lost";
 
@@ -94,7 +95,8 @@ export type GameEvent =
   | { type: "bounce"; at: Vec3; speed: number }
   | MayhemEvent
   | { type: "spin"; at: Vec3; speed: number }
-  | { type: "rat"; action: "enter" | "gnaw" | "steal" | "scared" | "gone"; at: Vec3; stole?: StockKind };
+  | { type: "rat"; action: "enter" | "gnaw" | "steal" | "scared" | "trapped" | "gone"; at: Vec3; stole?: StockKind }
+  | { type: "challenge"; at: Vec3 };
 
 export interface BodyView {
   id: number;
@@ -112,6 +114,8 @@ export interface BodyView {
   fuse?: number;
   /** A treasure chest that has been forced open. */
   open?: boolean;
+  /** A mousetrap that has snapped shut. */
+  sprung?: boolean;
 }
 
 export const vec = (x = 0, y = 0, z = 0): Vec3 => ({ x, y, z });

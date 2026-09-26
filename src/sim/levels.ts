@@ -260,6 +260,8 @@ function theKeep(): LevelDef {
   m.chest(-8.6, -2.2, { yaw: 0.4 });
   // The King's orchard, stage left, and a hive of bees in the old apple tree.
   m.beehive(-10.4, 1.2);
+  // A baited mousetrap, tucked away downstage left: knock it out and the rat goes for the cheese.
+  m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "the-keep",
     title: "The Keep",
@@ -321,6 +323,8 @@ function theEncore(): LevelDef {
   for (const x of [-7.2, 7.2]) m.hay(x, -0.2);
   m.sandbag(-3.4, 1.2, -3.3);
   m.chest(8.6, -4.8, { yaw: -0.4 });
+  // A baited mousetrap, tucked away downstage left: knock it out and the rat goes for the cheese.
+  m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "the-encore",
     title: "The Encore",
@@ -409,6 +413,8 @@ function seeSawMargeryDaw(): LevelDef {
   m.block("anvil", tray.x + 0.3, plinth, -0.58, 0.62, 0.42, 0.52);
   for (const x of [-6.2, -7.5]) m.hay(x, -1.8, 0, Math.PI / 2);
   m.chest(4.6, -4.4, { yaw: -0.2 });
+  // A baited mousetrap, tucked away downstage left: knock it out and the rat goes for the cheese.
+  m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "see-saw-margery-daw",
     title: "See-Saw Margery Daw",
@@ -452,6 +458,8 @@ function theQueensBilliards(): LevelDef {
   m.hedge(-5, -5.6, 3.2, 1.6);
   // Hidden behind the screen: bank a shot to reach it.
   m.chest(-1.6, -5.2);
+  // A baited mousetrap, tucked away downstage left: knock it out and the rat goes for the cheese.
+  m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "the-queens-billiards",
     title: "The Queen's Billiards",

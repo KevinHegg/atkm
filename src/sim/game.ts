@@ -33,14 +33,17 @@ import {
   PEEL_SIZE,
   type RevolveDef,
   REVOLVE_HEIGHT,
+  type MousetrapDef,
+  MOUSETRAP_SIZE,
   type ChinaKind,
   DRESSER,
   dresserChina,
 } from "./level.js";
+import { CHALLENGES } from "./challenges.js";
 import { CURIOS } from "./curios.js";
 import { add, axisAngle, closestBetweenSegments, closestOnSegment, distanceToSegment, rotate, scale, segmentDistance, troughFrame, yAxisTo } from "./geometry.js";
 import { FALL_POINTS, MayhemTally, comboBonus, type MayhemKind } from "./mayhem.js";
-import { createRat, scareRat, stepRat, type RatState } from "./rat.js";
+import { catchRat, createRat, scareRat, stepRat, type RatState } from "./rat.js";
 import {
   distance,
   lengthOf,
@@ -216,6 +219,8 @@ interface Entity {
   windy?: boolean;
   /** A banana skin: whether the Queen has sent it skidding, and whether it's been trodden on. */
   peel?: { armed: boolean; spent: boolean; flickedBy?: number; ghostUntil?: number };
+  /** A mousetrap: knocked out into the open (armed), and snapped shut (sprung). */
+  mousetrap?: { armed: boolean; sprung: boolean; flickedBy?: number; ghostUntil?: number };
 }
 
 export interface RopeView {
@@ -301,6 +306,10 @@ export class Game {
   won = false;
   resultAt: number | undefined;
   readonly stats = { shots: 0, bowled: 0, fall: 0, blocksMoved: 0, catches: 0 };
+  /** Did he crack with the verse's side challenge done? (Judged at the crack.) */
+  challengeMet = false;
+  private vaneTurns = 0;
+  private spins = 0;
   /** Everything the Queen has broken, up to the crack. */
   readonly mayhem = new MayhemTally();
   /** Every shot fired, by step, so a replay can fire them again at exactly the same moments. */
@@ -411,6 +420,7 @@ export class Game {
       else if (piece.kind === "dresser") this.addDresser(piece);
       else if (piece.kind === "peel") this.addPeel(piece);
       else if (piece.kind === "revolve") this.addRevolve(piece);
+      else if (piece.kind === "mousetrap") this.addMousetrap(piece);
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -1111,6 +1121,7 @@ export class Game {
     const vane = this.vanes.find((item) => item.entity === entity);
     if (!vane || vane.angle !== vane.target) return;
     vane.target += vane.step;
+    this.vaneTurns += 1;
     this.events.push({ type: "turn", at: { ...entity.view.position } });
   }
 
@@ -1439,6 +1450,7 @@ export class Game {
     const turntable = this.turntable;
     const v = projectile.lastVelocity;
     if (!turntable || !v) return;
+    if (projectile.ammo !== "blunderbuss") this.spins += 1;
     const p = projectile.body.translation();
     const rx = p.x - turntable.def.pos.x;
     const rz = p.z - turntable.def.pos.z;
@@ -1671,20 +1683,51 @@ export class Game {
    * something so light, which would send it clean off the stage.
    */
   private flickPeel(peel: Entity, shot: Entity): void {
-    const state = peel.peel!;
-    state.armed = true;
-    // One flick per shot, however it tumbles after.
+    peel.peel!.armed = true;
+    this.flick(peel, peel.peel!, shot, PEEL_KICK, 0.35);
+  }
+
+  /**
+   * Flick something light along the boards the way the shot was going, at a speed set by the
+   * shot's (once per shot, however it tumbles after); the ball rolls on past it for a moment
+   * rather than catching it up and shoving it again.
+   */
+  private flick(entity: Entity, state: { flickedBy?: number; ghostUntil?: number }, shot: Entity, most: number, share: number): void {
     if (state.flickedBy === shot.view.id) return;
     state.flickedBy = shot.view.id;
     const v = shot.lastVelocity ?? shot.body.linvel();
     const flat = Math.hypot(v.x, v.z);
     if (flat < 1) return;
-    const kick = Math.min(PEEL_KICK, flat * 0.35);
-    peel.body.setLinvel({ x: (v.x / flat) * kick, y: 1.2, z: (v.z / flat) * kick }, true);
-    peel.body.setAngvel({ x: 0, y: 5, z: 0 }, true);
-    // The ball rolls on past it rather than catching it up and shoving it again.
-    for (const collider of peel.colliders) collider.setCollisionGroups(groups(G.BLOCK, ALL & ~G.PROJ));
+    const kick = Math.min(most, flat * share);
+    entity.body.setLinvel({ x: (v.x / flat) * kick, y: 1.2, z: (v.z / flat) * kick }, true);
+    entity.body.setAngvel({ x: 0, y: 5, z: 0 }, true);
+    for (const collider of entity.colliders) collider.setCollisionGroups(groups(G.BLOCK, ALL & ~G.PROJ));
     state.ghostUntil = this.time + 0.6;
+  }
+
+  private addMousetrap(def: MousetrapDef): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(def.pos.x, def.pos.y, def.pos.z)
+        .setRotation(yawQuat(def.yaw))
+        .setLinearDamping(1.2)
+        .setAngularDamping(2)
+        .setCcdEnabled(true)
+        .setSleeping(true),
+    );
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(MOUSETRAP_SIZE.x / 2, MOUSETRAP_SIZE.y / 2, MOUSETRAP_SIZE.z / 2).setMass(1.2).setFriction(0.5).setRestitution(0.05).setCollisionGroups(GROUPS.block),
+      body,
+    );
+    this.register("mousetrap", "trap", { ...MOUSETRAP_SIZE }, body, [collider], { mousetrap: { armed: false, sprung: false } });
+  }
+
+  /** The cheese on a mousetrap the Queen has knocked out into the open, while it's still set. */
+  private bait(): Entity | undefined {
+    for (const entity of this.entities.values()) {
+      if (entity.mousetrap?.armed && !entity.mousetrap.sprung && !entity.view.removed && entity.view.position.y < 0.4) return entity;
+    }
+    return undefined;
   }
 
   /**
@@ -1694,11 +1737,12 @@ export class Game {
   private checkPeels(): void {
     if (!this.log.length) return;
     for (const peel of this.entities.values()) {
-      const state = peel.peel;
-      if (state?.ghostUntil !== undefined && this.time >= state.ghostUntil) {
-        state.ghostUntil = undefined;
+      const flicked = peel.peel ?? peel.mousetrap;
+      if (flicked?.ghostUntil !== undefined && this.time >= flicked.ghostUntil) {
+        flicked.ghostUntil = undefined;
         for (const collider of peel.colliders) collider.setCollisionGroups(GROUPS.block);
       }
+      const state = peel.peel;
       if (!state?.armed || state.spent || peel.view.removed || this.cracked) continue;
       const p = peel.view.position;
       // Still in the air: it has to land first.
@@ -2034,7 +2078,8 @@ export class Game {
     const { state, entity } = rat;
     const active = this.phase !== "won" && this.phase !== "lost";
     if (!active && state.mode !== "off" && state.mode !== "flee") state.mode = "flee";
-    const action = stepRat(state, STEP, this.time, active);
+    const trap = this.bait();
+    const action = stepRat(state, STEP, this.time, active, trap ? { x: trap.view.position.x, z: trap.view.position.z } : undefined);
     const at = { x: state.x, y: 0, z: state.z };
     if (action === "enter") {
       entity.colliders[0]?.setEnabled(true);
@@ -2053,6 +2098,14 @@ export class Game {
       } else {
         this.events.push({ type: "rat", action: "gnaw", at });
       }
+    } else if (action === "baited" && trap?.mousetrap) {
+      // Snap! He's caught by the tail, and there's no powder for him this visit.
+      trap.mousetrap.sprung = true;
+      trap.view.sprung = true;
+      catchRat(state, this.time);
+      this.events.push({ type: "rat", action: "trapped", at });
+      this.score("mousetrap", { x: at.x, y: 0.8, z: at.z });
+      if ("rat" in this.level.star) this.releaseStar({ x: at.x, y: 1.2, z: at.z });
     } else if (action === "gone") {
       entity.colliders[0]?.setEnabled(false);
       this.events.push({ type: "rat", action: "gone", at });
@@ -2280,6 +2333,27 @@ export class Game {
     }
   }
 
+  /** He's cracking: was the verse's side challenge done first? */
+  private judgeChallenge(): void {
+    const challenge = CHALLENGES[this.level.id];
+    if (!challenge || !this.log.length) return;
+    const fired = new Set<StockKind>();
+    for (const shot of this.log) if (shot.ammo !== "blunderbuss") fired.add(shot.ammo);
+    this.challengeMet = challenge.met(
+      {
+        count: (kind) => this.mayhem.entries.get(kind)?.count ?? 0,
+        shots: this.log.filter((shot) => shot.ammo !== "blunderbuss").length,
+        fired,
+        windy: this.windy,
+        vaneTurns: this.vaneTurns,
+        spins: this.spins,
+      },
+      this.level,
+    );
+    const humpty = this.humpty?.view.position;
+    if (this.challengeMet && humpty) this.events.push({ type: "challenge", at: { ...humpty } });
+  }
+
   /** The shot's account is settled: three or more kinds of mischief make it a trick shot. */
   private closeCombo(): void {
     const combo = this.combo;
@@ -2381,6 +2455,11 @@ export class Game {
         if (!owner) continue;
         if (owner.view.kind === "chest" && !free) this.openChest(owner, shot.ammo === "blunderbuss" ? undefined : shot.ammo);
         if (owner.peel && !owner.peel.spent && !free) this.flickPeel(owner, shot);
+        // A shot knocks the mousetrap a little way out into the open, where the rat will smell it.
+        if (owner.mousetrap && !owner.mousetrap.sprung && !free) {
+          owner.mousetrap.armed = true;
+          this.flick(owner, owner.mousetrap, shot, 2.6, 0.12);
+        }
         // A shot that strikes one of the King's men fair and square bowls his crew over.
         if (owner.crew && owner.role !== "bed" && !free && lengthOf(shot.lastVelocity ?? shot.body.linvel()) > 4) this.stun(owner.crew, owner.view.position);
         if (owner.bounce && owner.look) {
@@ -2522,8 +2601,9 @@ export class Game {
           this.stun(entity.crew, entity.view.position);
           continue;
         }
-        // A blast sends a banana skin flying: wherever it comes down, it's live.
+        // A blast sends a banana skin flying: wherever it comes down, it's live. So is a mousetrap.
         if (entity.peel) entity.peel.armed = true;
+        if (entity.mousetrap) entity.mousetrap.armed = true;
         if (entity.view.kind === "rat" || entity.view.kind === "turntable") continue;
         if (entity.view.kind === "chest" && gap < 2) this.openChest(entity, blast.ammo);
         if (!entity.body.isDynamic()) continue;
@@ -2578,6 +2658,7 @@ export class Game {
     if (!humpty || this.cracked || this.phase === "lost") return;
     // The shot that did it is a trick shot too, if it earned it: that goes on the bill first.
     this.closeCombo();
+    this.judgeChallenge();
     this.cracked = true;
     this.won = true;
     this.phase = "won";

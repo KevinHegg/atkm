@@ -267,6 +267,20 @@ export class TheatreAudio {
     this.tone(frequency * 2.01, 0.4, 0.02, "sine", { attack: 0.003 });
   }
 
+  /** A mousetrap snapping shut: a hard wooden crack and a spring's twang. */
+  snap(): void {
+    if (!this.throttle("snap", 300)) return;
+    this.burst({ duration: 0.06, volume: 0.7, filter: "highpass", frequency: 1500 });
+    this.tone(160, 0.08, 0.3, "square", { to: 90 });
+    this.tone(520, 0.5, 0.08, "triangle", { to: 470, delay: 0.02 });
+  }
+
+  /** A side challenge done: a little flourish on the trumpets. */
+  flourish(): void {
+    if (!this.throttle("flourish", 1500)) return;
+    [523, 659, 784, 1047].forEach((frequency, index) => this.tone(frequency, index === 3 ? 0.6 : 0.16, 0.12, "sawtooth", { delay: index * 0.12, attack: 0.02 }));
+  }
+
   squeak(): void {
     if (!this.throttle("squeak", 200)) return;
     const base = 1800 + Math.random() * 600;

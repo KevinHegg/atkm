@@ -51,13 +51,16 @@ export function createRat(def: RatDef): RatState {
   };
 }
 
-export type RatAction = "enter" | "arrived" | "gone" | undefined;
+export type RatAction = "enter" | "arrived" | "baited" | "gone" | undefined;
 
 const CREEP = 2.6;
 const SCURRY = 5.5;
 
-/** Advance the rat. Returns what just happened so the game can react. */
-export function stepRat(rat: RatState, dt: number, time: number, active: boolean): RatAction {
+/**
+ * Advance the rat. Returns what just happened so the game can react. `bait` is a mousetrap's
+ * cheese out in the open: once he's round the ramparts, he goes for that instead of the powder.
+ */
+export function stepRat(rat: RatState, dt: number, time: number, active: boolean, bait?: { x: number; z: number }): RatAction {
   if (rat.mode === "off") {
     if (!active || rat.visitsLeft <= 0 || time < rat.until) return undefined;
     rat.visitsLeft -= 1;
@@ -89,12 +92,14 @@ export function stepRat(rat: RatState, dt: number, time: number, active: boolean
   const fleeing = rat.mode === "flee";
   const waypoint = { x: rat.side * WAYPOINT.x, z: WAYPOINT.z };
   if (!fleeing && !rat.crossed && Math.hypot(waypoint.x - rat.x, waypoint.z - rat.z) < 0.5) rat.crossed = true;
+  const baited = !fleeing && rat.crossed && bait !== undefined;
   const goal = fleeing
     ? { x: rat.side * OFFSTAGE_X, z: ENTRY_Z }
-    : rat.crossed ? { x: RAT_LARDER.x, z: RAT_LARDER.z } : waypoint;
+    : baited ? bait : rat.crossed ? { x: RAT_LARDER.x, z: RAT_LARDER.z } : waypoint;
   const dx = goal.x - rat.x;
   const dz = goal.z - rat.z;
   const gap = Math.hypot(dx, dz);
+  if (baited && gap < 0.4) return "baited";
   if (!fleeing && gap < 0.35) {
     rat.mode = "gnaw";
     rat.until = time + 1.8;
@@ -118,6 +123,14 @@ export function stepRat(rat: RatState, dt: number, time: number, active: boolean
   rat.heading += turn * Math.min(1, dt * 10);
   rat.stride += step;
   return undefined;
+}
+
+/** Snap! Caught by the tail in a mousetrap: flat on his back a good while, then off, empty-pawed. */
+export function catchRat(rat: RatState, time: number): void {
+  rat.mode = "stunned";
+  rat.until = time + 3.2;
+  rat.carrying = false;
+  rat.speed = 0;
 }
 
 /** Startle him: he flips, then bolts for the wings, dropping anything he was carrying. */

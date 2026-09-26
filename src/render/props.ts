@@ -1187,6 +1187,30 @@ export function buildPeel(kit: Kit, parent: pc.Entity, size: { x: number; y: num
   return root;
 }
 
+/** A mousetrap: an oak board, a spring bail pulled back on its hinge, and a wedge of cheese. */
+export function buildMousetrap(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): { root: pc.Entity; bail: pc.Entity; cheese: pc.Entity } {
+  const root = kit.group("mousetrap", parent);
+  const low = -size.y / 2;
+  kit.meshEntity("trap-board", kit.boxes("mousetrap-board", [
+    { center: [0, low + 0.025, 0], size: [size.x, 0.05, size.z], color: palette.oakLight },
+    { center: [0, low + 0.055, 0], size: [0.06, 0.012, size.z - 0.04], color: palette.iron },
+    { center: [0.16, low + 0.056, 0], size: [0.12, 0.012, 0.1], color: palette.bronze },
+    { center: [-0.24, low + 0.07, 0], size: [0.04, 0.04, 0.04], color: palette.iron },
+  ]), kit.paintMaterial(0.3), root);
+  const bail = kit.group("trap-bail", root, V(0, low + 0.06, 0));
+  kit.meshEntity("trap-bail-wire", kit.boxes("mousetrap-bail", [
+    { center: [0.13, 0, -size.z / 2 + 0.04], size: [0.26, 0.02, 0.02], color: palette.iron },
+    { center: [0.13, 0, size.z / 2 - 0.04], size: [0.26, 0.02, 0.02], color: palette.iron },
+    { center: [0.26, 0, 0], size: [0.02, 0.02, size.z - 0.06], color: palette.iron },
+  ]), kit.paintMaterial(0.5), bail);
+  const cheese = kit.group("trap-cheese", root, V(0.16, low + 0.1, 0));
+  kit.meshEntity("trap-cheese-wedge", kit.boxes("mousetrap-cheese", [
+    { center: [0, 0, 0], size: [0.12, 0.07, 0.09], color: new pc.Color(0.98, 0.8, 0.25) },
+    { center: [0.02, 0.036, 0.02], size: [0.025, 0.004, 0.025], color: new pc.Color(0.85, 0.62, 0.15) },
+  ]), kit.paintMaterial(0.35), cheese);
+  return { root, bail, cheese };
+}
+
 /** A cloud of bees, baked into one mesh: the view spins and shakes it about the swarm's centre. */
 export function buildSwarm(kit: Kit, parent: pc.Entity): pc.Entity {
   const root = kit.group("swarm", parent);

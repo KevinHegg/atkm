@@ -964,3 +964,66 @@ test("the King's pie and the clock mouse are curios: each pays once, and each hi
     game.destroy();
   }
 });
+
+test("every verse's side challenge can be done: a recorded line cracks him with it done", async () => {
+  const { LEVELS } = await import("../src/sim/levels.js");
+  const { CHALLENGES } = await import("../src/sim/challenges.js");
+  const { playOut } = await import("../src/sim/autoplay.js");
+  type Shot = import("../src/sim/autoplay.js").PlannedShot;
+  const PAR = (await import("../src/sim/par.json", { with: { type: "json" } })).default as Record<string, Shot[]>;
+  const S = (ammo: Shot["ammo"], x: number, y: number, z: number, wait?: number): Shot => ({ ammo, at: { x, y, z }, ...(wait ? { wait } : {}) });
+  const H = (ammo: Shot["ammo"], x: number, y: number, z: number, wait?: number): Shot => ({ ammo, at: { x, y, z }, relativeToHumpty: true, ...(wait ? { wait } : {}) });
+  const lines: Record<string, Shot[]> = {
+    "sat-on-a-wall": [S("shot", -11, 4.7, -9.6), S("shot", -5, 0.4, -3.2), S("shot", 4.2, 5.3, -9.6), H("shot", 0, -0.4, 0)],
+    "had-a-great-fall": [S("shot", 0, 4, -0.6), S("shot", 1.08, 4.81, -2.03, 3)],
+    "all-the-kings-men": [S("shot", -4.15, 0.07, 0.2), S("shot", 0, 4.85, -1.5, 5)],
+    "over-the-wall": [S("shell", -3.8, 0.4, -4.6), H("shell", 0, 0.2, 0)],
+    "the-powder-room": [S("shot", 0, 0.3, -0.95)],
+    "hey-diddle-diddle": [S("shot", 6.745, 1.39, -3.879), S("shot", 6.982, 1.89, -3.749), S("shot", 6.745, 2.39, -3.879), S("shot", 7.174, 0.97, -3.268), H("shot", -0.6, 0, 0)],
+    "all-the-kings-horses": [S("shot", -9.02, 1.37, -4.3), S("shot", 0, 5.05, -1.6, 2.5)],
+    "chain-of-command": [S("shot", -4.5, 0.4, -4), S("shot", 6.2, 1, -1.4), H("chain", -0.38, 0.1, 0)],
+    "hanging-by-a-thread": [S("shot", -2.6, 1.2, 1.8), S("shot", 2.6, 1.2, 1.8), S("chain", 0.6, 6.07, -1.83, 4)],
+    "rock-a-bye-baby": [S("shot", -7.6, 0.8, 0.4), S("chain", 0.6, 5.69, -2.97, 5)],
+    "see-saw-margery-daw": [S("shot", -5.4, 0.1, 2.4), S("shot", 1.62, 5.2, -0.58, 13)],
+    "the-queens-billiards": [S("shot", -6.5, 5, -1), S("shot", 6.5, 4.8, -1), S("shot", 6.5, 5, -1)],
+    "remember-remember": [S("shot", 2.75, 2.13, 0.15), S("bomb", 1.48, 0.28, -2.6)],
+    "the-keep": [S("shot", -8.32, 3.25, 1.2), S("shell", -0.51, 2.9, -2.2)],
+    "the-encore": [S("shot", -12, 0.2, 6), S("shell", 12, 0.2, 6), S("grape", -12, 0.2, 5), S("chain", 12, 0.3, 5), S("bomb", -0.51, 3.45, -2.4, 2.5)],
+    "ring-of-roses": [S("shot", 0, 1, 1), S("shot", 3.2, 1, -2.2), S("shot", 6.6, 0.85, 0.2), H("shot", 0, 0.2, 0)],
+    "ride-a-cock-horse": [S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.48, 4.35, -4.74)],
+    "came-tumbling-after": [S("bomb", 1.8, 0.402, -3.75)],
+    "round-the-mulberry-bush": [S("shot", 3.66, 4, -4.14), S("shot", 3.66, 4, -4.14, 2.45)],
+    "london-bridge": [S("shot", -4.6, 0.4, -5.4), S("shot", 3, 1.35, -1.6), S("shot", -0.95, 1.45, -4.6)],
+  };
+  for (const level of LEVELS) {
+    assert.ok(CHALLENGES[level.id], `${level.id} has a side challenge`);
+    const line = lines[level.id];
+    assert.ok(line, `${level.id} has a line that proves its challenge`);
+    const result = await playOut(level, line, 45);
+    assert.ok(result.won && result.challenge, `${level.id}: "${CHALLENGES[level.id]!.text}" (won ${result.won}, challenge ${result.challenge})`);
+    // And the plain winning line doesn't do it by accident: it's a reason to play the verse again.
+    const plain = await playOut(level, PAR[level.id]!, 45);
+    assert.ok(!plain.challenge, `${level.id}'s winning line shouldn't meet its challenge`);
+  }
+});
+
+test("the rat ignores a mousetrap nobody has touched, but goes for the cheese once a shot knocks it out, and steals nothing", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const level = levelById("see-saw-margery-daw")!;
+  const firstVisit = async (aim: { x: number; y: number; z: number }): Promise<GameEvent[]> => {
+    const game = await Game.create(level);
+    await stepUntilReady(game);
+    assert.ok(game.fire(aim));
+    const events = await run(game, 30, (event) => event.type === "rat" && event.action === "gone");
+    game.destroy();
+    return events.filter((event) => event.type === "rat" || (event.type === "mayhem" && event.kind === "mousetrap"));
+  };
+  const trap = level.pieces.find((piece) => piece.kind === "mousetrap")!.pos;
+  const ignored = await firstVisit({ x: 6, y: 0.2, z: 6 });
+  assert.ok(!ignored.some((event) => event.type === "rat" && event.action === "trapped"), "left alone, it's just a mousetrap");
+  assert.ok(ignored.some((event) => event.type === "rat" && (event.action === "steal" || event.action === "gnaw")), "and he goes for the powder");
+  const caught = await firstVisit({ x: trap.x, y: 0.1, z: trap.z });
+  assert.ok(caught.some((event) => event.type === "rat" && event.action === "trapped"), "snap");
+  assert.ok(!caught.some((event) => event.type === "rat" && event.action === "steal"), "he steals nothing that visit");
+  assert.ok(caught.some((event) => event.type === "mayhem" && event.kind === "mousetrap"));
+});

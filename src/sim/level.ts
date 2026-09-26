@@ -221,7 +221,17 @@ export interface PeelDef {
   yaw: number;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef | DresserDef | PeelDef | RevolveDef;
+/** A mousetrap, baited with cheese, tucked away where the rat pays it no mind. */
+export interface MousetrapDef {
+  kind: "mousetrap";
+  pos: Vec3;
+  yaw: number;
+}
+
+/** A mousetrap's size: a board, a spring bar and a wedge of cheese. */
+export const MOUSETRAP_SIZE = { x: 0.62, y: 0.14, z: 0.34 };
+
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef | DresserDef | PeelDef | RevolveDef | MousetrapDef;
 
 /** A banana skin's size: long, flat and slippery. */
 export const PEEL_SIZE = { x: 0.8, y: 0.14, z: 0.5 };
@@ -611,6 +621,14 @@ export class Mason {
   /** The stagehands' capstan in the wings: strike it and the revolve turns. */
   capstan(x: number, z: number, yaw = 0): void {
     this.fixture("capstan", x, 0, z, 1.3, 1.2, 1.3, { yaw, cue: "revolve" });
+  }
+
+  /**
+   * A baited mousetrap on the boards. Left where it is, the rat ignores it; knocked out into the
+   * open by a shot, it's the first thing he goes for.
+   */
+  mousetrap(x: number, z: number, yaw = 0): void {
+    this.pieces.push({ kind: "mousetrap", pos: { x, y: MOUSETRAP_SIZE.y / 2 + GAP, z }, yaw });
   }
 
   /** A banana skin on the boards. */

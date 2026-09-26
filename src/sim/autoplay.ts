@@ -29,6 +29,8 @@ export interface PlayResult {
   shotsFired: number;
   /** Mayhem earned before the crack (or by the end). */
   mayhem: number;
+  /** He cracked with the verse's side challenge done. */
+  challenge: boolean;
   landing?: Vec3;
 }
 
@@ -70,6 +72,7 @@ export async function playOut(level: LevelDef, shots: readonly PlannedShot[], ma
             catches: game.stats.catches,
             shotsFired: game.stats.shots,
             mayhem: game.mayhem.total,
+            challenge: game.challengeMet,
             ...(landing ? { landing } : {}),
           };
         }
@@ -86,6 +89,7 @@ export async function playOut(level: LevelDef, shots: readonly PlannedShot[], ma
       catches: game.stats.catches,
       shotsFired: game.stats.shots,
       mayhem: game.mayhem.total,
+      challenge: game.challengeMet,
       ...(landing ? { landing } : {}),
     };
   } catch (error) {
@@ -132,7 +136,7 @@ export async function mayhemTargets(level: LevelDef): Promise<Array<{ label: str
       if (view.kind === "man" || view.kind === "horse") targets.push({ label: view.kind, at: { ...view.position } });
       if (view.kind === "keg") targets.push({ label: "keg", at: { ...view.position } });
       if (view.kind === "fixture" && (view.material === "gong" || view.material === "hive" || view.material === "capstan")) targets.push({ label: view.material, at: { ...view.position } });
-      if (view.kind === "peel") targets.push({ label: "peel", at: { ...view.position } });
+      if (view.kind === "peel" || view.kind === "mousetrap") targets.push({ label: view.kind, at: { ...view.position } });
     }
     // The King's china: a plate from each shelf, the teapot and a cup.
     const china = game.chinaView;

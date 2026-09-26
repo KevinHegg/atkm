@@ -39,6 +39,13 @@ Core promises:
   billed. Its sectors run well below the boards so a falling egg can't sink into them, and
   Humpty's landings sum the force from every collider of one body in a step, so coming down
   on a seam is the same blow as anywhere else.
+- Side challenges (`src/sim/challenges.ts`) are judged in the simulation at the crack
+  (`judgeChallenge`), from the bill and a few counters; like stars, they count only if he
+  cracks. Each is proved possible by a recorded line in the tests, and no verse's par line
+  may meet its own challenge. Rosettes are saved per player in `progress.challenges`.
+- Mousetraps (`Mason.mousetrap`) are armed only by a stock shot or a blast. The rat, once
+  round his waypoint, goes for an armed trap's cheese instead of the powder (`stepRat` bait),
+  and is caught (`catchRat`): he steals nothing that visit.
 - Banana skins (`Mason.peel`) trip any crew on the move whose footprint passes over them,
   but only once a stock shot or a blast has armed them. A shot flicks a skin (`flickPeel`) at a
   speed set by the shot's, not with the cannonball's full blow, and the skin ignores that

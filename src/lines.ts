@@ -44,6 +44,8 @@ export type Cue =
   | "dish"
   | "bees"
   | "revolve"
+  | "mousetrap"
+  | "challenge"
   | "revolved"
   | "stung"
   | "slip"
@@ -202,6 +204,14 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   barrel: {
     speaker: "humpty",
     lines: ["Is that a barrel? Is that a LIT barrel?", "Somebody stop that barrel! Somebody else!", "Gentlemen, I believe we are being bowled at."],
+  },
+  mousetrap: {
+    speaker: "queen",
+    lines: ["Snap! And stay out of my powder.", "Cheese: the rat's one weakness.", "Got you by the tail, you thief."],
+  },
+  challenge: {
+    speaker: "queen",
+    lines: ["And with a flourish, too.", "That's how it's done. Take notes, egg.", "Show-off. I adore it."],
   },
   revolve: {
     speaker: "humpty",

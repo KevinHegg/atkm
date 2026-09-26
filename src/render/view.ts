@@ -9,6 +9,7 @@ import {
   buildBucket,
   buildChest,
   buildRunaways,
+  buildMousetrap,
   buildPeel,
   buildRevolve,
   buildSwarm,
@@ -48,7 +49,7 @@ import { Curios } from "./curios.js";
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
 const DEG = 180 / Math.PI;
 /** Bodies that last the whole verse: worth batching. Shots and debris come and go too often. */
-const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag", "peel"]);
+const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag", "peel", "mousetrap"]);
 const SWEAT = new pc.Color(0.55, 0.78, 0.95);
 /** How long a released star rises on stage before flying off to its chip in the HUD. */
 const STAR_RISE = 1.9;
@@ -86,6 +87,8 @@ interface BodyVisual {
   skep?: pc.Entity;
   /** The capstan's spoked head, which turns while the revolve does. */
   capstan?: pc.Entity;
+  /** A mousetrap's spring bail and its cheese, and how far the bail has snapped over (0 set, 1 shut). */
+  trap?: { bail: pc.Entity; cheese: pc.Entity; shut: number };
 }
 
 /** A released star, floating up off the stage. */
@@ -867,6 +870,12 @@ export class StageView {
       case "peel":
         buildPeel(this.kit, root, view.size);
         break;
+      case "mousetrap": {
+        const trap = buildMousetrap(this.kit, root, view.size);
+        visual.trap = { bail: trap.bail, cheese: trap.cheese, shut: 0 };
+        trap.bail.setLocalEulerAngles(0, 0, 172);
+        break;
+      }
       default:
         break;
     }
@@ -1678,6 +1687,17 @@ export class StageView {
 
   /** The struck skep swings on its rope; the swarm buzzes about wherever the bees have got to. */
   private animateBees(dt: number): void {
+    // The mousetrap's bail slams over when it springs, and the cheese is gone.
+    for (const visual of this.visuals.values()) {
+      const trap = visual.trap;
+      if (!trap) continue;
+      const target = visual.view.sprung ? 1 : 0;
+      if (trap.shut === target) continue;
+      trap.shut = target ? Math.min(1, trap.shut + dt * 14) : 0;
+      trap.bail.setLocalEulerAngles(0, 0, 172 * (1 - trap.shut));
+      const left = trap.shut > 0.5 ? 0.001 : 1;
+      trap.cheese.setLocalScale(left, left, left);
+    }
     // (And the capstan, which the stagehands heave round while the revolve turns.)
     if (this.game?.revolving) this.capstanTurn += dt * 70;
     for (const visual of this.visuals.values()) visual.capstan?.setLocalEulerAngles(0, this.capstanTurn, 0);

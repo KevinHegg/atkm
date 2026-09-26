@@ -123,7 +123,9 @@ unlock every verse.
   and hedges hide what's behind them, including hay.
 - **The rat.** In later verses a giant rat creeps out of the wings to gnaw the Queen's
   powder. If he reaches it he steals a charge, but never the last one. The Queen's
-  blunderbuss (key **6**) sends him packing without spending a shot.
+  blunderbuss (key **6**) sends him packing without spending a shot. Or use the mousetrap
+  in his verses: left where it is he pays it no mind, but knock it out into the open with a
+  shot and he can't resist the cheese. Snap: he steals nothing that visit.
 - **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the moon, Jack and
   Jill's hill, the cuckoo clock, the well, the spider, the Grand Old Duke of York's men
   on the painted hill, Old King Cole in his royal box (or the stilts it stands on), or the
@@ -141,6 +143,11 @@ unlock every verse.
   for a while. A sandbag hanging from the flies swings like a wrecking ball when shot;
   chain shot cuts it loose. The stagehands who work the hoist can be seen in the wings,
   and one comes on with a mop when it's all over.
+- **Side challenges.** Every verse has one, shown on its card before you begin: open the chest
+  behind the wall, slip the stretcher crew on a banana skin, catch the rat in the mousetrap,
+  fire every kind of shot in the Encore, and so on. Like the stars, a challenge counts only
+  if he cracks. Done, it earns a rosette on the verse list (no stars, so the Grand Finale
+  doesn't depend on them), and the plain winning line never does one by accident.
 - **The Court Astrologer.** Lose a verse and, on the retry, a green ring marks a known
   winning shot. Aim anywhere inside it and your shot becomes his exactly.
 
