@@ -189,6 +189,53 @@ export class Kit {
     });
   }
 
+  /**
+   * A flat ring (an annulus with walls) lying in the XZ plane, `height` thick, in vertex colours:
+   * `colour(sector, band)` paints each sector of each band (bands run from the inside out).
+   */
+  ring(name: string, inner: number, outer: number, height: number, sectors: number, bands: readonly number[], colour: (sector: number, band: number) => pc.Color): pc.Mesh {
+    return this.mesh(name, () => {
+      const positions: number[] = [];
+      const normals: number[] = [];
+      const colors: number[] = [];
+      const indices: number[] = [];
+      const quad = (corners: number[][], normal: number[], color: pc.Color): void => {
+        const base = positions.length / 3;
+        for (const corner of corners) {
+          positions.push(corner[0]!, corner[1]!, corner[2]!);
+          normals.push(normal[0]!, normal[1]!, normal[2]!);
+          colors.push(color.r ** 2.2, color.g ** 2.2, color.b ** 2.2, 1);
+        }
+        // Wind each triangle so it faces along its normal, whichever way the corners came.
+        const [a, b, c] = corners as [number[], number[], number[]];
+        const cross = [
+          (b[1]! - a[1]!) * (c[2]! - a[2]!) - (b[2]! - a[2]!) * (c[1]! - a[1]!),
+          (b[2]! - a[2]!) * (c[0]! - a[0]!) - (b[0]! - a[0]!) * (c[2]! - a[2]!),
+          (b[0]! - a[0]!) * (c[1]! - a[1]!) - (b[1]! - a[1]!) * (c[0]! - a[0]!),
+        ];
+        const facing = cross[0]! * normal[0]! + cross[1]! * normal[1]! + cross[2]! * normal[2]! >= 0;
+        if (facing) indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        else indices.push(base, base + 2, base + 1, base, base + 3, base + 2);
+      };
+      const radii = [inner, ...bands, outer];
+      for (let sector = 0; sector < sectors; sector += 1) {
+        const a0 = (sector / sectors) * Math.PI * 2;
+        const a1 = ((sector + 1) / sectors) * Math.PI * 2;
+        const at = (r: number, a: number, y: number): number[] => [Math.cos(a) * r, y, -Math.sin(a) * r];
+        for (let band = 0; band < radii.length - 1; band += 1) {
+          const r0 = radii[band]!;
+          const r1 = radii[band + 1]!;
+          quad([at(r0, a0, height), at(r1, a0, height), at(r1, a1, height), at(r0, a1, height)], [0, 1, 0], colour(sector, band));
+        }
+        const mid = (a0 + a1) / 2;
+        const rim = colour(sector, radii.length - 2);
+        quad([at(outer, a0, 0), at(outer, a1, 0), at(outer, a1, height), at(outer, a0, height)], [Math.cos(mid), 0, -Math.sin(mid)], rim);
+        quad([at(inner, a0, 0), at(inner, a0, height), at(inner, a1, height), at(inner, a1, 0)], [-Math.cos(mid), 0, Math.sin(mid)], colour(sector, 0));
+      }
+      return this.build(positions, indices, { normals, colors });
+    });
+  }
+
   /** Surface of revolution around +y from (radius, y) pairs, bottom to top. */
   lathe(name: string, profile: Array<[number, number]>, segments = 32, capBottom = false): pc.Mesh {
     return this.mesh(name, () => {

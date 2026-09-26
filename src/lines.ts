@@ -43,6 +43,8 @@ export type Cue =
   | "china"
   | "dish"
   | "bees"
+  | "revolve"
+  | "revolved"
   | "stung"
   | "slip"
   | "phew";
@@ -200,6 +202,14 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   barrel: {
     speaker: "humpty",
     lines: ["Is that a barrel? Is that a LIT barrel?", "Somebody stop that barrel! Somebody else!", "Gentlemen, I believe we are being bowled at."],
+  },
+  revolve: {
+    speaker: "humpty",
+    lines: ["Is the room going round, or is it me?", "Where is my hay going? Come back, hay!", "Round and round the cobbler's bench... I hate this song."],
+  },
+  revolved: {
+    speaker: "queen",
+    lines: ["There. The hay is out front now, where it can watch.", "All the way round. Pop goes the weasel.", "Mind the back, egg. There's nothing there."],
   },
   bees: {
     speaker: "humpty",

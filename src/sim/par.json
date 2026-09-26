@@ -47,11 +47,20 @@
     {
       "ammo": "shot",
       "at": {
-        "x": 0,
-        "y": 4.51,
-        "z": -1.4
+        "x": 7.4,
+        "y": 0.6,
+        "z": 3.2
       },
       "wait": 0
+    },
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 0,
+        "y": 0.2,
+        "z": 0
+      },
+      "relativeToHumpty": true
     }
   ],
   "all-the-kings-horses": [

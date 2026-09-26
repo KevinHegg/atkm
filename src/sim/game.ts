@@ -31,6 +31,8 @@ import {
   type DresserDef,
   type PeelDef,
   PEEL_SIZE,
+  type RevolveDef,
+  REVOLVE_HEIGHT,
   type ChinaKind,
   DRESSER,
   dresserChina,
@@ -356,6 +358,8 @@ export class Game {
   private turntable: { entity: Entity; def: TurntableDef; angle: number; omega: number } | undefined;
   private readonly vanes: Array<{ entity: Entity; angle: number; target: number; step: number }> = [];
   private carousel: { entity: Entity; def: CarouselDef; angle: number } | undefined;
+  /** The revolving stage: how far round it has been turned, and when its current turn began. */
+  private revolve: { entity: Entity; def: RevolveDef; angle: number; startedAt: number | undefined; previous?: number } | undefined;
   private gate: { entity: Entity; def: GateDef; openedAt: number } | undefined;
   /** Sensors in the mouths of chute hoppers: a shot dropping in pays once. */
   private readonly hoppers = new Map<number, { scored: boolean }>();
@@ -406,6 +410,7 @@ export class Game {
       else if (piece.kind === "gate") this.addGate(piece);
       else if (piece.kind === "dresser") this.addDresser(piece);
       else if (piece.kind === "peel") this.addPeel(piece);
+      else if (piece.kind === "revolve") this.addRevolve(piece);
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -1180,6 +1185,65 @@ export class Game {
     this.carousel = { entity, def, angle: def.angle };
   }
 
+  /**
+   * A ring of floorboards (convex sectors round a hole) on a kinematic body. It turns about its
+   * middle; whatever stands on it is carried round by friction, and the middle stays put.
+   */
+  private addRevolve(def: RevolveDef): void {
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(def.pos.x, 0, def.pos.z));
+    const sectors = 24;
+    const colliders: RAPIER.Collider[] = [];
+    for (let index = 0; index < sectors; index += 1) {
+      const points: number[] = [];
+      for (const a of [index / sectors, (index + 1) / sectors].map((k) => k * Math.PI * 2)) {
+        for (const r of [def.inner, def.outer]) {
+          // Deep below the boards (the ring never touches the fixed floor): a thin ring lets a falling
+          // egg sink into it for a step or two, which softens the landing enough to save him.
+          for (const y of [-0.6, REVOLVE_HEIGHT]) points.push(Math.cos(a) * r, y, -Math.sin(a) * r);
+        }
+      }
+      const hull = RAPIER.ColliderDesc.convexHull(new Float32Array(points));
+      if (!hull) throw new Error("A sector of the revolve failed to form a convex hull.");
+      colliders.push(this.world.createCollider(hull.setFriction(1).setRestitution(0.05).setCollisionGroups(GROUPS.static), body));
+    }
+    const entity = this.register("fixture", "revolve", { x: def.outer * 2, y: REVOLVE_HEIGHT, z: def.outer * 2 }, body, colliders, { look: "revolve" });
+    this.revolve = { entity, def, angle: 0, startedAt: undefined };
+  }
+
+  /** The capstan is struck: the revolve begins another half turn, unless it's turning already. */
+  private startRevolve(): boolean {
+    const revolve = this.revolve;
+    if (!revolve || revolve.startedAt !== undefined) return false;
+    revolve.startedAt = this.time;
+    // Everything asleep on the boards must be awake to ride round (or it's left hanging in the air).
+    for (const body of this.world.bodies.getAll()) if (body.isDynamic()) body.wakeUp();
+    return true;
+  }
+
+  /**
+   * Hay and masonry riding the ring go round with it: turn the places they started from by as
+   * much, so a ride isn't billed as wreckage. Only a shot or a blast that moves them counts.
+   */
+  private carryRound(def: RevolveDef, turn: number): void {
+    if (turn === 0) return;
+    const c = Math.cos(turn);
+    const s = Math.sin(turn);
+    for (const start of this.startPositions.values()) {
+      const dx = start.x - def.pos.x;
+      const dz = start.z - def.pos.z;
+      const r = Math.hypot(dx, dz);
+      if (r < def.inner || r > def.outer || start.y > 3) continue;
+      // Turning by `turn` about +y: x' = x cos + z sin, z' = -x sin + z cos.
+      start.x = def.pos.x + dx * c + dz * s;
+      start.z = def.pos.z - dx * s + dz * c;
+    }
+  }
+
+  /** Is the revolve turning? */
+  get revolving(): boolean {
+    return this.revolve?.startedAt !== undefined;
+  }
+
   private addGate(def: GateDef): void {
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(def.pos.x, def.height / 2, def.pos.z).setRotation(yawQuat(def.yaw)),
@@ -1285,6 +1349,21 @@ export class Game {
 
   /** The machines that turn on their own: struck weathercocks, the carousel, the portcullis. */
   private updateMachines(): void {
+    // The revolve: eased in and out, so what rides on it isn't flung off.
+    const revolve = this.revolve;
+    if (revolve && revolve.startedAt !== undefined) {
+      const u = Math.min(1, (this.time + STEP - revolve.startedAt) / revolve.def.time);
+      const angle = revolve.angle + revolve.def.turn * u * u * (3 - 2 * u);
+      this.carryRound(revolve.def, angle - (revolve.previous ?? revolve.angle));
+      revolve.previous = angle;
+      revolve.entity.body.setNextKinematicRotation(yawQuat(angle));
+      if (u >= 1) {
+        revolve.angle += revolve.def.turn;
+        revolve.previous = undefined;
+        revolve.startedAt = undefined;
+        this.events.push({ type: "revolved", at: { ...revolve.def.pos } });
+      }
+    }
     // China rattled off its shelf by a neighbour's smash.
     for (const piece of this.china.values()) if (!piece.broken && piece.breakAt !== undefined && this.time >= piece.breakAt) this.smashChina(piece, piece.shock);
     // A barrel off its chock: once it's rolling, its fuse is lit.
@@ -2329,12 +2408,13 @@ export class Game {
     if (cue === "gate" && !this.raiseGate()) return;
     if (cue === "release") this.knockChock(fixture);
     if (cue === "hive" && !this.releaseSwarm(fixture)) return;
+    if (cue === "revolve" && !this.startRevolve()) return;
     fixture.cuedAt = this.time;
     if (cue === "lunch") for (const crew of this.crews) callLunch(crew, this.time);
     if (cue === "wind") this.windUntil = this.time + WIND_TIME;
     const p = shot.body.translation();
     this.events.push({ type: "cue", cue, at: { x: p.x, y: p.y, z: p.z } });
-    if (cue !== "trap") this.score(cue === "wind" ? "wind" : cue === "gate" ? "gate" : cue === "release" ? "barrel" : cue === "hive" ? "hive" : "gong", { x: p.x, y: p.y, z: p.z });
+    if (cue !== "trap") this.score(cue === "wind" ? "wind" : cue === "gate" ? "gate" : cue === "release" ? "barrel" : cue === "hive" ? "hive" : cue === "revolve" ? "revolve" : "gong", { x: p.x, y: p.y, z: p.z });
   }
 
   private handleForces(): void {
@@ -2344,10 +2424,13 @@ export class Game {
       const b = this.byCollider.get(event.collider2());
       if (a && b) contacts.push({ a, b, force: event.totalForceMagnitude() });
     });
+    // Humpty's landings are judged per thing he lands on: an egg that comes down across two boards
+    // of the revolve (two colliders, one body) takes the whole blow, not two halves of it.
+    const landings = new Map<Entity, number>();
     for (const { a, b, force } of contacts) {
       for (const [me, other] of [[a, b], [b, a]] as const) {
         if (me.view.removed || other.view.removed) continue;
-        if (me === this.humpty && !this.cracked && !this.hoist) this.humptyContact(other, force);
+        if (me === this.humpty) landings.set(other, (landings.get(other) ?? 0) + force);
         if (me.crew && other.view.kind !== "ground") {
           const v = other.body.linvel();
           const crewSpeed = me.crew.speed;
@@ -2363,6 +2446,9 @@ export class Game {
           me.fuseAt = this.time + 0.02;
         }
       }
+    }
+    for (const [other, force] of landings) {
+      if (this.humpty && !this.cracked && !this.hoist && !this.humpty.view.removed) this.humptyContact(other, force);
     }
   }
 

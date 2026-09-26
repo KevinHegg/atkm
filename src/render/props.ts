@@ -1,7 +1,7 @@
 import * as pc from "playcanvas";
 import { EGG_BASE_T, eggRadius, eggY } from "../sim/egg.js";
 import { axisAngle, troughFrame } from "../sim/geometry.js";
-import { DRESSER, dresserChina, hopperBoards } from "../sim/level.js";
+import { DRESSER, REVOLVE_HEIGHT, dresserChina, hopperBoards, type RevolveDef } from "../sim/level.js";
 import { hashUnit, palette, type Kit } from "./kit.js";
 
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
@@ -958,6 +958,23 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
     return root;
   }
   if (look === "dresser") return buildDresser(kit, root);
+  if (look === "capstan") {
+    // The stagehands' capstan: a crimson drum on a heavy foot, and a spoked brass head that spins.
+    const oak = kit.material("oak-dark", palette.oakDark, 0.16);
+    const drum = kit.material("capstan-red", palette.king, 0.3);
+    const brass = kit.material("gold", palette.gold, 0.72, 0.55);
+    kit.primitive("capstan-foot", "box", root, V(0, -y / 2 + 0.08, 0), { x: x * 0.95, y: 0.16, z: z * 0.95 }, oak);
+    kit.primitive("capstan-drum", "cylinder", root, V(0, -0.1, 0), { x: 0.62, y: y * 0.62, z: 0.62 }, drum);
+    for (const k of [-0.32, 0.12]) kit.primitive("capstan-hoop", "cylinder", root, V(0, k, 0), { x: 0.66, y: 0.06, z: 0.66 }, brass, pc.Vec3.ZERO, false);
+    const head = kit.group("capstan-head", root, V(0, y / 2 - 0.2, 0));
+    kit.primitive("capstan-cap", "cylinder", head, V(), { x: 0.5, y: 0.14, z: 0.5 }, brass);
+    for (let index = 0; index < 6; index += 1) {
+      const arm = kit.group("capstan-arm", head, V(), V(0, index * 60, 0));
+      kit.primitive("capstan-bar", "box", arm, V(0.38, 0, 0), { x: 0.5, y: 0.07, z: 0.07 }, oak);
+      kit.primitive("capstan-grip", "sphere", arm, V(0.62, 0, 0), { x: 0.1, y: 0.1, z: 0.1 }, brass, pc.Vec3.ZERO, false);
+    }
+    return root;
+  }
   if (look === "hive") {
     // A straw skep on a short rope from the bough: coiled straw, a dark little door at the foot.
     const straw = kit.material("straw", palette.straw, 0.12);
@@ -1130,6 +1147,18 @@ function buildDresser(kit: Kit, root: pc.Entity): pc.Entity {
       kit.primitive("cup-handle", "box", group, V(0.075, 0, 0), { x: 0.03, y: 0.07, z: 0.02 }, white, pc.Vec3.ZERO, false);
     }
   }
+  return root;
+}
+
+/** The revolve's ring of floorboards: planks in two tones, a gilt inlay and a dark rim, all one mesh. */
+export function buildRevolve(kit: Kit, parent: pc.Entity, def: RevolveDef): pc.Entity {
+  const root = kit.group("fixture-revolve", parent);
+  const inlay = def.outer - 0.34;
+  const rim = def.outer - 0.2;
+  const mesh = kit.ring(`revolve-${def.inner}-${def.outer}`, def.inner, def.outer, REVOLVE_HEIGHT, 32, [inlay, rim], (sector, band) =>
+    band === 1 ? palette.gold : band === 2 ? palette.oakDark : sector % 2 ? palette.oak : palette.oakLight,
+  );
+  kit.meshEntity("revolve", mesh, kit.paintMaterial(0.22), root);
   return root;
 }
 

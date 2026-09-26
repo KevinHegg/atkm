@@ -470,6 +470,83 @@ export class TheatreAudio {
     this.burst({ duration: 0.2, volume: 0.3, filter: "lowpass", frequency: 500, delay: 0.42 });
   }
 
+  /** The revolve's great wooden rumble, with the capstan's pawl clacking over it, while it turns. */
+  private grind: { source: AudioBufferSourceNode; lfo: OscillatorNode; level: GainNode; on: boolean } | undefined;
+  private nextClack = 0;
+
+  rumble(on: boolean): void {
+    const audio = this.ready();
+    if (!audio || !this.noise) {
+      this.stopGrind();
+      return;
+    }
+    const { ctx, out } = audio;
+    if (!on) {
+      if (this.grind?.on) {
+        this.grind.on = false;
+        this.grind.level.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
+        const grind = this.grind;
+        setTimeout(() => {
+          if (this.grind === grind && !grind.on) this.stopGrind();
+        }, 900);
+      }
+      return;
+    }
+    if (!this.grind) {
+      const source = ctx.createBufferSource();
+      source.buffer = this.noise;
+      source.loop = true;
+      source.playbackRate.value = 0.5;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 170;
+      // A slow wobble: timber groaning as it goes round.
+      const wobble = ctx.createGain();
+      wobble.gain.value = 0.7;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 2.3;
+      const depth = ctx.createGain();
+      depth.gain.value = 0.3;
+      lfo.connect(depth).connect(wobble.gain);
+      const level = ctx.createGain();
+      level.gain.value = 0.0001;
+      source.connect(filter).connect(wobble).connect(level).connect(out);
+      source.start();
+      lfo.start();
+      this.grind = { source, lfo, level, on: false };
+    }
+    if (!this.grind.on) {
+      this.grind.on = true;
+      this.grind.level.gain.setTargetAtTime(0.5, ctx.currentTime, 0.3);
+    }
+    // The pawl clacks over the capstan's ratchet.
+    if (ctx.currentTime >= this.nextClack) {
+      this.nextClack = ctx.currentTime + 0.42;
+      this.burst({ duration: 0.05, volume: 0.22, filter: "bandpass", frequency: 1800, q: 3 });
+      this.tone(240, 0.06, 0.08, "square", { to: 180 });
+    }
+  }
+
+  private stopGrind(): void {
+    const grind = this.grind;
+    const ctx = this.context;
+    if (!grind || !ctx) return;
+    this.grind = undefined;
+    const now = ctx.currentTime;
+    grind.level.gain.cancelScheduledValues(now);
+    grind.level.gain.setValueAtTime(grind.level.gain.value, now);
+    grind.level.gain.linearRampToValueAtTime(0.0001, now + 0.1);
+    grind.source.stop(now + 0.12);
+    grind.lfo.stop(now + 0.12);
+  }
+
+  /** The revolve locks home: a deep wooden clunk. */
+  clunk(): void {
+    if (!this.throttle("clunk", 500)) return;
+    this.tone(95, 0.35, 0.45, "triangle", { to: 60 });
+    this.burst({ duration: 0.18, volume: 0.35, filter: "lowpass", frequency: 400 });
+  }
+
   /** One of the King's men, stung: a yelp. */
   ow(): void {
     if (!this.throttle("ow", 350)) return;

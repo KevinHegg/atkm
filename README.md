@@ -99,6 +99,11 @@ unlock every verse.
   tree: strike it and a swarm goes after the King's stretcher crews and carts, one after
   another, for twelve seconds. Stung bearers run up and down their beat and a stung horse
   rears, and nobody runs to catch him until the bees have gone.
+- **The revolving stage.** In Pop Goes the Weasel (Verse V) Humpty's tower stands on powder in the
+  fixed middle of a revolve, a great ring of floorboards with hay banked on it behind him, so
+  every knock lands soft. Strike the stagehands' capstan in the wings and the ring turns half
+  round over six seconds, carrying the hay (and anything else on it) round to the front. His
+  back is bare while it turns and after. Strike it again and round it comes back.
 - **Machines.** The last five verses are built round contraptions that redirect a shot.
   The Queen's weathercock is a bronze plate on a pole that turns an eighth of a turn each
   time it's struck: set it with one shot, bank the next off it. A bomb dropped in a chute's

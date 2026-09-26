@@ -32,6 +32,13 @@ Core promises:
   after the nearest crew able to catch, then the next; stung crews (`sting`, mode `stung`)
   don't run to catch him (though a bed that happens to be under him still breaks his fall). Stung bearers run only along their own beat (`beatOf`), and carts and guards
   stay put, so a panic never ploughs a crew into scenery: keep every litter's beat clear.
+- The revolve (`Mason.revolve`, turned by `Mason.capstan`, cue `revolve`) is a kinematic ring
+  of convex sectors round a fixed middle; it turns `turn` radians over `time` seconds, eased,
+  and carries what rests on it by friction (everything is woken when it starts). Wreckage is
+  measured against start positions turned round with it (`carryRound`), so a ride is never
+  billed. Its sectors run well below the boards so a falling egg can't sink into them, and
+  Humpty's landings sum the force from every collider of one body in a step, so coming down
+  on a seam is the same blow as anywhere else.
 - Banana skins (`Mason.peel`) trip any crew on the move whose footprint passes over them,
   but only once a stock shot or a blast has armed them. A shot flicks a skin (`flickPeel`) at a
   speed set by the shot's, not with the cannonball's full blow, and the skin ignores that

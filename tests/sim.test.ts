@@ -789,10 +789,11 @@ test("one shot that sets off three or more kinds of mischief earns a trick-shot 
   assert.equal(comboBonus(2), 0);
   assert.ok(comboBonus(3) > 0 && comboBonus(4) > comboBonus(3));
   const { levelById } = await import("../src/sim/levels.js");
-  const game = await Game.create(levelById("the-powder-room")!);
+  const game = await Game.create(levelById("the-keep")!);
   await stepUntilReady(game);
-  // Round shot into the powder under his tower: kegs, hay, masonry and the King's men all at once.
-  assert.ok(game.fire({ x: 0, y: 0.4, z: -0.95 }));
+  // A shell into the powder by the horse cart: kegs, a tower and the cart all go over at once.
+  game.select("shell");
+  assert.ok(game.fire({ x: 6.6, y: 0.4, z: -1.9 }));
   const events = await run(game, 8);
   const combo = events.find((event) => event.type === "mayhem" && event.kind === "combo");
   assert.ok(combo && combo.type === "mayhem" && combo.label?.startsWith("Combo ×"), "a combo is scored");
@@ -913,4 +914,37 @@ test("struck, the beehive sends a swarm after the King's men, who run for it, an
   assert.equal(game.swarmView, undefined, "the bees go home");
   assert.notEqual(game.crewViews[0]!.mode, "stung");
   game.destroy();
+});
+
+test("striking the capstan turns the revolve half round, hay and all, and a ride is not wreckage", async () => {
+  const game = await Game.create(arena((mason) => {
+    const ring = mason.revolve(0, -1, { inner: 1.9, outer: 6 });
+    mason.hay(0, -5, ring);
+    mason.capstan(8, 2);
+    const top = mason.pillar("stone", 0, -1, 4, { size: 1, height: 0.8 });
+    return perchAt(0, top, -1);
+  }, { ammo: { shot: 2 } }));
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: 8, y: 0.6, z: 2 }));
+  const events = await run(game, 9);
+  assert.ok(events.some((event) => event.type === "cue" && event.cue === "revolve"));
+  assert.ok(events.some((event) => event.type === "revolved"), "it comes round and locks");
+  assert.equal(game.revolving, false);
+  const hay = game.bodies.find((body) => body.kind === "hay")!;
+  assert.ok(Math.hypot(hay.position.x, hay.position.z - 3) < 0.25, `the hay rode round to the front (${hay.position.x.toFixed(2)}, ${hay.position.z.toFixed(2)})`);
+  assert.equal(game.mayhem.entries.get("hay"), undefined, "riding round isn't wreckage");
+  assert.equal(game.mayhem.entries.get("revolve")?.count, 1);
+  game.destroy();
+});
+
+test("in Pop Goes the Weasel the hay behind him catches a plain knock; turn the stage first and he cracks", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const { playOut } = await import("../src/sim/autoplay.js");
+  const level = levelById("the-powder-room")!;
+  for (const x of [-0.2, 0, 0.2]) {
+    const plain = await playOut(level, [{ ammo: "shot", at: { x, y: 4.6, z: -1.4 } }], 20);
+    assert.ok(!plain.won, `a plain knock at x ${x} is caught`);
+  }
+  const turned = await playOut(level, [{ ammo: "shot", at: { x: 7.4, y: 0.6, z: 3.2 } }, { ammo: "shot", at: { x: 0, y: 4.6, z: -1.4 }, wait: 3 }], 24);
+  assert.ok(turned.won, "capstan, then the same knock, cracks him");
 });

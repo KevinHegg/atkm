@@ -1122,6 +1122,10 @@ function handle(event: GameEvent): void {
       audio.creak();
       if (live) later(1.4, () => cue("hoist", 0.6, 5));
       break;
+    case "revolved":
+      audio.clunk();
+      if (live) later(0.5, () => cue("revolved", 0.8, 0));
+      break;
     case "slip":
       audio.slip();
       if (live) {
@@ -1216,6 +1220,14 @@ function handle(event: GameEvent): void {
         if (live) {
           toast("Look out below!", true, "The barrel is rolling");
           later(0.8, () => cue("barrel", 1, 0));
+        }
+        break;
+      }
+      if (event.cue === "revolve") {
+        audio.clang();
+        if (live) {
+          toast("Round she goes!", true, "The stagehands are turning the stage");
+          later(1, () => cue("revolve", 1, 0));
         }
         break;
       }
@@ -1374,6 +1386,7 @@ function playAmbience(current: Game, realDt: number): void {
   for (const fuse of current.fuses) audio.fizz(1 - fuse.left / BOMB_FUSE);
   const swarm = current.swarmView;
   audio.buzz(swarm ? (swarm.home ? 0.35 : 1) : 0);
+  audio.rumble(current.revolving);
 }
 
 /** The house and the pit follow the physics: a roll while he teeters or falls, gasps for close shaves. */
@@ -1552,7 +1565,10 @@ function tick(realDt: number): void {
   updateStatus();
   updateFuseTags();
   if (screen === "play") playAmbience(current, realDt);
-  else audio.buzz(0);
+  else {
+    audio.buzz(0);
+    audio.rumble(false);
+  }
   if (screen === "play" || screen === "replay") listenToCrowd(current);
   else audio.roll(0);
   view.sync(Math.min(1, accumulator / STEP));

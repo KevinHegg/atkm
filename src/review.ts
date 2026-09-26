@@ -44,6 +44,7 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
     [count("combo") === 1, 64, () => "ONE SHOT, A DOZEN DISASTERS: QUEEN'S TRICK SHOT STUNS STALLS"],
     [count("tower") > 0, 72, () => "ROYAL BOX SHAKEN TO ITS STILTS; FIDDLERS MISS A BEAT"],
     [count("slip") > 0, 78, () => (count("slip") > 1 ? "BANANA SKINS FLOOR THE KING'S MEN, TWICE" : "STRETCHER CREW SLIPS ON BANANA SKIN")],
+    [count("revolve") > 0, 66, () => "STAGEHANDS TURN THE WHOLE STAGE ROUND; HAY GOES WALKABOUT"],
     [count("hive") > 0, 76, () => (count("stung") > 1 ? "SWARM CHASES THE KING'S MEN ROUND THE STAGE" : "BEES LOOSED IN THE ROYAL ORCHARD")],
     [count("china") >= 6, 80, () => "THE KING'S BEST CHINA SMASHED; DISH AND SPOON AT LARGE"],
     [count("china") > 0, 60, () => "DISH RUNS AWAY WITH SPOON AFTER SHOT THROUGH ROYAL DRESSER"],

@@ -72,8 +72,11 @@ for (const level of LEVELS) {
     const openers = [...cues, ...singles.filter((shot, index) => !shot.relativeToHumpty && index % 2 === 0)].slice(0, 70);
     const perch = level.humpty;
     const under = targets.filter((at) => Math.hypot(at.x - perch.x, at.z - perch.z) < 1 && at.y < perch.y - 0.5).slice(-4);
+    // A revolve takes a few seconds to bring the stage round: give the second shot time to wait for it.
+    const revolve = level.pieces.some((piece) => piece.kind === "revolve");
+    const followWaits = revolve ? [0, 1.5, 3] : [0];
     const follows = (kind: StockKind): PlannedShot[] => [
-      ...HUMPTY_OFFSETS.map((offset): PlannedShot => ({ ammo: kind, at: offset, relativeToHumpty: true })),
+      ...HUMPTY_OFFSETS.flatMap((offset) => followWaits.map((wait): PlannedShot => ({ ammo: kind, at: offset, relativeToHumpty: true, ...(wait ? { wait } : {}) }))),
       ...under.map((at): PlannedShot => ({ ammo: kind, at: { x: round(at.x), y: round(at.y), z: round(at.z) } })),
       // A second shot at the machinery: bank off the weathercock once it's turned, and so on.
       ...targets.slice(cueCount - machines, cueCount).map((at): PlannedShot => ({ ammo: kind, at: { x: round(at.x), y: round(at.y), z: round(at.z) } })),

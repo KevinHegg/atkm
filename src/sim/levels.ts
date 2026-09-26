@@ -128,39 +128,35 @@ function overTheWall(): LevelDef {
 
 function thePowderRoom(): LevelDef {
   const m = new Mason();
+  // Humpty's tower stands on powder in the fixed middle of a revolve; the ring round it turns.
   let y = 0;
   m.keg(-0.55, -1.6);
   m.keg(0.55, -1.6);
   m.keg(0, -0.95);
   y = m.slab("plank", 0, 0.8, -1.4, 2.4, 1.8, 0.16);
-  y = m.wall("stone", 0, -1.4, 2.2, 3, { y, brick: { x: 1.1, y: 0.5, z: 1.1 } });
+  y = m.wall("stone", 0, -1.4, 2.2, 3, { brick: { x: 1.1, y: 0.5, z: 1.1 } , y });
   const top = m.tower("oak", 0, -1.4, 4, { y });
-  for (const x of [-4.2, -2.8, 2.8, 4.2]) m.hay(x, -1.4);
-  for (const x of [-2.1, -0.7, 0.7, 2.1]) m.hay(x, -3.4);
-  m.keg(-6.5, 0.6);
-  m.keg(6.5, 0.6);
-  m.chest(6.8, -3.2, { yaw: -0.3 });
+  const ring = m.revolve(0, -1.4, { inner: 1.9, outer: 6.6 });
+  // Hay riding the ring: at his sides, and banked up behind him where any knock sends him.
+  for (const x of [-4.2, -2.8, 2.8, 4.2]) m.hay(x, -1.4, ring);
+  for (const z of [-3.95, -4.75, -5.55, -6.35, -7.15]) for (const x of [-1.3, 0, 1.3]) m.hay(x, z, ring);
+  // The stagehands' capstan, in the wings: strike it and round she goes.
+  m.capstan(7.4, 3.2);
+  m.keg(-7, 0.6);
+  m.keg(7, 0.6);
+  m.chest(7, -3.6, { yaw: -0.3 });
   return {
     id: "the-powder-room",
-    title: "The Powder Room",
-    verse: ["Humpty Dumpty built on a keg.", "Say what you like — he's a very brave egg."],
-    hint: "Powder kegs go off when they're struck hard. One good blast can take the whole tower.",
+    title: "Pop Goes the Weasel",
+    verse: ["Round and round the powder room the stagehands turned the floor;", "the egg thought 'twas all in fun. Then POP! went the powder store."],
+    hint: "The hay behind him catches every knock. Strike the stagehands' capstan and the stage turns round, hay and all. Or try the powder under his tower.",
     ammo: { shot: 3 },
     greatFall: 3.8,
-    mayhem: 750,
+    mayhem: 925,
     star: { curio: "stagehands" },
     humpty: perchAt(0, top, -1.4),
     pieces: m.pieces,
-    crews: [
-      {
-        id: "litter-c",
-        kind: "litter",
-        home: { x: -6, y: 0, z: -5.5 },
-        yaw: Math.PI / 2,
-        zone: { minX: -9, maxX: 9, minZ: -8.5, maxZ: 3 },
-        patrol: [{ x: -6, y: 0, z: -5.5 }, { x: 6, y: 0, z: -5.5 }],
-      },
-    ],
+    crews: [],
     view: view(),
   };
 }

@@ -10,6 +10,7 @@ import {
   buildChest,
   buildRunaways,
   buildPeel,
+  buildRevolve,
   buildSwarm,
   buildCannon,
   buildCartBed,
@@ -83,6 +84,8 @@ interface BodyVisual {
   china?: pc.Entity[];
   /** A beehive's straw skep, which swings when struck. */
   skep?: pc.Entity;
+  /** The capstan's spoked head, which turns while the revolve does. */
+  capstan?: pc.Entity;
 }
 
 /** A released star, floating up off the stage. */
@@ -157,6 +160,7 @@ export class StageView {
   /** The bees, when they're out, and when their hive was last struck. */
   private readonly swarm: pc.Entity;
   private hiveStruckAt = -99;
+  private capstanTurn = 0;
   /** A piece of the King's china has been smashed since the dresser was last redrawn. */
   private chinaDirty = false;
   /** The dish that ran away with the spoon, while they're still on stage. */
@@ -758,7 +762,7 @@ export class StageView {
     this.company.update(this.elapsed, Boolean(this.game?.hoisting));
     this.animateEffects(dt);
     this.animateChina(dt);
-    this.animateBees();
+    this.animateBees(dt);
     this.animateScenery();
     this.updateCamera(realDt);
   }
@@ -811,7 +815,13 @@ export class StageView {
         break;
       case "fixture": {
         const carousel = view.material === "carousel" ? this.game?.level.pieces.find((piece) => piece.kind === "carousel") : undefined;
-        const fixture = carousel?.kind === "carousel" ? buildCarousel(this.kit, root, carousel) : buildFixture(this.kit, root, view.material, view.size);
+        const revolve = view.material === "revolve" ? this.game?.level.pieces.find((piece) => piece.kind === "revolve") : undefined;
+        const fixture = carousel?.kind === "carousel"
+          ? buildCarousel(this.kit, root, carousel)
+          : revolve?.kind === "revolve"
+            ? buildRevolve(this.kit, root, revolve)
+            : buildFixture(this.kit, root, view.material, view.size);
+        if (view.material === "capstan") visual.capstan = fixture.findByName("capstan-head") as pc.Entity;
         if (view.material === "counterweight") visual.counterweight = fixture.findByName("counterweight-body") as pc.Entity;
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
         if (view.material === "lever") visual.lever = fixture.findByName("lever-arm") as pc.Entity;
@@ -1657,7 +1667,10 @@ export class StageView {
   }
 
   /** The struck skep swings on its rope; the swarm buzzes about wherever the bees have got to. */
-  private animateBees(): void {
+  private animateBees(dt: number): void {
+    // (And the capstan, which the stagehands heave round while the revolve turns.)
+    if (this.game?.revolving) this.capstanTurn += dt * 70;
+    for (const visual of this.visuals.values()) visual.capstan?.setLocalEulerAngles(0, this.capstanTurn, 0);
     const since = this.elapsed - this.hiveStruckAt;
     for (const visual of this.visuals.values()) {
       if (!visual.skep) continue;

@@ -196,6 +196,24 @@ export interface TrapDef {
   outer: number;
 }
 
+/**
+ * A revolve: a ring of the stage floor round a fixed middle, turned by the stagehands' capstan.
+ * Whatever stands on the ring rides round with it; whatever stands in the middle stays put.
+ */
+export interface RevolveDef {
+  kind: "revolve";
+  /** Middle of the ring, on the boards. */
+  pos: Vec3;
+  inner: number;
+  outer: number;
+  /** How far one strike of the capstan turns it (radians), and how long that takes. */
+  turn: number;
+  time: number;
+}
+
+/** How high a revolve's ring stands above the boards. */
+export const REVOLVE_HEIGHT = 0.12;
+
 /** A banana skin lying on the boards: knock it under a running crew and down they go. */
 export interface PeelDef {
   kind: "peel";
@@ -203,7 +221,7 @@ export interface PeelDef {
   yaw: number;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef | DresserDef | PeelDef;
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef | DresserDef | PeelDef | RevolveDef;
 
 /** A banana skin's size: long, flat and slippery. */
 export const PEEL_SIZE = { x: 0.8, y: 0.14, z: 0.5 };
@@ -579,6 +597,20 @@ export class Mason {
       this.block(material, spot.x, 0, spot.z, 0.7, height, 0.12, spot.yaw);
       along += height * 0.5 + 0.12;
     }
+  }
+
+  /**
+   * A revolving stage round (x, z); returns the height of its boards, to build things on it.
+   * The capstan that turns it is a stage cue: see `capstan`.
+   */
+  revolve(x: number, z: number, opts: { inner?: number; outer?: number; turn?: number; time?: number } = {}): number {
+    this.pieces.push({ kind: "revolve", pos: { x, y: 0, z }, inner: opts.inner ?? 1.9, outer: opts.outer ?? 6, turn: opts.turn ?? Math.PI, time: opts.time ?? 6 });
+    return REVOLVE_HEIGHT;
+  }
+
+  /** The stagehands' capstan in the wings: strike it and the revolve turns. */
+  capstan(x: number, z: number, yaw = 0): void {
+    this.fixture("capstan", x, 0, z, 1.3, 1.2, 1.3, { yaw, cue: "revolve" });
   }
 
   /** A banana skin on the boards. */
