@@ -26,6 +26,7 @@
         <div class="verse-tag">
           <span id="hud-number">Verse I</span>
           <strong id="hud-title">Sat on a Wall</strong>
+          <em id="royal-badge" hidden><i class="crown"></i>Royal</em>
         </div>
         <div class="hud-notes">
           <ol id="objectives" aria-label="Stars for this verse">
@@ -86,7 +87,10 @@
         <div class="playbill wide">
           <header>
             <h2>The Verses</h2>
-            <button type="button" id="levels-back">Back</button>
+            <div class="levels-tools">
+              <button type="button" id="royal-toggle" aria-pressed="false" title="Royal difficulty: the aim arc shows only its first half, with no ring where the shot lands and no Court Astrologer. Verses won this way earn a crown."><i class="crown"></i><span>Royal</span></button>
+              <button type="button" id="levels-back">Back</button>
+            </div>
           </header>
           <ol id="level-list"></ol>
           <div class="levels-foot">

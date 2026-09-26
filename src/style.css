@@ -622,6 +622,37 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .playbill.wide header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .playbill.wide header h2 { margin: 0; }
 #levels-back { min-width: 0; }
+.levels-tools { display: flex; align-items: center; gap: 10px; }
+
+/* Royal difficulty: a crown, cut from gilt card. */
+.crown {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 14px;
+  background: rgb(20 17 15 / 0.2);
+  clip-path: polygon(0 100%, 0 20%, 25% 55%, 50% 0, 75% 55%, 100% 20%, 100% 100%);
+}
+.crown.lit { background: var(--gold-dark); }
+#royal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 9px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  font: 700 16px/1 var(--ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#royal-toggle[aria-pressed="true"] { background: var(--crimson); color: var(--paper); }
+#royal-toggle[aria-pressed="true"] .crown { background: var(--gold); }
+#royal-badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; font: 700 11px/1 var(--ui); font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-dark); }
+#royal-badge .crown { width: 13px; height: 10px; background: var(--gold-dark); }
+#royal-badge[hidden] { display: none; }
+#level-list .foot .crown { width: 15px; height: 11px; }
 
 /* Sixteen verses: a four-by-four playbill. */
 #level-list {

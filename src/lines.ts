@@ -1,3 +1,4 @@
+import type { Weather } from "./sim/level.js";
 export type Cue =
   | "start"
   | "retort"
@@ -50,6 +51,15 @@ export type Cue =
   | "stung"
   | "slip"
   | "phew";
+
+/** Humpty's remarks on the weather, now and then, as a verse begins. */
+export const WEATHER_LINES: Partial<Record<Weather, string[]>> = {
+  rain: ["Somebody fetch me an umbrella. A royal one.", "Rain. On my shell. How very common.", "Is that rain, or is the scenery leaking?"],
+  storm: ["A dark and stormy night. How original.", "Thunder? That's a stagehand with a tin sheet. I've seen him.", "Nobody fire anything during the lightning. Please."],
+  snow: ["Snow! I'll catch my death. Well, my crack.", "Paper snow. The budget, I suppose.", "On a cold and frosty morning, even an egg shivers."],
+  night: ["Who turned the moon on?", "Nobody can see me in the dark. Probably.", "Up past my bedtime, and for what?"],
+  dawn: ["Up with the lark. The lark is not happy either.", "Dawn. Too early for gunpowder, surely."],
+};
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {

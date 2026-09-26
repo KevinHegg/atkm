@@ -42,6 +42,7 @@ import {
   type QueenRig,
   LEVER_THROW,
 } from "./props.js";
+import { WeatherRig } from "./weather.js";
 import { buildStage, type StageSet } from "./stage.js";
 import { Company } from "./company.js";
 import { Curios } from "./curios.js";
@@ -160,6 +161,11 @@ export class StageView {
   private readonly chains = new Map<number, pc.Entity>();
   private readonly puffs: Puff[] = [];
   private readonly splats: Splat[] = [];
+  /** The verse's sky and weather, and whether the thunder sheet is owed a rattle. */
+  private readonly weather: WeatherRig;
+  private thunderOwed = false;
+  /** Royal difficulty: the aim arc shows only its first half, and no markers. */
+  private royal = false;
   /** The bees, when they're out, and when their hive was last struck. */
   private readonly swarm: pc.Entity;
   private hiveStruckAt = -99;
@@ -230,8 +236,9 @@ export class StageView {
     this.swarm = buildSwarm(this.kit, this.effects);
     this.swarm.enabled = false;
     this.camera = this.createCamera();
-    this.createLights();
+    const lights = this.createLights();
     this.stage = buildStage(this.kit, this.world);
+    this.weather = new WeatherRig(this.kit, this.world, { ...lights, camera: this.camera });
     this.curios = new Curios(this.kit, this.world, this.stage.moon);
     this.company = new Company(this.kit, this.world, this.stage.root, (at) => {
       this.puff(at, V(0.1, 0.5, 0.05), 0.22, 1.6, 0, palette.smoke);
@@ -360,6 +367,8 @@ export class StageView {
     this.chinaDirty = false;
     this.swarm.enabled = false;
     this.hiveStruckAt = -99;
+    this.weather.apply(game.level.weather ?? "dusk");
+    this.thunderOwed = false;
     this.humpty = undefined;
     this.humptyVisualId = undefined;
     this.crackAt = undefined;
@@ -466,6 +475,18 @@ export class StageView {
   project(point: Vec3): ScreenPoint {
     const out = this.camera.camera!.worldToScreen(new pc.Vec3(point.x, point.y, point.z), new pc.Vec3());
     return { x: out.x, y: out.y, visible: out.z > 0 };
+  }
+
+  /** True once after each lightning flash: time to rattle the thunder sheet. */
+  takeThunder(): boolean {
+    const owed = this.thunderOwed;
+    this.thunderOwed = false;
+    return owed;
+  }
+
+  /** Royal difficulty on or off: half an aim arc, and no markers. */
+  setRoyal(on: boolean): void {
+    this.royal = on;
   }
 
   kingHead(): Vec3 {
@@ -774,6 +795,7 @@ export class StageView {
     this.curios.update(this.elapsed);
     this.company.update(this.elapsed, Boolean(this.game?.hoisting));
     this.animateEffects(dt);
+    if (this.weather.update(this.elapsed)) this.thunderOwed = true;
     this.animateChina(dt);
     this.animateBees(dt);
     this.animateScenery();
@@ -1317,9 +1339,21 @@ export class StageView {
       this.chainSpan.enabled = false;
       return;
     }
+    // Royal difficulty: only the first half of the arc, and nothing to say where it ends up.
+    const royal = this.royal;
+    let reach = Infinity;
+    if (royal) {
+      let total = 0;
+      for (let index = 1; index < aim.points.length; index += 1) {
+        const a = aim.points[index - 1]!;
+        const b = aim.points[index]!;
+        total += Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+      }
+      reach = total / 2;
+    }
     // Chain shot sweeps a chain's width, level and across the line of flight: shown where it
     // first cuts a rope, or else where it lands.
-    const chainAt = game?.selected === "chain" ? (aim.cuts?.[0] ?? aim.hit) : undefined;
+    const chainAt = game?.selected === "chain" && !royal ? (aim.cuts?.[0] ?? aim.hit) : undefined;
     this.chainSpan.enabled = Boolean(chainAt);
     if (chainAt) {
       const a = aim.points[0]!;
@@ -1327,7 +1361,7 @@ export class StageView {
       this.chainSpan.setPosition(chainAt.x, chainAt.y, chainAt.z);
       this.chainSpan.setEulerAngles(0, heading, Math.sin(this.elapsed * 5) * 8);
     }
-    const marks = [...(aim.passes ? [aim.passes.at] : []), ...(aim.cuts ?? [])];
+    const marks = royal ? [] : [...(aim.passes ? [aim.passes.at] : []), ...(aim.cuts ?? [])];
     this.passRings.forEach((ring, index) => {
       const at = marks[index];
       ring.enabled = Boolean(at);
@@ -1342,12 +1376,13 @@ export class StageView {
     const offset = (this.elapsed * 1.6) % spacing;
     let dotIndex = 0;
     let carried = spacing - offset;
-    for (let index = 1; index < aim.points.length && dotIndex < this.arcDots.length; index += 1) {
+    let travelled = 0;
+    for (let index = 1; index < aim.points.length && dotIndex < this.arcDots.length && travelled < reach; index += 1) {
       const a = aim.points[index - 1]!;
       const b = aim.points[index]!;
       const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
       let along = carried;
-      while (along < length && dotIndex < this.arcDots.length) {
+      while (along < length && dotIndex < this.arcDots.length && travelled + along < reach) {
         const k = along / length;
         const dot = this.arcDots[dotIndex]!;
         dot.enabled = true;
@@ -1359,9 +1394,10 @@ export class StageView {
         along += spacing;
       }
       carried = along - length;
+      travelled += length;
     }
     for (let index = dotIndex; index < this.arcDots.length; index += 1) this.arcDots[index]!.enabled = false;
-    const hit = aim.hit;
+    const hit = royal ? undefined : aim.hit;
     this.reticle.enabled = Boolean(hit);
     if (hit) {
       const pulse = 1 + Math.sin(this.elapsed * 7) * 0.12;
@@ -1837,7 +1873,7 @@ export class StageView {
     return camera;
   }
 
-  private createLights(): void {
+  private createLights(): { key: pc.Entity; fill: pc.Entity; rim: pc.Entity } {
     const key = new pc.Entity("key");
     key.setEulerAngles(48, -30, 0);
     key.addComponent("light", {
@@ -1863,6 +1899,7 @@ export class StageView {
     rim.setPosition(4, 10, -8);
     rim.addComponent("light", { type: "omni", color: new pc.Color(0.55, 0.62, 0.85), intensity: 0.45, range: 30, castShadows: false });
     this.app.root.addChild(rim);
+    return { key, fill, rim };
   }
 
   private updateCamera(dt: number): void {

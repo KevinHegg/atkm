@@ -151,6 +151,13 @@ unlock every verse.
   fire every kind of shot in the Encore, and so on. Like the stars, a challenge counts only
   if he cracks. Done, it earns a rosette on the verse list (no stars, so the Grand Finale
   doesn't depend on them), and the plain winning line never does one by accident.
+- **Royal difficulty.** For players who have learned the physics: switch it on from the verse
+  list (the crown button). The aim arc shows only its first half, with no ring where the shot
+  lands, no red ring on Humpty, no Astrologer, and Humpty gives nothing away when you aim at
+  him. A verse cracked with Royal on from the start earns a crown on the verse list.
+- **Weather.** Every verse has its own painted sky: dusk, dawn, day or night, paper rain on
+  strings, a storm (lightning on the backdrop and a stagehand rattling the thunder sheet), or
+  paper snow. It's scenery and sound only: no shot flies any differently.
 - **The Court Astrologer.** Lose a verse and, on the retry, a green ring marks a known
   winning shot. Aim anywhere inside it and your shot becomes his exactly.
 

@@ -39,6 +39,12 @@ Core promises:
   billed. Its sectors run well below the boards so a falling egg can't sink into them, and
   Humpty's landings sum the force from every collider of one body in a step, so coming down
   on a seam is the same blow as anywhere else.
+- Weather (`LevelDef.weather`, `src/render/weather.ts`) is look and sound only: the sim never
+  reads it, so it can't bend a shot or break a replay. The sky bands, stars and clouds are
+  shared materials repainted per verse (they're static-batched: recolour, don't toggle).
+- Royal difficulty is a per-player setting (`progress.royal`): the view draws half the aim arc
+  and no markers, the Astrologer and Humpty's tells are off, and a crack with it on from the
+  verse's start earns a crown (`progress.crowns`).
 - Side challenges (`src/sim/challenges.ts`) are judged in the simulation at the crack
   (`judgeChallenge`), from the bill and a few counters; like stars, they count only if he
   cracks. Each is proved possible by a recorded line in the tests, and no verse's par line

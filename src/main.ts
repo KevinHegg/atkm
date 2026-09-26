@@ -1,6 +1,6 @@
 import { ChevronsLeft, ChevronsRight, createIcons, RotateCcw, Scan, ScrollText, Volume2, VolumeX } from "lucide";
 import { TheatreAudio } from "./audio.js";
-import { CURIO_LINES, LINES, type Cue, type Speaker } from "./lines.js";
+import { CURIO_LINES, LINES, WEATHER_LINES, type Cue, type Speaker } from "./lines.js";
 import { review } from "./review.js";
 import { StageView } from "./render/view.js";
 import { AMMO } from "./sim/ballistics.js";
@@ -35,6 +35,10 @@ interface Progress {
   finale?: boolean;
   /** Side challenges done, per verse. */
   challenges?: Record<string, true>;
+  /** Royal difficulty is on: half an aim arc, no markers, no Astrologer. */
+  royal?: boolean;
+  /** Verses cracked with Royal difficulty on. */
+  crowns?: Record<string, true>;
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
@@ -49,7 +53,7 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {} };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {} };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
@@ -109,6 +113,8 @@ let lastHeight = "";
 let musicBox = 0;
 let musicNote = 0;
 let launchCued = false;
+/** Royal difficulty as it stood when this verse began: only that earns a crown. */
+let royalRun = false;
 
 // ------------------------------------------------------------------ speech
 
@@ -203,6 +209,7 @@ function recordStars(current: Game): void {
   progress.stars[id] = Math.max(progress.stars[id] ?? 0, current.stars().count);
   progress.best[id] = Math.max(progress.best[id] ?? 0, current.mayhem.total);
   if (current.challengeMet) (progress.challenges ??= {})[id] = true;
+  if (royalRun) (progress.crowns ??= {})[id] = true;
   // Marked as seen only once it actually plays (a restart or reload before then keeps it owed).
   if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = true;
   saveProgress();
@@ -325,6 +332,7 @@ function renderLevelList(): void {
   list.replaceChildren();
   let total = 0;
   let challenges = 0;
+  let crowns = 0;
   LEVELS.forEach((level, index) => {
     const stars = progress.stars[level.id] ?? 0;
     total += stars;
@@ -335,7 +343,9 @@ function renderLevelList(): void {
     const best = progress.best[level.id];
     const challenged = Boolean(progress.challenges?.[level.id]);
     if (challenged) challenges += 1;
-    button.innerHTML = `<span class="numeral">Verse ${numeral(index)}</span><span class="name"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>${best ? `<span class="best">Best ${best.toLocaleString("en-GB")}</span>` : ""}${challenged ? `<i class="rosette lit" title="Side challenge done"></i>` : ""}</span>`;
+    const crowned = Boolean(progress.crowns?.[level.id]);
+    if (crowned) crowns += 1;
+    button.innerHTML = `<span class="numeral">Verse ${numeral(index)}</span><span class="name"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>${best ? `<span class="best">Best ${best.toLocaleString("en-GB")}</span>` : ""}${crowned ? `<i class="crown lit" title="Won with Royal difficulty"></i>` : ""}${challenged ? `<i class="rosette lit" title="Side challenge done"></i>` : ""}</span>`;
     button.querySelector(".name")!.textContent = button.disabled ? "Locked" : level.title;
     item.classList.toggle("complete", stars === 3);
     button.addEventListener("click", () => {
@@ -347,7 +357,8 @@ function renderLevelList(): void {
     list.append(item);
   });
   const all = total === LEVELS.length * 3;
-  $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "");
+  $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "") + (crowns ? ` · ${crowns} won in Royal` : "");
+  $("#royal-toggle").setAttribute("aria-pressed", String(Boolean(progress.royal)));
   $("#star-total").classList.toggle("all", all);
   $("#build-tag").textContent = `v${__BUILD__.version} · ${__BUILD__.commit} · ${__BUILD__.date}`;
 }
@@ -400,7 +411,11 @@ async function startLevel(index: number): Promise<void> {
     $("#verse-ammo").textContent = STOCK_ORDER.filter((kind) => (level.ammo[kind] ?? 0) > 0)
       .map((kind) => `${level.ammo[kind]} × ${AMMO[kind].name}`)
       .join("  ·  ");
-    hintShot = (losses.get(level.id) ?? 0) > 0 ? PAR[level.id]?.[0] : undefined;
+    // Royal difficulty: no help from the Court Astrologer.
+    hintShot = !progress.royal && (losses.get(level.id) ?? 0) > 0 ? PAR[level.id]?.[0] : undefined;
+    royalRun = Boolean(progress.royal);
+    $("#royal-badge").hidden = !royalRun;
+    view.setRoyal(royalRun);
     const timing = hintShot?.wait ? " Timing matters: the stars are fickle." : "";
     $("#hint").textContent = hintShot
       ? `The Court Astrologer has marked a winning shot with a green ring. Aim anywhere inside it and he'll fire ${AMMO[hintShot.ammo].name.toLowerCase()} exactly where it should go.${timing}`
@@ -505,6 +520,9 @@ function closeVerse(): void {
   if (hintShot) toast("The Astrologer", true, "has marked a winning shot in green");
   later(0.5, () => cue("start", 1, 0));
   later(3.6, () => !game?.cracked && cue("retort", 1, 0));
+  // Now and then, a word about the weather.
+  const remarks = game ? WEATHER_LINES[game.level.weather ?? "dusk"] : undefined;
+  if (remarks && Math.random() < 0.6) later(9, () => screen === "play" && !game?.cracked && say("humpty", remarks[Math.floor(Math.random() * remarks.length)]!));
 }
 
 function showResult(): void {
@@ -884,12 +902,14 @@ function updateAim(): void {
   view.setAim(preview);
   const humpty = current.humptyPosition;
   const onHumpty = preview.hit && humpty && Math.hypot(preview.hit.x - humpty.x, preview.hit.y - humpty.y, preview.hit.z - humpty.z) < 1.2;
-  aimedAt = onHumpty ? aimedAt + 1 : 0;
+  // With Royal difficulty he gives nothing away: no nervous look down the barrel, no remarks.
+  const tell = onHumpty && !progress.royal;
+  aimedAt = tell ? aimedAt + 1 : 0;
   if (aimedAt > 40 && performance.now() - lastAimedLine > 22000) {
     lastAimedLine = performance.now();
     cue("aimed", 1, 0);
   }
-  view.lookHumptyAt(onHumpty ? { x: -0.9, y: 1, z: 8.4 } : undefined);
+  view.lookHumptyAt(tell ? { x: -0.9, y: 1, z: 8.4 } : undefined);
 }
 
 /** Where the recorded hint shot aims, and where its ring sits (its first contact). */
@@ -1105,6 +1125,13 @@ $("#replay-skip").addEventListener("click", () => {
 $("#retry-button").addEventListener("click", () => {
   audio.click();
   void startLevel(levelIndex);
+});
+$("#royal-toggle").addEventListener("click", () => {
+  audio.unlock();
+  audio.click();
+  progress.royal = !progress.royal;
+  saveProgress();
+  renderLevelList();
 });
 $("#menu-button").addEventListener("click", () => {
   audio.click();
@@ -1449,6 +1476,9 @@ function playAmbience(current: Game, realDt: number): void {
   const swarm = current.swarmView;
   audio.buzz(swarm ? (swarm.home ? 0.35 : 1) : 0);
   audio.rumble(current.revolving);
+  const weather = current.level.weather;
+  audio.rain(weather === "storm" ? 1 : weather === "rain" ? 0.7 : 0);
+  if (view.takeThunder()) audio.thunder();
 }
 
 /** The house and the pit follow the physics: a roll while he teeters or falls, gasps for close shaves. */
@@ -1630,6 +1660,8 @@ function tick(realDt: number): void {
   else {
     audio.buzz(0);
     audio.rumble(false);
+    audio.rain(0);
+    view.takeThunder();
   }
   if (screen === "play" || screen === "replay") listenToCrowd(current);
   else audio.roll(0);

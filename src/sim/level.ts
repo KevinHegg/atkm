@@ -289,7 +289,11 @@ export interface LevelDef {
   star: StarHolder;
   /** Where the stagehands return him after a safe landing: the highest nearby perch, or his ride. */
   perch?: "highest" | "turntable" | "swing" | "seesaw";
+  /** The painted sky and weather (look and sound only: the simulation never reads it). Dusk if unset. */
+  weather?: Weather;
 }
+
+export type Weather = "dusk" | "dawn" | "day" | "night" | "rain" | "storm" | "snow";
 
 export const HUMPTY_HEIGHT = 1.4;
 export const HUMPTY_RADIUS = 0.5;

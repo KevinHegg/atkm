@@ -267,6 +267,81 @@ export class TheatreAudio {
     this.tone(frequency * 2.01, 0.4, 0.02, "sine", { attack: 0.003 });
   }
 
+  /** Paper rain: a soft, steady hiss while it falls (`level` 0 stops it). */
+  private drizzle: { source: AudioBufferSourceNode; level: GainNode; target: number } | undefined;
+
+  rain(level: number): void {
+    const audio = this.ready();
+    if (!audio || !this.noise || level <= 0) {
+      const drizzle = this.drizzle;
+      if (drizzle && this.context) {
+        this.drizzle = undefined;
+        const now = this.context.currentTime;
+        drizzle.level.gain.cancelScheduledValues(now);
+        drizzle.level.gain.setValueAtTime(drizzle.level.gain.value, now);
+        drizzle.level.gain.linearRampToValueAtTime(0.0001, now + 0.4);
+        drizzle.source.stop(now + 0.45);
+      }
+      return;
+    }
+    const { ctx, out } = audio;
+    if (!this.drizzle) {
+      const source = ctx.createBufferSource();
+      source.buffer = this.noise;
+      source.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 2400;
+      filter.Q.value = 0.4;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      source.connect(filter).connect(gain).connect(out);
+      source.start();
+      this.drizzle = { source, level: gain, target: 0 };
+    }
+    const target = level * 0.05;
+    if (Math.abs(target - this.drizzle.target) > 0.002) {
+      this.drizzle.level.gain.setTargetAtTime(target, ctx.currentTime, 0.6);
+      this.drizzle.target = target;
+    }
+  }
+
+  /** The thunder sheet: a stagehand shakes a great sheet of iron in the wings. A crack, then a rumble. */
+  thunder(): void {
+    if (!this.throttle("thunder", 3000)) return;
+    const audio = this.ready();
+    if (!audio || !this.noise) return;
+    const { ctx, out } = audio;
+    this.burst({ duration: 0.12, volume: 0.35, filter: "highpass", frequency: 2200 });
+    const start = ctx.currentTime + 0.05;
+    const source = ctx.createBufferSource();
+    source.buffer = this.noise;
+    source.loop = true;
+    source.playbackRate.value = 0.6;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(420, start);
+    filter.frequency.exponentialRampToValueAtTime(120, start + 2.6);
+    // The sheet's rattle: the rumble shivers as it's shaken.
+    const shake = ctx.createGain();
+    shake.gain.value = 0.6;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.setValueAtTime(13, start);
+    lfo.frequency.linearRampToValueAtTime(6, start + 2.6);
+    const depth = ctx.createGain();
+    depth.gain.value = 0.4;
+    lfo.connect(depth).connect(shake.gain);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.9, start + 0.25);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 2.8);
+    source.connect(filter).connect(shake).connect(gain).connect(out);
+    source.start(start);
+    lfo.start(start);
+    source.stop(start + 2.9);
+    lfo.stop(start + 2.9);
+  }
+
   /** A mousetrap snapping shut: a hard wooden crack and a spring's twang. */
   snap(): void {
     if (!this.throttle("snap", 300)) return;

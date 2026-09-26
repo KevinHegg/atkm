@@ -13,6 +13,7 @@ function satOnAWall(): LevelDef {
   m.chest(-5, -3.2, { yaw: 0.3 });
   return {
     id: "sat-on-a-wall",
+    weather: "dusk",
     title: "Sat on a Wall",
     verse: ["Humpty Dumpty sat on a wall,", "and the Queen wheeled her cannon into the hall."],
     hint: "Aim at anything and fire. A cannonball won’t break him — only a fall will.",
@@ -38,6 +39,7 @@ function hadAGreatFall(): LevelDef {
   m.chest(-4.6, -2.4, { yaw: -0.2 });
   return {
     id: "had-a-great-fall",
+    weather: "day",
     title: "Had a Great Fall",
     verse: ["Humpty Dumpty went round and round", "on a music box, high off the ground."],
     hint: "Hay covers only one side. Wait for him to swing round to the bare side, or shoot the arm to spin it.",
@@ -78,6 +80,7 @@ function allTheKingsMen(): LevelDef {
   m.chest(-6.4, -6.6, { yaw: 0.4 });
   return {
     id: "all-the-kings-men",
+    weather: "dawn",
     title: "All the King's Men",
     verse: ["Then along came the King's men, two to a litter,", "and whenever he fell, they caught him. How bitter."],
     hint: "The stretcher crew will run to catch him. Time your shot while they're far away, or bowl them over first.",
@@ -104,6 +107,7 @@ function overTheWall(): LevelDef {
   m.chest(-3.8, -4.6);
   return {
     id: "over-the-wall",
+    weather: "rain",
     title: "Over the Wall",
     verse: ["Humpty Dumpty hid behind a wall,", "so the Queen sent for something that doesn't aim at all."],
     hint: "Round shot can't clear this wall. Mortar shells go up and over, then burst: press 2.",
@@ -147,6 +151,7 @@ function thePowderRoom(): LevelDef {
   m.chest(7, -3.6, { yaw: -0.3 });
   return {
     id: "the-powder-room",
+    weather: "dusk",
     title: "Pop Goes the Weasel",
     verse: ["Round and round the powder room the stagehands turned the floor;", "the egg thought 'twas all in fun. Then POP! went the powder store."],
     hint: "The hay behind him catches every knock. Strike the stagehands' capstan and the stage turns round, hay and all. Or try the powder under his tower.",
@@ -183,6 +188,7 @@ function allTheKingsHorses(): LevelDef {
   m.dominoes([{ x: -6.2, z: 1.2 }, { x: -6.2, z: -0.6 }, { x: -6.35, z: -1.3 }, { x: -6.75, z: -1.95 }, { x: -7.35, z: -2.45 }, { x: -8.75, z: -2.6 }], [0.9, 1.1, 1.3, 1.5, 1.7, 1.8, 1.9, 2]);
   return {
     id: "all-the-kings-horses",
+    weather: "dawn",
     title: "All the King's Horses",
     verse: ["All the King's horses came thundering near,", "with a cart full of straw and a very large ear."],
     hint: "The horse cart catches everything. Scatter it (grapeshot, a keg as it passes, or topple the dominoes and let loose the barrel) then knock Humpty off.",
@@ -229,6 +235,7 @@ function chainOfCommand(): LevelDef {
   m.chest(-6.2, -1.4, { yaw: 0.2 });
   return {
     id: "chain-of-command",
+    weather: "day",
     title: "Chain of Command",
     verse: ["Humpty Dumpty sat on a stick.", "The Queen brought a chain. It was ever so quick."],
     hint: "Only chain shot can cut down his maypole. But four stretcher crews stand guard: ring the dinner gong first, and they'll all go to lunch.",
@@ -264,6 +271,7 @@ function theKeep(): LevelDef {
   m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "the-keep",
+    weather: "rain",
     title: "The Keep",
     verse: ["All the King's horses and all the King's men", "built him a castle. Let's knock it down again."],
     hint: "Everything you've learned, all at once. There's more than one way in, and a beehive in the orchard: stir it up and the bees chase the King's men round the stage.",
@@ -329,6 +337,7 @@ function theEncore(): LevelDef {
   m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "the-encore",
+    weather: "dusk",
     title: "The Encore",
     verse: ["The audience stamped and demanded one more,", "so the Queen brought the whole of the royal armoury."],
     hint: "Nothing fired straight at him gets through the gilt trellis, and shells burst on his canopy. Blow the canopy away first, then drop something on him from above. Or give him the greatest fall of all from below.",
@@ -380,6 +389,7 @@ function hangingByAThread(): LevelDef {
   m.chest(5.6, -5, { yaw: -0.3 });
   return {
     id: "hanging-by-a-thread",
+    weather: "rain",
     title: "Hanging by a Thread",
     verse: ["Humpty Dumpty sat on a swing,", "held up by nothing but four bits of string."],
     hint: "Chain shot cuts rope. Cut the ropes on one side to tip him out, or all four to drop him.",
@@ -419,6 +429,7 @@ function seeSawMargeryDaw(): LevelDef {
   m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "see-saw-margery-daw",
+    weather: "day",
     title: "See-Saw Margery Daw",
     verse: ["See-saw, Margery Daw,", "drop the anvil and watch the egg soar."],
     hint: "Knock the anvil onto the high end of the see-saw. And mind the rat: grab the blunderbuss (6) when it creeps in.",
@@ -465,6 +476,7 @@ function theQueensBilliards(): LevelDef {
   m.mousetrap(-5.4, 2.4, 0.5);
   return {
     id: "the-queens-billiards",
+    weather: "night",
     title: "The Queen's Billiards",
     verse: ["Humpty Dumpty hid out of sight,", "so the Queen played billiards by candlelight."],
     hint: "The screen stops round shot, but the bronze bumpers bounce it. Bank your shot — and drag to look behind the screen first.",
@@ -494,6 +506,7 @@ function rememberRemember(): LevelDef {
   m.chest(0, -6.2);
   return {
     id: "remember-remember",
+    weather: "night",
     title: "Remember, Remember",
     verse: ["Remember, remember the fifth of November,", "gunpowder, treason, and one flying egg."],
     hint: "The parapet stops round shot and the canopy stops shells. But there's powder in the cellar: lob a fizzing bomb (5) over the railings to the cellar door.",
@@ -530,6 +543,7 @@ function heyDiddleDiddle(): LevelDef {
   m.dresser(6.9, -3.6, -0.5);
   return {
     id: "hey-diddle-diddle",
+    weather: "night",
     title: "Hey Diddle Diddle",
     verse: ["Hey diddle diddle, a bed with a spring in the middle;", "the egg jumped over the moon."],
     hint: "A tumble off this little wall won't hurt him. Knock him back onto the royal bed and it will throw him sky-high.",
@@ -566,6 +580,7 @@ function rockABye(): LevelDef {
   m.chest(6.6, -5.2, { yaw: -0.3 });
   return {
     id: "rock-a-bye-baby",
+    weather: "storm",
     title: "Rock-a-bye Baby",
     verse: ["Rock-a-bye baby, the wind's on its way;", "when the lines break, the egg falls today."],
     hint: "Cut the lines now and he drops in the hay. Strike the wind machine first: when the cradle swings out over the boards, cut it down.",
@@ -621,6 +636,7 @@ function ringOfRoses(): LevelDef {
   });
   return {
     id: "ring-of-roses",
+    weather: "dawn",
     title: "Ring-a-ring o' Roses",
     verse: ["Ring-a-ring o' roses, a pocket full of posies;", "a-tishoo! a-tishoo! We ALL fall down."],
     hint: "The King's men dance round him and catch anything that falls. Shoot the stage lever and the trapdoors drop them, then knock him off before they climb back up.",
@@ -648,6 +664,7 @@ function rideACockHorse(): LevelDef {
   m.chest(-4.6, -1.8, { yaw: 0.3 });
   return {
     id: "ride-a-cock-horse",
+    weather: "day",
     title: "Ride a Cock-Horse",
     verse: ["Ride a cock-horse to Banbury Cross,", "where the Queen's weathercock turns at each toss."],
     hint: "He's behind the screen. Every shot that strikes the weathercock turns it an eighth of a turn; turn it to face him, then bank a shot off it.",
@@ -689,6 +706,7 @@ function cameTumblingAfter(): LevelDef {
   m.chest(5.6, -2.4, { yaw: -0.3 });
   return {
     id: "came-tumbling-after",
+    weather: "rain",
     title: "Came Tumbling After",
     verse: ["Up the hill the Queen's bomb went to fetch a pail of powder;", "down the chute it came tumbling, and the bang was rather louder."],
     hint: "Under the canopy he's safe from above, and the stone shed keeps its kegs dry. Drop a bomb in the hopper on the hill and let it roll down the chute into the shed.",
@@ -714,6 +732,7 @@ function roundTheMulberryBush(): LevelDef {
   m.chest(-5, -2.2, { yaw: 0.3 });
   return {
     id: "round-the-mulberry-bush",
+    weather: "snow",
     title: "Round the Mulberry Bush",
     verse: ["Here we go round the mulberry bush, so early in the morning;", "the children bat the cannonballs about without a word of warning."],
     hint: "He's behind the screen, but the children on the carousel bat shots about. Watch the arc as they turn, and fire when it glances round to him.",
@@ -740,6 +759,7 @@ function londonBridge(): LevelDef {
   m.chest(-4.6, -5.4, { yaw: 0.3 });
   return {
     id: "london-bridge",
+    weather: "storm",
     title: "London Bridge",
     verse: ["London Bridge is falling down, falling down, falling down;", "raise the gate and knock it down, my fair lady."],
     hint: "The portcullis stops round shot. Strike the iron counterweight beside the gatehouse and it winds up for a while: then shoot a post out from under the bridge.",
