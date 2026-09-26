@@ -26,6 +26,8 @@ import {
   buildRat,
   buildSandbag,
   buildTrapRing,
+  buildCarousel,
+  buildChute,
   buildTurntable,
   type RatRig,
   type GunRig,
@@ -49,6 +51,9 @@ const STAR_RISE = 1.9;
 const UNBATCHED = new Set(["daze", "sandwich", "mopper", "cat"]);
 /** The Queen stands on a podium stage-left of her battery. */
 const QUEEN_SPOT = { x: -4.4, y: 0.42, z: 7.4 };
+const smoothstep = (k: number): number => k * k * (3 - 2 * k);
+/** The Queen's stroll, in seconds: hop down, walk, look about, walk back, hop up. */
+const STROLL = { down: 0.45, look: 3.6, back: 8.2, up: 11.3, end: 11.75 };
 
 interface BodyVisual {
   view: BodyView;
@@ -67,6 +72,8 @@ interface BodyVisual {
   drum?: pc.Entity;
   /** The stage lever's handle. */
   lever?: pc.Entity;
+  /** The portcullis counterweight: it sinks as the gate rises. */
+  counterweight?: pc.Entity;
   /** How far the chest lid has opened, 0 to 1. */
   opened?: number;
 }
@@ -348,6 +355,8 @@ export class StageView {
     this.queenFlag.enabled = false;
     this.queen.root.setPosition(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
     this.queen.body.setLocalPosition(0, 0, 0);
+    this.strollAt = -1;
+    this.strollWait = 12;
     this.trapRing?.root.destroy();
     this.trapRing = undefined;
     const trap = game.trapView;
@@ -355,6 +364,14 @@ export class StageView {
       this.trapRing = buildTrapRing(this.kit, this.world, trap.inner, trap.outer);
       this.trapRing.root.setPosition(trap.center.x, 0, trap.center.z);
       this.batch(this.trapRing.root);
+    }
+    for (const chute of this.chutes) chute.destroy();
+    this.chutes.length = 0;
+    for (const piece of game.level.pieces) {
+      if (piece.kind !== "chute") continue;
+      const chute = buildChute(this.kit, this.world, piece.path, piece.width);
+      this.batch(chute);
+      this.chutes.push(chute);
     }
     for (const star of this.risingStars) star.root.destroy();
     this.risingStars.length = 0;
@@ -614,6 +631,7 @@ export class StageView {
       }
       if (visual.drum) visual.drum.rotateLocal(game.windy ? 14 : 0.4, 0, 0);
       if (visual.lever) visual.lever.setLocalEulerAngles(0, 0, game.trapView?.pulled ? -LEVER_THROW : LEVER_THROW);
+      if (visual.counterweight) visual.counterweight.setLocalPosition(0, -(game.gateView?.lift ?? 0) * 0.75, 0);
       if (visual.view.material === "bed") {
         const squash = Math.max(0, 1 - (this.elapsed - this.bedBounceAt) * 4);
         visual.root.setLocalScale(1 + squash * 0.06, 1 - squash * 0.22, 1 + squash * 0.06);
@@ -737,7 +755,9 @@ export class StageView {
         else buildLitterBed(this.kit, root, view.size);
         break;
       case "fixture": {
-        const fixture = buildFixture(this.kit, root, view.material, view.size);
+        const carousel = view.material === "carousel" ? this.game?.level.pieces.find((piece) => piece.kind === "carousel") : undefined;
+        const fixture = carousel?.kind === "carousel" ? buildCarousel(this.kit, root, carousel) : buildFixture(this.kit, root, view.material, view.size);
+        if (view.material === "counterweight") visual.counterweight = fixture.findByName("counterweight-body") as pc.Entity;
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
         if (view.material === "lever") visual.lever = fixture.findByName("lever-arm") as pc.Entity;
         break;
@@ -771,7 +791,7 @@ export class StageView {
         break;
     }
     // Things that animate inside (the wind drum, a chest lid) stay out of the batch.
-    if (BATCHED.has(view.kind) && !visual.drum && !visual.lever) this.batch(root);
+    if (BATCHED.has(view.kind) && !visual.drum && !visual.lever && !visual.counterweight) this.batch(root);
     return visual;
   }
 
@@ -1038,10 +1058,66 @@ export class StageView {
     }
   }
 
+  /**
+   * Now and then, when nothing needs her, the Queen hops off her podium and strolls down to the
+   * edge of the boards for a look at the stage, then strolls back. Returns her place and heading.
+   */
+  private queenStroll(dt: number): { at: pc.Vec3; heading: number; look: number; bob: number } | undefined {
+    const game = this.game;
+    const needed = !game || game.selected === "blunderbuss" || (game.ratView !== undefined && game.ratView.mode !== "off") || game.cracked || game.hoisting;
+    if (this.strollAt < 0) {
+      this.strollWait -= dt;
+      if (this.strollWait > 0 || needed || this.queenTalk > 0) return undefined;
+      this.strollAt = 0;
+    }
+    // Wanted back at the battery: skip the looking about and turn for home from wherever she is.
+    if (needed && this.strollAt < STROLL.back) {
+      const t = this.strollAt;
+      if (t < STROLL.down) this.strollAt = STROLL.end - (t / STROLL.down) * (STROLL.end - STROLL.up);
+      else if (t < STROLL.look) this.strollAt = STROLL.back + (1 - (t - STROLL.down) / (STROLL.look - STROLL.down)) * (STROLL.up - STROLL.back);
+      else this.strollAt = STROLL.back;
+    }
+    this.strollAt += dt * (needed ? 2.2 : 1);
+    const t = this.strollAt;
+    const home = V(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
+    const foot = V(QUEEN_SPOT.x + 0.2, 0, QUEEN_SPOT.z - 0.95);
+    const edge = V(QUEEN_SPOT.x + 0.8, 0, 3.7);
+    const heading = (from: pc.Vec3, to: pc.Vec3): number => Math.atan2(to.x - from.x, to.z - from.z) * DEG;
+    const hop = (from: pc.Vec3, to: pc.Vec3, k: number): pc.Vec3 => new pc.Vec3().lerp(from, to, k).add(V(0, Math.sin(k * Math.PI) * 0.22, 0));
+    if (t < STROLL.down) return { at: hop(home, foot, t / STROLL.down), heading: heading(home, edge), look: 0, bob: 0 };
+    if (t < STROLL.look) return { at: new pc.Vec3().lerp(foot, edge, smoothstep((t - STROLL.down) / (STROLL.look - STROLL.down))), heading: heading(foot, edge), look: 0, bob: 1 };
+    if (t < STROLL.back) {
+      // A look to one side, then the other, then a long hard look at the egg.
+      const k = t - STROLL.look;
+      const look = k < 1.2 ? Math.sin((k / 1.2) * Math.PI * 0.5) * 38 : k < 2.6 ? 38 - ((k - 1.2) / 1.4) * 76 : k < 3.4 ? -38 + ((k - 2.6) / 0.8) * 38 : 0;
+      return { at: edge, heading: 180, look, bob: 0 };
+    }
+    if (t < STROLL.up) return { at: new pc.Vec3().lerp(edge, foot, smoothstep((t - STROLL.back) / (STROLL.up - STROLL.back))), heading: heading(edge, foot), look: 0, bob: 1 };
+    if (t < STROLL.end) return { at: hop(foot, home, (t - STROLL.up) / (STROLL.end - STROLL.up)), heading: heading(foot, home), look: 0, bob: 0 };
+    this.strollAt = -1;
+    this.strollWait = 22 + Math.random() * 14;
+    return undefined;
+  }
+
+  private strollAt = -1;
+  private strollWait = 12;
+
   private animateQueen(dt: number): void {
     if (this.animateFinale(dt)) return;
     const queen = this.queen;
     const t = this.elapsed;
+    const stroll = this.queenStroll(dt);
+    if (stroll) {
+      const walking = stroll.bob > 0 ? Math.sin(t * 9) : 0;
+      queen.root.setPosition(stroll.at.x, stroll.at.y + Math.abs(walking) * 0.06, stroll.at.z);
+      queen.root.setLocalEulerAngles(0, stroll.heading, walking * 4);
+      queen.body.setLocalPosition(0, 0, 0);
+      queen.head.setLocalEulerAngles(stroll.look === 0 && stroll.bob === 0 ? -6 : 0, stroll.look, -7);
+      queen.arm.setLocalEulerAngles(0, 0, 20 + walking * 12);
+      queen.scepter.setLocalEulerAngles(0, 0, -9 + walking * 10);
+      return;
+    }
+    queen.root.setPosition(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
     this.queenPoint = Math.max(0, this.queenPoint - dt * 0.9);
     this.queenCheer = Math.max(0, this.queenCheer - dt * 0.25);
     this.queenSulk = Math.max(0, this.queenSulk - dt * 0.4);
@@ -1336,6 +1412,7 @@ export class StageView {
   private bedBounceAt = -10;
   private readonly risingStars: RisingStar[] = [];
   private trapRing: { root: pc.Entity; leaves: pc.Entity[]; pit: pc.Entity } | undefined;
+  private readonly chutes: pc.Entity[] = [];
   /** The Grand Finale: the Queen marches to centre stage and plants her flag. */
   private finale: { age: number; to: pc.Vec3; nextBurst: number; showered: boolean } | undefined;
   private readonly queenFlag: pc.Entity;

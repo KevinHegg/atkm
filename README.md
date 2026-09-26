@@ -50,7 +50,7 @@ unlock every verse.
   crew, the horse cart, the rat, or a curio such as the cow or Old King Cole). Knock that
   figure down with a munition and the star floats up off the stage. Like the others, it
   only counts if he cracks. Watch for the occasional glint. Your best mayhem per verse is kept.
-- **The Grand Finale.** Win all forty-eight stars (three in each of the sixteen verses)
+- **The Grand Finale.** Win all sixty stars (three in each of the twenty verses)
   and the Queen herself takes centre stage to plant her standard beside the broken egg.
 - **A great fall** (at least the verse's height, shown by the surveyor's line) earns a
   mayhem bonus on top of the crack.
@@ -87,7 +87,14 @@ unlock every verse.
   when they'll be back). Strike the stagehands' wind machine and a gale rocks anything
   hanging on a line, harder and harder, for a few seconds. It never bends your shot.
   Pull the stage lever and a ring of trapdoors drops the King's men beneath the boards;
-  they climb back out a few seconds later.
+  they climb back out a few seconds later. Strike a gatehouse's iron counterweight and
+  its portcullis winds up for a while.
+- **Machines.** The last five verses are built round contraptions that redirect a shot.
+  The Queen's weathercock is a bronze plate on a pole that turns an eighth of a turn each
+  time it's struck: set it with one shot, bank the next off it. A bomb dropped in a chute's
+  hopper rolls down the trough, fuse fizzing, to wherever it leads. The mulberry-bush
+  carousel's cut-out children bat shots about as they turn; its aim arc shows where they
+  will be when the shot arrives, so wait for the arc to swing round, then fire.
 - **Bumpers and screens.** Bronze bumpers bounce round shot cleanly. Painted screens
   and hedges hide what's behind them, including hay.
 - **The rat.** In later verses a giant rat creeps out of the wings to gnaw the Queen's
@@ -137,7 +144,7 @@ src/sim/      rules and physics, headless, no rendering
                 fixtures, bumpers, hedges, turntables, swings, see-saws, canopies,
                 maypoles, gongs, railings, houses, chests, beds, wind machines, cradles,
                 trapdoor rings)
-  levels.ts     the sixteen verses
+  levels.ts     the twenty verses
   ballistics.ts ammunition and launch solutions
   autoplay.ts   headless play-through used by tests and the solver
   par.json      one recorded winning line per verse

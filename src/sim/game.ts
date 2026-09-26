@@ -14,6 +14,8 @@ import {
   SANDBAG_SIZE,
   SEESAW_FLOOR,
   TURNTABLE_SEAT,
+  hopperBoards,
+  hopperFrame,
   type FixtureDef,
   type ChestDef,
   type LevelDef,
@@ -22,9 +24,13 @@ import {
   type SwingDef,
   type TrapDef,
   type TurntableDef,
+  type VaneDef,
+  type ChuteDef,
+  type CarouselDef,
+  type GateDef,
 } from "./level.js";
 import { CURIOS } from "./curios.js";
-import { add, closestBetweenSegments, closestOnSegment, distanceToSegment, rotate, segmentDistance, yAxisTo } from "./geometry.js";
+import { add, axisAngle, closestBetweenSegments, closestOnSegment, distanceToSegment, rotate, scale, segmentDistance, troughFrame, yAxisTo } from "./geometry.js";
 import { FALL_POINTS, MayhemTally, type MayhemKind } from "./mayhem.js";
 import { createRat, scareRat, stepRat, type RatState } from "./rat.js";
 import {
@@ -83,6 +89,7 @@ const SHOT_RADIUS_CHAIN = 0.17;
 const CHAIN_FOLLOW = 0.45;
 /** Shared by every aim preview; made once Rapier has loaded. */
 let chainBall: RAPIER.Ball | undefined;
+const paddleProbes = new Map<number, RAPIER.Ball>();
 
 /** Where the first chain ball sits from the pair's middle, t s after firing: across and forward. */
 function chainOffset(t: number): { across: number; forward: number } {
@@ -92,6 +99,15 @@ function chainOffset(t: number): { across: number; forward: number } {
   const turn = start + ((2 * CHAIN_SPIN * Math.cos(start)) / CHAIN_LENGTH) * (t - taut);
   return { across: (CHAIN_LENGTH / 2) * Math.cos(turn), forward: (CHAIN_LENGTH / 2) * Math.sin(turn) };
 }
+/** How fast a struck weathercock swings round to its next setting (rad/s). */
+const VANE_TURN = 3;
+/** The carousel's paddles: thickness, and how cleanly shots glance off them. */
+const PADDLE_THICK = 0.14;
+const PADDLE_BOUNCE = 0.85;
+/** The portcullis: up in `GATE_RISE`, held for `GATE_TIME`, then lowered over `GATE_FALL` seconds. */
+export const GATE_RISE = 0.9;
+export const GATE_TIME = 8;
+export const GATE_FALL = 2.5;
 /** A forced chest: one to replace the shot that opened it, and two more for the emptiest racks. */
 const CHEST_EXTRA = 2;
 /** Height of the rail round the music box's seat. */
@@ -298,6 +314,11 @@ export class Game {
   private needsHoist = false;
   private lastStock: StockKind = "shot";
   private turntable: { entity: Entity; def: TurntableDef; angle: number; omega: number } | undefined;
+  private readonly vanes: Array<{ entity: Entity; angle: number; target: number; step: number }> = [];
+  private carousel: { entity: Entity; def: CarouselDef; angle: number } | undefined;
+  private gate: { entity: Entity; def: GateDef; openedAt: number } | undefined;
+  /** Sensors in the mouths of chute hoppers: a shot dropping in pays once. */
+  private readonly hoppers = new Map<number, { scored: boolean }>();
   private swing: { seat: Entity; def: SwingDef } | undefined;
   private seesaw: { plank: Entity; def: SeesawDef; restAngle: number } | undefined;
   private readonly ropes: Array<{ joint: RAPIER.ImpulseJoint; seat: Entity; local: Vec3; top: Vec3; cut: boolean }> = [];
@@ -334,6 +355,10 @@ export class Game {
       else if (piece.kind === "sandbag") this.addSandbag(piece);
       else if (piece.kind === "chest") this.addChest(piece);
       else if (piece.kind === "trap") this.trap = { def: piece, openedAt: -99 };
+      else if (piece.kind === "vane") this.addVane(piece);
+      else if (piece.kind === "chute") this.addChute(piece);
+      else if (piece.kind === "carousel") this.addCarousel(piece);
+      else if (piece.kind === "gate") this.addGate(piece);
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -554,6 +579,7 @@ export class Game {
       };
     };
     const ball = kind === "chain" ? (chainBall ??= new RAPIER.Ball(SHOT_RADIUS_CHAIN)) : undefined;
+    const spinner = this.carousel?.entity.body;
     // What the player is pointing at, if it's a curio shots fly through.
     const through = this.passThrough(target, kind);
     let passes: AimPreview["passes"];
@@ -572,7 +598,8 @@ export class Game {
       const length = lengthOf(segment);
       const direction = { x: segment.x / length, y: segment.y / length, z: segment.z / length };
       const ray = new RAPIER.Ray(previous, direction);
-      const contact = this.world.castRayAndGetNormal(ray, length, true, flags, filter);
+      // The carousel is left out of these casts: where its paddles are now is not where they'll be.
+      const contact = this.world.castRayAndGetNormal(ray, length, true, flags, filter, undefined, spinner);
       // How far along this step the shot gets before it strikes something (1: all the way).
       let stop = contact ? contact.timeOfImpact / length : Infinity;
       let ballHit: { handle: number; normal: Vec3 } | undefined;
@@ -580,13 +607,39 @@ export class Game {
         for (const sign of [1, -1]) {
           const a = ballAt(previous, flown - dt, sign);
           const b = ballAt(next, flown, sign);
-          const swept = this.world.castShape(a, { x: 0, y: 0, z: 0, w: 1 }, { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, ball, 0, 1, true, flags, filter);
+          const swept = this.world.castShape(a, { x: 0, y: 0, z: 0, w: 1 }, { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, ball, 0, 1, true, flags, filter, undefined, spinner);
           if (swept && swept.time_of_impact < stop) {
             stop = swept.time_of_impact;
-            // The ball's outward normal points at what it touched; that surface faces back at it.
-            ballHit = { handle: swept.collider.handle, normal: { x: -swept.normal1.x, y: -swept.normal1.y, z: -swept.normal1.z } };
+            // Rapier reports the struck surface's normal first, in world space, facing the ball.
+            ballHit = { handle: swept.collider.handle, normal: { x: swept.normal1.x, y: swept.normal1.y, z: swept.normal1.z } };
           }
         }
+      }
+      const paddle = this.paddleHit(previous, next, flown - dt, flown, SHOT_RADIUS[kind]);
+      if (paddle && paddle.u < stop) {
+        const at = { x: previous.x + segment.x * paddle.u, y: previous.y + segment.y * paddle.u, z: previous.z + segment.z * paddle.u };
+        points.push(at);
+        if (bounces < 3 && kind !== "shell" && kind !== "bomb") {
+          // Glance off the paddle as it sweeps past: a mirror bounce, carried along by the paddle.
+          const v = arcVelocity(launch, (step - 1 + paddle.u) * dt);
+          const rel = { x: v.x - paddle.surface.x, y: v.y - paddle.surface.y, z: v.z - paddle.surface.z };
+          const into = rel.x * paddle.normal.x + rel.y * paddle.normal.y + rel.z * paddle.normal.z;
+          const k = into < 0 ? (1 + PADDLE_BOUNCE) * into : 0;
+          launch = {
+            x: rel.x - k * paddle.normal.x + paddle.surface.x,
+            y: rel.y - k * paddle.normal.y + paddle.surface.y,
+            z: rel.z - k * paddle.normal.z + paddle.surface.z,
+          };
+          // Start the rest of the flight just clear of the paddle's face.
+          origin = { x: at.x + paddle.normal.x * 0.02, y: at.y + paddle.normal.y * 0.02, z: at.z + paddle.normal.z * 0.02 };
+          step = 0;
+          bounces += 1;
+          continue;
+        }
+        hit = at;
+        hitKind = "fixture";
+        hitNormal = paddle.normal;
+        break;
       }
       const reached = Math.min(1, stop);
       const along = (u: number): Vec3 => ({ x: previous.x + segment.x * u, y: previous.y + segment.y * u, z: previous.z + segment.z * u });
@@ -658,6 +711,36 @@ export class Game {
     const last = points[points.length - 1]!;
     if (aimedRope >= 0 && !cut.has(aimedRope) && distance(last, target) < CHAIN_LENGTH) cuts.unshift({ ...target });
     return { points, hit, hitKind, ...(hitNormal ? { hitNormal } : {}), ...(passes ? { passes } : {}), ...(cuts.length ? { cuts } : {}), reachable: solution.reachable, from, velocity };
+  }
+
+  /**
+   * Where a shot's path from a to b (flown t0 to t1 seconds after firing) first meets a carousel
+   * paddle, with each paddle where it will be by then. The path is turned back by however far the
+   * carousel will have turned, and swept, as the real ball, against the real paddles as they stand
+   * now. `u` is how far along a-b; `normal` faces the shot; `surface` is the paddle's velocity there.
+   */
+  private paddleHit(a: Vec3, b: Vec3, t0: number, t1: number, radius: number): { u: number; normal: Vec3; surface: Vec3 } | undefined {
+    const carousel = this.carousel;
+    if (!carousel) return undefined;
+    const { def } = carousel;
+    const axis = { x: def.pos.x, y: 0, z: def.pos.z };
+    const back = (point: Vec3, t: number): Vec3 => add(axis, rotate(yawQuat(-def.speed * t), { x: point.x - axis.x, y: point.y, z: point.z - axis.z }));
+    const from = back(a, t0);
+    const to = back(b, t1);
+    let shape = paddleProbes.get(radius);
+    if (!shape) {
+      shape = new RAPIER.Ball(radius);
+      paddleProbes.set(radius, shape);
+    }
+    const body = carousel.entity.body;
+    const hit = this.world.castShape(from, { x: 0, y: 0, z: 0, w: 1 }, { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z }, shape, 0, 1, false, undefined, undefined, undefined, undefined, (collider) => collider.parent()?.handle === body.handle);
+    if (!hit) return undefined;
+    const u = hit.time_of_impact;
+    const at = { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
+    // Rapier gives the struck face's normal (world space, facing the shot): turn it forward again.
+    const normal = rotate(yawQuat(def.speed * (t0 + (t1 - t0) * u)), { x: hit.normal1.x, y: hit.normal1.y, z: hit.normal1.z });
+    const r = { x: at.x - axis.x, z: at.z - axis.z };
+    return { u, normal, surface: { x: def.speed * r.z, y: 0, z: -def.speed * r.x } };
   }
 
   /** Is the aim point on a curio? Shots fly straight through them, setting them off. */
@@ -790,6 +873,7 @@ export class Game {
     }
     this.updateCrews();
     this.updateTurntable();
+    this.updateMachines();
     this.updateRat();
     this.updateHoist();
     this.blow();
@@ -801,6 +885,7 @@ export class Game {
     this.time += STEP;
     this.steps += 1;
     this.handleCollisions();
+    this.wakeSupported();
     this.handleForces();
     this.handleExplosions();
     this.cutRopes();
@@ -936,6 +1021,158 @@ export class Game {
       ...(def.spring !== undefined ? { spring: def.spring } : {}),
       softness: def.soft ?? 1,
     });
+  }
+
+  // ---------------------------------------------------------------- machines
+
+  private addVane(def: VaneDef): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(def.pos.x, def.pos.y, def.pos.z).setRotation(yawQuat(def.angle)),
+    );
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(def.width / 2, def.height / 2, 0.08)
+        .setFriction(0)
+        .setRestitution(0.92)
+        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+        .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
+        .setCollisionGroups(GROUPS.static)
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+      body,
+    );
+    const entity = this.register("fixture", "vane", { x: def.width, y: def.height, z: 0.16 }, body, [collider], { look: "vane", bounce: 0.92 });
+    this.vanes.push({ entity, angle: def.angle, target: def.angle, step: def.step });
+  }
+
+  /** Struck: the weathercock swings a step further round (unless it is already swinging). */
+  private turnVane(entity: Entity): void {
+    const vane = this.vanes.find((item) => item.entity === entity);
+    if (!vane || vane.angle !== vane.target) return;
+    vane.target += vane.step;
+    this.events.push({ type: "turn", at: { ...entity.view.position } });
+  }
+
+  /** A trough of boards on a fixed frame, and a three-sided hopper over its top end. */
+  private addChute(def: ChuteDef): void {
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    const board = (desc: RAPIER.ColliderDesc, at: Vec3, rotation: Quat): void => {
+      this.world.createCollider(
+        desc
+          .setTranslation(at.x, at.y, at.z)
+          .setRotation(rotation)
+          // Slick and dead: a bomb drops in without bouncing out, and slides down smartly.
+          .setFriction(0)
+          .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+          .setRestitution(0)
+          .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
+          .setCollisionGroups(GROUPS.static),
+        body,
+      );
+    };
+    const half = def.width / 2;
+    for (let index = 0; index + 1 < def.path.length; index += 1) {
+      const a = def.path[index]!;
+      const b = def.path[index + 1]!;
+      const frame = troughFrame(a, b);
+      const long = frame.length / 2 + 0.06;
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
+      board(RAPIER.ColliderDesc.cuboid(half, 0.04, long), add(mid, scale(frame.up, -0.04)), frame.rotation);
+      for (const side of [-1, 1]) {
+        board(RAPIER.ColliderDesc.cuboid(0.04, 0.2, long), add(add(mid, scale(frame.across, side * (half + 0.04))), scale(frame.up, 0.16)), frame.rotation);
+      }
+    }
+    // The hopper: a low near side, a tall far side and a back, the downhill end left open.
+    for (const plank of hopperBoards(def.path, def.width)) board(RAPIER.ColliderDesc.cuboid(plank.size.x / 2, plank.size.y / 2, plank.size.z / 2), plank.center, plank.rotation);
+    const lift = hopperFrame(def.path).mouth;
+    const mouth = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(half + 0.3, 0.3, half + 0.3)
+        .setTranslation(lift.x, lift.y, lift.z)
+        .setSensor(true)
+        .setCollisionGroups(groups(G.STATIC, G.PROJ))
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+      body,
+    );
+    this.hoppers.set(mouth.handle, { scored: false });
+  }
+
+  private addCarousel(def: CarouselDef): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(def.pos.x, def.y, def.pos.z).setRotation(yawQuat(def.angle)),
+    );
+    const reach = (def.inner + def.outer) / 2;
+    const colliders: RAPIER.Collider[] = [];
+    for (let index = 0; index < def.paddles; index += 1) {
+      const turn = (index / def.paddles) * Math.PI * 2;
+      colliders.push(this.world.createCollider(
+        // Rounded edges: a shot catching a paddle's tip glances off predictably, not at random.
+        RAPIER.ColliderDesc.roundCuboid((def.outer - def.inner) / 2 - PADDLE_THICK / 2, def.height / 2 - PADDLE_THICK / 2, 0.005, PADDLE_THICK / 2 - 0.005)
+          .setTranslation(Math.cos(turn) * reach, 0, -Math.sin(turn) * reach)
+          .setRotation(yawQuat(turn))
+          .setFriction(0)
+          .setRestitution(PADDLE_BOUNCE)
+          .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min)
+          .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max)
+          .setCollisionGroups(GROUPS.static)
+          .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+        body,
+      ));
+    }
+    const entity = this.register("fixture", "carousel", { x: def.outer * 2, y: def.height, z: def.outer * 2 }, body, colliders, { look: "carousel", bounce: PADDLE_BOUNCE });
+    this.carousel = { entity, def, angle: def.angle };
+  }
+
+  private addGate(def: GateDef): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(def.pos.x, def.height / 2, def.pos.z).setRotation(yawQuat(def.yaw)),
+    );
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(def.width / 2, def.height / 2, 0.1).setFriction(0.6).setRestitution(0.1).setCollisionGroups(GROUPS.static),
+      body,
+    );
+    const entity = this.register("fixture", "portcullis", { x: def.width, y: def.height, z: 0.2 }, body, [collider], { look: "portcullis" });
+    this.gate = { entity, def, openedAt: -99 };
+  }
+
+  /** How far the portcullis is wound up, 0 (down) to 1 (right up). */
+  private gateLift(): number {
+    const gate = this.gate;
+    if (!gate) return 0;
+    const t = this.time - gate.openedAt;
+    if (t < 0 || t > GATE_RISE + GATE_TIME + GATE_FALL) return 0;
+    if (t < GATE_RISE) return 1 - (1 - t / GATE_RISE) ** 2;
+    if (t < GATE_RISE + GATE_TIME) return 1;
+    return 1 - (t - GATE_RISE - GATE_TIME) / GATE_FALL;
+  }
+
+  /** The counterweight is struck: up goes the portcullis. Not while it is still up or coming down. */
+  private raiseGate(): boolean {
+    if (!this.gate || this.gateLift() > 0) return false;
+    this.gate.openedAt = this.time;
+    return true;
+  }
+
+  get gateView(): { lift: number; left: number } | undefined {
+    if (!this.gate) return undefined;
+    return { lift: this.gateLift(), left: Math.max(0, this.gate.openedAt + GATE_RISE + GATE_TIME - this.time) };
+  }
+
+  /** The machines that turn on their own: struck weathercocks, the carousel, the portcullis. */
+  private updateMachines(): void {
+    for (const vane of this.vanes) {
+      if (vane.angle === vane.target) continue;
+      const left = vane.target - vane.angle;
+      vane.angle = Math.abs(left) <= VANE_TURN * STEP ? vane.target : vane.angle + Math.sign(left) * VANE_TURN * STEP;
+      vane.entity.body.setNextKinematicRotation(yawQuat(vane.angle));
+    }
+    const carousel = this.carousel;
+    if (carousel) {
+      carousel.angle += carousel.def.speed * STEP;
+      carousel.entity.body.setNextKinematicRotation(yawQuat(carousel.angle));
+    }
+    const gate = this.gate;
+    if (gate) {
+      const y = gate.def.height / 2 + this.gateLift() * (gate.def.height - 0.3);
+      gate.entity.body.setNextKinematicTranslation({ x: gate.def.pos.x, y, z: gate.def.pos.z });
+    }
   }
 
   private addTurntable(def: TurntableDef): void {
@@ -1719,7 +1956,17 @@ export class Game {
         const shot = this.byCollider.get(mine);
         if (shot?.spring && this.humpty && this.byCollider.get(other) === this.humpty) this.bounceHumpty(shot);
         if (!shot?.ammo || shot.view.removed) continue;
-        if (shot.view.kind === "bomb" && shot.fuseAt === undefined && !this.curios.has(other)) shot.fuseAt = this.time + BOMB_FUSE;
+        if (shot.view.kind === "bomb" && shot.fuseAt === undefined && !this.curios.has(other) && !this.hoppers.has(other)) shot.fuseAt = this.time + BOMB_FUSE;
+        const hopper = this.hoppers.get(other);
+        if (hopper) {
+          if (!hopper.scored && shot.ammo !== "blunderbuss") {
+            hopper.scored = true;
+            const p = shot.body.translation();
+            this.events.push({ type: "chute", at: { x: p.x, y: p.y, z: p.z } });
+            this.score("chute", { x: p.x, y: p.y, z: p.z });
+          }
+          continue;
+        }
         const curio = this.curios.get(other);
         // The Queen's blunderbuss is free and for vermin only: it earns nothing but a scared rat.
         const free = shot.ammo === "blunderbuss";
@@ -1744,6 +1991,7 @@ export class Game {
         if (owner.bounce && owner.look) {
           const v = shot.lastVelocity ?? shot.body.linvel();
           const p = shot.body.translation();
+          if (owner.look === "vane" && !free) this.turnVane(owner);
           this.events.push({ type: "ricochet", at: { x: p.x, y: p.y, z: p.z }, look: owner.look, strength: Math.min(1, lengthOf(v) / 20) });
           if (shot.ammo !== "blunderbuss") this.score("ricochet", { x: p.x, y: p.y, z: p.z });
         } else if (owner.cue && shot.ammo !== "blunderbuss") {
@@ -1762,12 +2010,13 @@ export class Game {
     const cue = fixture.cue;
     if (!cue || this.time - (fixture.cuedAt ?? -10) < 2) return;
     if (cue === "trap" && !this.springTrap()) return;
+    if (cue === "gate" && !this.raiseGate()) return;
     fixture.cuedAt = this.time;
     if (cue === "lunch") for (const crew of this.crews) callLunch(crew, this.time);
     if (cue === "wind") this.windUntil = this.time + WIND_TIME;
     const p = shot.body.translation();
     this.events.push({ type: "cue", cue, at: { x: p.x, y: p.y, z: p.z } });
-    if (cue !== "trap") this.score(cue === "wind" ? "wind" : "gong", { x: p.x, y: p.y, z: p.z });
+    if (cue !== "trap") this.score(cue === "wind" ? "wind" : cue === "gate" ? "gate" : "gong", { x: p.x, y: p.y, z: p.z });
   }
 
   private handleForces(): void {
@@ -2341,6 +2590,30 @@ export class Game {
         if (entity.view.kind === "grape" && entity.restFor > 2.5) this.remove(entity);
       }
     }
+  }
+
+  /**
+   * Bodies start asleep so a verse stands still, which means they never joined Rapier's contact
+   * islands: knock a post out from under a sleeping deck and the deck would hang in the air. So
+   * anything moving briskly wakes whatever it is still touching (collected first, woken after the
+   * query, since Rapier holds the world during its callbacks).
+   */
+  private wakeSupported(): void {
+    const sleepers = new Set<RAPIER.RigidBody>();
+    for (const entity of this.entities.values()) {
+      const body = entity.body;
+      if (!body.isDynamic() || body.isSleeping()) continue;
+      const v = body.linvel();
+      const w = body.angvel();
+      if (v.x * v.x + v.y * v.y + v.z * v.z < 0.36 && w.x * w.x + w.y * w.y + w.z * w.z < 1) continue;
+      for (const collider of entity.colliders) {
+        this.world.contactPairsWith(collider, (other) => {
+          const parent = other.parent();
+          if (parent && parent.isDynamic() && parent.isSleeping()) sleepers.add(parent);
+        });
+      }
+    }
+    for (const body of sleepers) body.wakeUp();
   }
 
   /** No shot still in the air or rolling fast, no lit fuse and no blast waiting to go off. */

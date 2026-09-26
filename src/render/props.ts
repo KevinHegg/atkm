@@ -1,5 +1,7 @@
 import * as pc from "playcanvas";
 import { EGG_BASE_T, eggRadius, eggY } from "../sim/egg.js";
+import { axisAngle, troughFrame } from "../sim/geometry.js";
+import { hopperBoards } from "../sim/level.js";
 import { hashUnit, palette, type Kit } from "./kit.js";
 
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
@@ -633,6 +635,93 @@ function buildCradle(kit: Kit, root: pc.Entity, size: { x: number; y: number; z:
   return root;
 }
 
+/**
+ * Here we go round the mulberry bush: a hub with cut-out children on paddles, and the bush on top.
+ * Built round the carousel's axis at the paddles' mid-height; the view turns it with the body.
+ */
+export function buildCarousel(kit: Kit, parent: pc.Entity, def: { inner: number; outer: number; height: number; paddles: number }): pc.Entity {
+  const root = kit.group("carousel", parent);
+  const gold = kit.material("gold", palette.gold, 0.72, 0.55);
+  const oak = kit.material("oak", palette.oak, 0.18);
+  const length = def.outer - def.inner;
+  const reach = (def.inner + def.outer) / 2;
+  const frocks = [palette.queen, palette.king, new pc.Color(0.25, 0.4, 0.7), new pc.Color(0.85, 0.55, 0.2), new pc.Color(0.5, 0.3, 0.6), new pc.Color(0.3, 0.55, 0.3)];
+  kit.primitive("hub", "cylinder", root, V(0, def.height / 2 - 0.05, 0), { x: def.inner * 2 + 0.2, y: 0.14, z: def.inner * 2 + 0.2 }, gold);
+  kit.primitive("hub-low", "cylinder", root, V(0, -def.height / 2 + 0.05, 0), { x: def.inner * 2 + 0.2, y: 0.1, z: def.inner * 2 + 0.2 }, gold);
+  for (let index = 0; index < def.paddles; index += 1) {
+    const turn = (index / def.paddles) * 360;
+    const arm = kit.group("paddle", root, V(), V(0, turn, 0));
+    const frock = frocks[index % frocks.length]!;
+    // A painted board with a child on each face, arms out, holding hands round the bush.
+    const parts: Box[] = [
+      { center: [reach, 0, 0], size: [length, def.height, 0.1], color: palette.cream },
+      { center: [reach, def.height / 2 - 0.05, 0], size: [length + 0.04, 0.1, 0.14], color: palette.oakDark },
+      { center: [reach, -def.height / 2 + 0.05, 0], size: [length + 0.04, 0.1, 0.14], color: palette.oakDark },
+      { center: [def.outer - 0.04, 0, 0], size: [0.08, def.height, 0.14], color: palette.oakDark },
+    ];
+    for (const side of [-1, 1]) {
+      const z = side * 0.06;
+      parts.push(
+        { center: [reach, -0.2, z], size: [0.46, 0.7, 0.02], color: frock },
+        { center: [reach, 0.3, z], size: [0.3, 0.32, 0.02], color: palette.skin },
+        { center: [reach, 0.48, z], size: [0.36, 0.1, 0.02], color: index % 2 ? palette.oakDark : palette.gold },
+        { center: [reach, 0.08, z], size: [length * 0.8, 0.07, 0.02], color: palette.skin },
+        { center: [reach - 0.1, -0.68, z], size: [0.08, 0.26, 0.02], color: palette.ink },
+        { center: [reach + 0.1, -0.68, z], size: [0.08, 0.26, 0.02], color: palette.ink },
+      );
+    }
+    kit.meshEntity("paddle-board", kit.boxes(`carousel-paddle-${index % frocks.length}-${length.toFixed(2)}x${def.height.toFixed(2)}`, parts), kit.paintMaterial(0.2), arm);
+    kit.primitive("paddle-rod", "cylinder", arm, V(reach, def.height / 2 + 0.02, 0), { x: 0.05, y: length, z: 0.05 }, oak, V(0, 0, 90), false);
+  }
+  // The mulberry bush itself, on top of the hub.
+  const bush = kit.material("hedge-leaf", new pc.Color(0.13, 0.3, 0.13), 0.08);
+  const berry = kit.material("mulberry", new pc.Color(0.3, 0.08, 0.25), 0.5);
+  for (const [dx, dy, dz, r] of [[0, 0.35, 0, 0.55], [0.3, 0.2, 0.15, 0.4], [-0.28, 0.22, -0.1, 0.42], [0.05, 0.25, -0.3, 0.38], [-0.1, 0.62, 0.1, 0.36]] as const) {
+    kit.primitive("bush", "sphere", root, V(dx, def.height / 2 + dy, dz), { x: r, y: r * 0.85, z: r }, bush);
+  }
+  for (let index = 0; index < 9; index += 1) {
+    const a = index * 2.4;
+    kit.primitive("berry", "sphere", root, V(Math.cos(a) * 0.36, def.height / 2 + 0.3 + (index % 3) * 0.14, Math.sin(a) * 0.36), { x: 0.09, y: 0.09, z: 0.09 }, berry, pc.Vec3.ZERO, false);
+  }
+  return root;
+}
+
+/** The chute: a plank trough down `path` on its trestles, and a hopper over the top end. */
+export function buildChute(kit: Kit, parent: pc.Entity, path: ReadonlyArray<{ x: number; y: number; z: number }>, width: number): pc.Entity {
+  const root = kit.group("chute", parent);
+  const plank = kit.material("oak", palette.oak, 0.18);
+  const dark = kit.material("oak-dark", palette.oakDark, 0.16);
+  const half = width / 2;
+  const place = (name: string, at: { x: number; y: number; z: number }, rotation: { x: number; y: number; z: number; w: number }, size: { x: number; y: number; z: number }, material: pc.StandardMaterial): void => {
+    const entity = kit.primitive(name, "box", root, V(at.x, at.y, at.z), size, material);
+    entity.setLocalRotation(rotation.x, rotation.y, rotation.z, rotation.w);
+  };
+  const offset = (a: { x: number; y: number; z: number }, d: { x: number; y: number; z: number }, k: number) => ({ x: a.x + d.x * k, y: a.y + d.y * k, z: a.z + d.z * k });
+  for (let index = 0; index + 1 < path.length; index += 1) {
+    const a = path[index]!;
+    const b = path[index + 1]!;
+    const frame = troughFrame(a, b);
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
+    const long = frame.length + 0.12;
+    place("trough-floor", offset(mid, frame.up, -0.04), frame.rotation, { x: width, y: 0.08, z: long }, plank);
+    for (const side of [-1, 1]) {
+      place("trough-side", offset(offset(mid, frame.across, side * (half + 0.04)), frame.up, 0.16), frame.rotation, { x: 0.08, y: 0.4, z: long }, dark);
+    }
+  }
+  // The hopper: low on the side facing the guns, a tall backstop behind.
+  for (const board of hopperBoards(path, width)) place("hopper-board", board.center, board.rotation, board.size, plank);
+  return root;
+}
+
+function quatMultiply(a: { x: number; y: number; z: number; w: number }, b: { x: number; y: number; z: number; w: number }): { x: number; y: number; z: number; w: number } {
+  return {
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+  };
+}
+
 /** How far the stage lever leans either way, in degrees. */
 export const LEVER_THROW = 16;
 
@@ -785,6 +874,68 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
     }
     for (let coil = 0; coil < 6; coil += 1) parts.push({ center: [-x / 2 + 0.3 + coil * ((x - 0.6) / 5), -y / 2 + 0.36, z / 2 + 0.01], size: [0.12, 0.12, 0.02], color: new pc.Color(0.55, 0.56, 0.58) });
     kit.meshEntity("bed", kit.boxes(`bed-${x.toFixed(2)}x${z.toFixed(2)}`, parts), kit.paintMaterial(0.25), root);
+    return root;
+  }
+  if (look === "vane") {
+    // The Queen's weathercock: a polished bronze plate with a gilt cockerel on top.
+    const bronze = kit.material("bumper-bronze", new pc.Color(0.7, 0.45, 0.16), 0.85, 0.8);
+    kit.primitive("plate", "box", root, V(), { x, y, z }, bronze);
+    for (const side of [-1, 1]) {
+      kit.primitive("rim", "box", root, V(0, (side * y) / 2, 0), { x: x + 0.08, y: 0.08, z: z + 0.06 }, gold);
+      kit.primitive("rim", "box", root, V((side * x) / 2, 0, 0), { x: 0.08, y: y + 0.08, z: z + 0.06 }, gold);
+    }
+    kit.primitive("spindle", "cylinder", root, V(0, -y / 2 - 0.1, 0), { x: 0.12, y: 0.2, z: 0.12 }, gold);
+    const cock = kit.group("cockerel", root, V(0, y / 2 + 0.36, 0));
+    kit.primitive("cock-body", "sphere", cock, V(), { x: 0.6, y: 0.42, z: 0.12 }, gold);
+    kit.primitive("cock-tail", "cone", cock, V(-0.34, 0.16, 0), { x: 0.34, y: 0.5, z: 0.08 }, gold, V(0, 0, 38));
+    kit.primitive("cock-head", "sphere", cock, V(0.28, 0.26, 0), { x: 0.2, y: 0.22, z: 0.1 }, gold);
+    kit.primitive("cock-comb", "box", cock, V(0.28, 0.4, 0), { x: 0.16, y: 0.1, z: 0.04 }, kit.material("lever-red", palette.king, 0.4), pc.Vec3.ZERO, false);
+    kit.primitive("cock-beak", "cone", cock, V(0.42, 0.26, 0), { x: 0.06, y: 0.12, z: 0.05 }, gold, V(0, 0, -90), false);
+    for (const dx of [-0.08, 0.08]) kit.primitive("cock-leg", "box", cock, V(dx, -0.26, 0), { x: 0.04, y: 0.16, z: 0.04 }, gold, pc.Vec3.ZERO, false);
+    return root;
+  }
+  if (look === "pier" || look === "lintel") {
+    // Dressed stone in courses, with a line of merlons along the top of the gatehouse.
+    const parts: Box[] = [];
+    const course = 0.45;
+    for (let row = 0; row * course < y - 0.01; row += 1) {
+      const h = Math.min(course, y - row * course);
+      const tone = row % 2 ? palette.stone : palette.stoneAlt;
+      parts.push({ center: [0, -y / 2 + row * course + h / 2, 0], size: [x, h - 0.03, z], color: tone });
+      parts.push({ center: [0, -y / 2 + row * course + h - 0.015, 0], size: [x - 0.02, 0.03, z - 0.02], color: palette.mortar });
+    }
+    if (look === "lintel") {
+      parts.push({ center: [0, 0, z / 2 + 0.01], size: [0.5, y - 0.1, 0.04], color: palette.stoneAlt });
+      for (let index = 0; index < Math.floor(x / 0.8); index += 1) {
+        parts.push({ center: [-x / 2 + 0.3 + index * 0.8, y / 2 + 0.2, 0], size: [0.45, 0.4, z], color: palette.stone });
+      }
+    }
+    kit.meshEntity(look, kit.boxes(`${look}-${x.toFixed(2)}x${y.toFixed(2)}`, parts), kit.paintMaterial(0.06), root);
+    return root;
+  }
+  if (look === "portcullis") {
+    // An iron grille with spiked feet. It rises bodily; the view doesn't need to know how.
+    const parts: Box[] = [];
+    const iron = palette.iron;
+    const bars = Math.max(3, Math.round(x / 0.32));
+    for (let index = 0; index <= bars; index += 1) parts.push({ center: [-x / 2 + (index * x) / bars, 0, 0], size: [0.07, y, 0.07], color: iron });
+    for (const k of [-0.35, 0, 0.35]) parts.push({ center: [0, k * y, 0], size: [x, 0.08, 0.09], color: iron });
+    kit.meshEntity("grille", kit.boxes(`portcullis-${x.toFixed(2)}x${y.toFixed(2)}`, parts), kit.material("iron", palette.iron, 0.55, 0.68), root);
+    for (let index = 0; index <= bars; index += 1) {
+      kit.primitive("spike", "cone", root, V(-x / 2 + (index * x) / bars, -y / 2 - 0.1, 0), { x: 0.1, y: 0.2, z: 0.1 }, kit.material("iron", palette.iron, 0.55, 0.68), V(180, 0, 0), false);
+    }
+    return root;
+  }
+  if (look === "counterweight") {
+    // A great iron weight on a chain from a pulley on the gatehouse: strike it and the gate rises.
+    const iron = kit.material("iron", palette.iron, 0.55, 0.68);
+    const weight = kit.group("counterweight-body", root);
+    kit.primitive("weight", "cylinder", weight, V(0, -0.05, 0), { x, y: y * 0.8, z }, iron);
+    kit.primitive("weight-band", "cylinder", weight, V(0, y * 0.2, 0), { x: x + 0.04, y: 0.08, z: z + 0.04 }, gold);
+    kit.primitive("weight-ring", "cylinder", weight, V(0, y / 2 + 0.08, 0), { x: 0.24, y: 0.05, z: 0.24 }, iron, V(90, 0, 0), false);
+    kit.primitive("weight-mark", "box", weight, V(0, -0.05, z / 2 + 0.01), { x: 0.32, y: 0.1, z: 0.02 }, kit.material("cream", palette.cream, 0.3), pc.Vec3.ZERO, false);
+    kit.primitive("chain", "box", root, V(0, y / 2 + 1.2, 0), { x: 0.05, y: 2.4, z: 0.05 }, iron, pc.Vec3.ZERO, false);
+    kit.primitive("pulley", "cylinder", root, V(0, y / 2 + 2.45, 0), { x: 0.5, y: 0.1, z: 0.5 }, gold, V(90, 0, 0));
     return root;
   }
   if (look === "lever") {

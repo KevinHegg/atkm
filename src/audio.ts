@@ -360,6 +360,18 @@ export class TheatreAudio {
     this.tone(95, 0.9, 0.12, "triangle", { to: 130, delay: 0.1, attack: 0.1 });
   }
 
+  /** A bomb rattling down the wooden chute: a falling slide-whistle over a timber rumble. */
+  chute(): void {
+    this.tone(1300, 1.1, 0.1, "sine", { to: 380, attack: 0.05 });
+    for (let index = 0; index < 8; index += 1) this.burst({ duration: 0.08, volume: 0.14, filter: "lowpass", frequency: 500, delay: index * 0.13 });
+  }
+
+  /** The portcullis winding up: a ratchet and a chain. */
+  portcullis(): void {
+    for (let index = 0; index < 10; index += 1) this.burst({ duration: 0.04, volume: 0.2, filter: "bandpass", frequency: 1800 + (index % 2) * 500, q: 5, delay: index * 0.08 });
+    this.tone(70, 0.9, 0.14, "triangle", { to: 110, attack: 0.1 });
+  }
+
   clang(): void {
     this.tone(880, 0.6, 0.18, "triangle", { to: 820 });
     this.tone(1320, 0.4, 0.08, "sine", { to: 1200 });

@@ -615,6 +615,125 @@ function ringOfRoses(): LevelDef {
   };
 }
 
+function rideACockHorse(): LevelDef {
+  const m = new Mason();
+  // A painted screen hides him from the gun. Off to the right stands the Queen's weathercock, a
+  // bronze plate on a tall pole: every blow turns it an eighth of the way round.
+  m.fixture("screen", -0.6, 0, -1.2, 5.2, 5.8, 0.4);
+  const top = m.pillar("stone", -1, -4, 4, { size: 1, height: 0.9 });
+  m.vane(5.4, -4.4, -1.8, { y: 3.2 });
+  // A shove backwards only puts him in the hay; he must go over sideways.
+  for (const x of [-2.2, -0.9, 0.4]) m.hay(x, -5.7);
+  m.hedge(-6.2, -3.6, 2.6, 1.6);
+  m.chest(-4.6, -1.8, { yaw: 0.3 });
+  return {
+    id: "ride-a-cock-horse",
+    title: "Ride a Cock-Horse",
+    verse: ["Ride a cock-horse to Banbury Cross,", "where the Queen's weathercock turns at each toss."],
+    hint: "He's behind the screen. Every shot that strikes the weathercock turns it an eighth of a turn; turn it to face him, then bank a shot off it.",
+    ammo: { shot: 4 },
+    greatFall: 3.4,
+    mayhem: 825,
+    star: { curio: "well" },
+    humpty: perchAt(-1, top, -4),
+    pieces: m.pieces,
+    crews: [],
+    view: view({ pitch: -20, distance: 22, target: { x: 1.2, y: 2.8, z: -2 } }),
+  };
+}
+
+function cameTumblingAfter(): LevelDef {
+  const m = new Mason();
+  // The powder shed: stone walls, a stone roof and three kegs inside. Its only way in is the
+  // chute, which runs down from a hopper on the hill.
+  const cx = 1.7;
+  const cz = -4.3;
+  m.wall("stone", cx, cz + 1.05, 3.1, 3);
+  m.wall("stone", cx, cz - 1.05, 3.1, 3);
+  for (let row = 0; row < 3; row += 1) {
+    const y = row * 0.502;
+    for (const z of [cz - 0.4, cz + 0.4]) m.block("stone", cx + 1.3, y, z, 0.5, 0.5, 0.8);
+    // The left wall is two thin jambs: the chute runs in between them, under the roof.
+    for (const z of [cz - 0.7, cz + 0.7]) m.block("stone", cx - 1.3, y, z, 0.5, 0.5, 0.2);
+  }
+  // He sits right on the shed's stone roof, which keeps a bomb's flash off the powder below.
+  const y = m.slab("stone", cx, 1.506, cz, 3.2, 2.7, 0.22);
+  // The powder is stacked at the front: when it goes, it throws him off the back.
+  m.keg(cx + 0.1, cz + 0.55);
+  m.keg(cx + 0.7, cz + 0.55);
+  m.keg(cx + 0.7, cz - 0.1);
+  // A broad royal canopy: bombs lobbed at him roll off it and go off outside the shed walls.
+  const seat = cz - 0.5;
+  m.canopy(cx, y, seat, { roof: 3.4 });
+  m.chute([{ x: -3, y: 3.1, z: -3.4 }, { x: -1.1, y: 1.65, z: cz }, { x: 0.1, y: 0.6, z: cz }, { x: cx - 0.4, y: 0.3, z: cz }]);
+  m.chest(5.6, -2.4, { yaw: -0.3 });
+  return {
+    id: "came-tumbling-after",
+    title: "Came Tumbling After",
+    verse: ["Up the hill the Queen's bomb went to fetch a pail of powder;", "down the chute it came tumbling, and the bang was rather louder."],
+    hint: "Under the canopy he's safe from above, and the stone shed keeps its kegs dry. Drop a bomb in the hopper on the hill and let it roll down the chute into the shed.",
+    ammo: { bomb: 3 },
+    greatFall: 4,
+    mayhem: 1400,
+    star: { curio: "jack-and-jill" },
+    humpty: perchAt(cx, y, seat),
+    pieces: m.pieces,
+    crews: [],
+    view: view({ pitch: -22, distance: 22, target: { x: -0.6, y: 2.4, z: -2.4 } }),
+  };
+}
+
+function roundTheMulberryBush(): LevelDef {
+  const m = new Mason();
+  // A screen hides him; beside it, the children go round and round the mulberry bush on a
+  // carousel. A shot that glances off one of them goes wherever the carousel has turned it.
+  m.fixture("screen", -0.8, 0, -1.3, 5.4, 6, 0.4);
+  const top = m.pillar("stone", -1.2, -4.2, 4, { size: 1, height: 0.9 });
+  m.carousel(4.8, -3, { y: 4, height: 1.6, outer: 1.9, speed: 0.8 });
+  for (const x of [-2.4, -1.1, 0.2]) m.hay(x, -5.9);
+  m.chest(-5, -2.2, { yaw: 0.3 });
+  return {
+    id: "round-the-mulberry-bush",
+    title: "Round the Mulberry Bush",
+    verse: ["Here we go round the mulberry bush, so early in the morning;", "the children bat the cannonballs about without a word of warning."],
+    hint: "He's behind the screen, but the children on the carousel bat shots about. Watch the arc as they turn, and fire when it glances round to him.",
+    ammo: { shot: 5 },
+    greatFall: 3.4,
+    mayhem: 750,
+    star: { crew: "bush-guard" },
+    humpty: perchAt(-1.2, top, -4.2),
+    pieces: m.pieces,
+    crews: [{ id: "bush-guard", kind: "guard", home: { x: 7.2, y: 0, z: -5.2 }, yaw: -0.4 }],
+    view: view({ pitch: -20, distance: 22, target: { x: 1.4, y: 2.8, z: -2 } }),
+  };
+}
+
+function londonBridge(): LevelDef {
+  const m = new Mason();
+  // A gatehouse, portcullis down. Behind it he sits on a little wooden bridge on two posts:
+  // raise the gate with its counterweight and shoot a post out through the arch.
+  m.gatehouse(0, -1.6, { width: 2.6, height: 2.8 });
+  // Slender posts right under the ends of the deck: lose one and that end drops at once.
+  for (const x of [-0.95, 0.95]) m.block("post", x, 0, -4.6, 0.24, 2.9, 0.24);
+  const deck = m.slab("plank", 0, 2.902, -4.6, 2.5, 1.1, 0.16);
+  for (const x of [-5.6, 5.6]) m.hedge(x, -3.4, 3.2, 3.2, Math.PI / 2);
+  m.chest(-4.6, -5.4, { yaw: 0.3 });
+  return {
+    id: "london-bridge",
+    title: "London Bridge",
+    verse: ["London Bridge is falling down, falling down, falling down;", "raise the gate and knock it down, my fair lady."],
+    hint: "The portcullis stops round shot. Strike the iron counterweight beside the gatehouse and it winds up for a while: then shoot a post out from under the bridge.",
+    ammo: { shot: 4 },
+    greatFall: 3,
+    mayhem: 775,
+    star: { curio: "tower" },
+    humpty: perchAt(0, deck, -4.6),
+    pieces: m.pieces,
+    crews: [],
+    view: view({ pitch: -18, distance: 21, target: { x: 0.4, y: 2.6, z: -2.2 } }),
+  };
+}
+
 export const LEVELS: readonly LevelDef[] = [
   satOnAWall(),
   hadAGreatFall(),
@@ -632,6 +751,10 @@ export const LEVELS: readonly LevelDef[] = [
   theKeep(),
   theEncore(),
   ringOfRoses(),
+  rideACockHorse(),
+  cameTumblingAfter(),
+  roundTheMulberryBush(),
+  londonBridge(),
 ];
 
 export function levelById(id: string): LevelDef | undefined {

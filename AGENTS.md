@@ -23,10 +23,18 @@ Core promises:
   a verse's shot.
 - A bomb's fuse is lit when it first lands. Stone and brick between a blast and a powder
   keg keep the keg from going off (the blast still pushes things).
-- Stage cues (the dinner gong, the wind machine, the trapdoor lever) are fixtures any
-  stock shot can strike; lunch lasts `LUNCH_BREAK` seconds and nothing, not even a
-  falling egg, interrupts it. The trapdoor (`Mason.trapRing`) drops every crew standing
-  on its ring for `TRAP_TIME` seconds; trapped crews can't be stunned or sent to lunch.
+- Stage cues (the dinner gong, the wind machine, the trapdoor lever, the portcullis
+  counterweight) are fixtures any stock shot can strike; lunch lasts `LUNCH_BREAK` seconds
+  and nothing, not even a falling egg, interrupts it. The trapdoor (`Mason.trapRing`) drops
+  every crew standing on its ring for `TRAP_TIME` seconds; trapped crews can't be stunned
+  or sent to lunch. The portcullis (`Mason.gatehouse`) rises for `GATE_TIME` seconds.
+- Machines are kinematic bodies driven in `updateMachines`: the weathercock (`Mason.vane`)
+  turns `step` per blow, the carousel (`Mason.carousel`) turns steadily, the portcullis
+  slides. The chute (`Mason.chute`) is a fixed trough with a scoring sensor in its hopper.
+  The aim arc leaves the carousel out of its casts and sweeps the ball against its paddles
+  where they will be when the shot arrives (`paddleHit`); keep that true if you change it.
+- Bodies start asleep so verses stand still. Anything moving briskly wakes whatever it is
+  still touching (`wakeSupported`), so nothing is left hanging when its support is shot away.
 - The gun reloads `FALLING_RELOAD` times faster while Humpty is airborne, so a parting
   shot or two can add mayhem before he lands, but never a volley.
 - The verse ends when Humpty cracks. Mayhem (`src/sim/mayhem.ts`) is scored in the

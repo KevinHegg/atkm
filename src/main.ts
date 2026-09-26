@@ -159,8 +159,17 @@ function later(seconds: number, action: () => void): void {
 
 /** The best mayhem before this attempt, so the result can say whether it was beaten. */
 let previousBest = 0;
-/** The forty-eighth star has just been won: the finale plays instead of the usual result. */
+/** The last of all the stars has just been won: the finale plays instead of the usual result. */
 let finalePending = false;
+
+/** Small numbers as the Queen would say them: 60 is "sixty", 48 "forty-eight". */
+function inWords(n: number): string {
+  const ones = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+  const tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+  if (n < 20) return ones[n]!;
+  if (n >= 100) return String(n);
+  return tens[Math.floor(n / 10)]! + (n % 10 ? `-${ones[n % 10]}` : "");
+}
 
 function totalStars(): number {
   return LEVELS.reduce((sum, level) => sum + (progress.stars[level.id] ?? 0), 0);
@@ -169,6 +178,7 @@ function totalStars(): number {
 /** The Grand Finale: the Queen marches to the broken egg and plants her standard. */
 function startFinale(): void {
   finalePending = false;
+  $("#finale-kicker").textContent = `All ${inWords(LEVELS.length * 3)} stars`;
   progress.finale = true;
   saveProgress();
   for (const bubble of [...bubbles]) dismissBubble(bubble);
@@ -181,7 +191,7 @@ function startFinale(): void {
   audio.applause(4);
   window.setTimeout(() => screen === "finale" && audio.fanfare(), 4600);
   window.setTimeout(() => screen === "finale" && audio.applause(6), 4800);
-  window.setTimeout(() => screen === "finale" && say("queen", "All forty-eight! The stage is MINE.", 4), 5200);
+  window.setTimeout(() => screen === "finale" && say("queen", `All ${inWords(LEVELS.length * 3)}! The stage is MINE.`, 4), 5200);
 }
 
 function recordStars(current: Game): void {
@@ -787,14 +797,17 @@ function updateStatus(): void {
   const status = $("#status");
   const lunch = game && screen === "play" ? game.lunchLeft : 0;
   const trap = game && screen === "play" ? game.trapLeft : 0;
-  if (lunch <= 0 && trap <= 0) {
+  const gate = game && screen === "play" ? (game.gateView?.left ?? 0) : 0;
+  if (lunch <= 0 && trap <= 0 && gate <= 0) {
     status.hidden = true;
     return;
   }
   status.hidden = false;
   const html = lunch > 0
     ? `The King's men are at lunch: back in <b>${Math.ceil(lunch)}</b> s`
-    : `The King's men are down the trapdoor: back up in <b>${Math.ceil(trap)}</b> s`;
+    : trap > 0
+      ? `The King's men are down the trapdoor: back up in <b>${Math.ceil(trap)}</b> s`
+      : `The portcullis is up: it comes down in <b>${Math.ceil(gate)}</b> s`;
   if (status.innerHTML !== html) status.innerHTML = html;
 }
 
@@ -1145,7 +1158,26 @@ function handle(event: GameEvent): void {
         later(0.5, () => cue("bucket", 1, 6));
       }
       break;
+    case "turn":
+      audio.creak();
+      if (live) later(0.5, () => cue("vane", 0.7, 6));
+      break;
+    case "chute":
+      audio.chute();
+      if (live) {
+        toast("Down the chute!", true);
+        later(0.8, () => cue("chute", 1, 5));
+      }
+      break;
     case "cue":
+      if (event.cue === "gate") {
+        audio.portcullis();
+        if (live) {
+          toast("Up she goes!", true, "The portcullis is up");
+          later(1, () => cue("gate", 1, 0));
+        }
+        break;
+      }
       if (event.cue === "trap") {
         audio.trapdoor();
         if (live) {

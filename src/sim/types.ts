@@ -20,10 +20,10 @@ export type StockKind = Exclude<AmmoKind, "blunderbuss">;
 export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole";
 
 /** Static scenery in the playing area: it stops shots but never moves. */
-export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever";
+export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever" | "vane" | "pier" | "lintel" | "counterweight" | "portcullis" | "carousel";
 
 /** Stage cues: strike one and the theatre does something that helps the Queen. */
-export type CueKind = "lunch" | "wind" | "trap";
+export type CueKind = "lunch" | "wind" | "trap" | "gate";
 
 /** Where a verse hides its star: in one of the King's crews, a curio, or the rat. */
 export type StarHolder = { crew: string } | { curio: CurioId } | { rat: true };
@@ -64,6 +64,8 @@ export type Speaker = "humpty" | "queen" | "men";
 export type GameEvent =
   | { type: "fire"; ammo: AmmoKind; from: Vec3; velocity: Vec3 }
   | { type: "impact"; at: Vec3; strength: number; material: string }
+  | { type: "turn"; at: Vec3 }
+  | { type: "chute"; at: Vec3 }
   | { type: "explode"; at: Vec3; radius: number; keg: boolean }
   | { type: "crack"; at: Vec3; fall: number; speed: number }
   | { type: "caught"; at: Vec3; by: "litter" | "hay" | "cart" | "ground" }

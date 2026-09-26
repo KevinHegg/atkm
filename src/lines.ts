@@ -33,7 +33,10 @@ export type Cue =
   | "star"
   | "bounce"
   | "gale"
-  | "trapdoor";
+  | "trapdoor"
+  | "gate"
+  | "chute"
+  | "vane";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -184,6 +187,18 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   bounce: {
     speaker: "humpty",
     lines: ["Wheeeee— I mean, stop that.", "This bed is FAR too bouncy!", "Up I go! And, er, down?"],
+  },
+  gate: {
+    speaker: "queen",
+    lines: ["Wind it up! Wind it UP!", "London Bridge is falling down, and so are you, egg.", "The gate is open. My patience is not."],
+  },
+  chute: {
+    speaker: "humpty",
+    lines: ["What is that rumbling?", "Did somebody post a parcel? Down the chute? Near the POWDER?", "I hear fizzing. I dislike fizzing."],
+  },
+  vane: {
+    speaker: "queen",
+    lines: ["Round she goes. Now, which way is the egg?", "The weathercock says: east wind, and a great fall.", "Turn, cockerel, turn."],
   },
   trapdoor: {
     speaker: "humpty",

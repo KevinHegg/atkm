@@ -1,4 +1,5 @@
-import type { BlockMaterial, CueKind, FixtureLook, StarHolder, StockKind, Vec3 } from "./types.js";
+import { axisAngle, quatFromBasis } from "./geometry.js";
+import type { BlockMaterial, CueKind, FixtureLook, Quat, StarHolder, StockKind, Vec3 } from "./types.js";
 
 export interface BlockDef {
   kind: "block";
@@ -97,6 +98,60 @@ export interface ChestDef {
   yaw: number;
 }
 
+/**
+ * A weathercock: a bronze plate on a pivot that shots bounce off cleanly. Every blow turns it a
+ * step further round, so one shot sets it and the next banks off it.
+ */
+export interface VaneDef {
+  kind: "vane";
+  /** Centre of the plate. */
+  pos: Vec3;
+  width: number;
+  height: number;
+  /** Where it starts (radians, like a fixture's yaw), and how far each blow turns it. */
+  angle: number;
+  step: number;
+}
+
+/**
+ * A wooden trough on trestles, with a hopper at the top: a lobbed bomb that drops in rolls down
+ * it and out of the far end, fuse fizzing. `path` runs down the middle of the trough's floor.
+ */
+export interface ChuteDef {
+  kind: "chute";
+  path: Vec3[];
+  width: number;
+}
+
+/**
+ * Here we go round the mulberry bush: cut-out children on arms that turn round a painted bush
+ * at a steady pace. Shots glance off them, so where one goes depends on when it arrives.
+ */
+export interface CarouselDef {
+  kind: "carousel";
+  /** The axis, on the boards. */
+  pos: Vec3;
+  /** Height of the middle of the paddles above the boards. */
+  y: number;
+  inner: number;
+  outer: number;
+  height: number;
+  paddles: number;
+  /** Radians per second (positive turns anticlockwise seen from above), and the starting turn. */
+  speed: number;
+  angle: number;
+}
+
+/** A portcullis between two piers. Strike its counterweight and it winds up for a while. */
+export interface GateDef {
+  kind: "gate";
+  /** Bottom middle of the opening, on the boards. */
+  pos: Vec3;
+  width: number;
+  height: number;
+  yaw: number;
+}
+
 /** A ring of stage trapdoors: pull the lever and anyone standing on them drops below. */
 export interface TrapDef {
   kind: "trap";
@@ -106,7 +161,7 @@ export interface TrapDef {
   outer: number;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef;
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef;
 
 /** A giant rat that creeps out of the wings to gnaw the Queen's powder. */
 export interface RatDef {
@@ -182,6 +237,58 @@ export const MAYPOLE_CROWN = { radius: 0.48, height: 0.12 };
 export const BUCKET_SIZE = { radius: 0.2, height: 0.36 };
 export const SANDBAG_SIZE = { radius: 0.32, height: 0.7 };
 export const CHEST_SIZE = { x: 0.9, y: 0.62, z: 0.6 };
+/**
+ * The boards of a chute's hopper round the head of its trough, as boxes (centre, rotation, size).
+ * Bombs are lobbed in from the front of the stage, so the side facing the guns is low and the
+ * far side is a tall backstop: a bomb can't clip the near rim or ride up and out over the far one.
+ */
+export function hopperBoards(path: readonly Vec3[], width: number): Array<{ center: Vec3; rotation: Quat; size: Vec3 }> {
+  const head = path[0]!;
+  const frame = hopperFrame(path);
+  const half = width / 2;
+  const splay = (22 * Math.PI) / 180;
+  const at = (rise: number, out: Vec3, lean: number): Vec3 => ({
+    x: head.x + out.x * lean,
+    y: head.y + (rise / 2) * Math.cos(splay),
+    z: head.z + out.z * lean,
+  });
+  const boards: Array<{ center: Vec3; rotation: Quat; size: Vec3 }> = [];
+  for (const side of [-1, 1]) {
+    const out = { x: frame.across.x * side, y: 0, z: frame.across.z * side };
+    const rise = out.z > 0 ? 0.45 : 1.7;
+    boards.push({
+      center: at(rise, out, half + (rise / 2) * Math.sin(splay)),
+      rotation: multiplyQuat(frame.rotation, axisAngle({ x: 0, y: 0, z: 1 }, -side * splay)),
+      size: { x: 0.08, y: rise, z: width + 1 },
+    });
+  }
+  const back = { x: -frame.along.x, y: 0, z: -frame.along.z };
+  boards.push({
+    center: at(1.1, back, half + 0.55 * Math.sin(splay)),
+    rotation: multiplyQuat(frame.rotation, axisAngle({ x: 1, y: 0, z: 0 }, -splay)),
+    size: { x: width + 1.2, y: 1.1, z: 0.08 },
+  });
+  return boards;
+}
+
+/** A hopper stands upright over the head of its trough, facing down the trough's first run. */
+export function hopperFrame(path: readonly Vec3[]): { along: Vec3; across: Vec3; rotation: Quat; mouth: Vec3 } {
+  const head = path[0]!;
+  const next = path[1]!;
+  const flat = Math.hypot(next.x - head.x, next.z - head.z) || 1;
+  const along = { x: (next.x - head.x) / flat, y: 0, z: (next.z - head.z) / flat };
+  const across = { x: along.z, y: 0, z: -along.x };
+  return { along, across, rotation: quatFromBasis(across, { x: 0, y: 1, z: 0 }, along), mouth: { x: head.x + along.x * 0.3, y: head.y + 0.5, z: head.z + along.z * 0.3 } };
+}
+
+function multiplyQuat(a: Quat, b: Quat): Quat {
+  return {
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+  };
+}
 
 /** Small builder so level layouts read as masonry rather than coordinates. */
 export class Mason {
@@ -360,6 +467,66 @@ export class Mason {
   trapRing(x: number, z: number, inner: number, outer: number, lever: { x: number; z: number; yaw?: number }): void {
     this.pieces.push({ kind: "trap", pos: { x, y: 0, z }, inner, outer });
     this.fixture("lever", lever.x, 0, lever.z, 0.5, 1.7, 0.4, { yaw: lever.yaw ?? 0, cue: "trap" });
+  }
+
+  /** A weathercock on a post: a bronze plate that bounces shots and turns `step` each time it's hit. */
+  vane(x: number, z: number, angle: number, opts: { y?: number; width?: number; height?: number; step?: number } = {}): void {
+    const height = opts.height ?? 2.2;
+    const y = opts.y ?? 1.2;
+    this.fixture("post", x, 0, z, 0.22, y, 0.22);
+    this.pieces.push({ kind: "vane", pos: { x, y: y + height / 2 + 0.05, z }, width: opts.width ?? 1.9, height, angle, step: opts.step ?? Math.PI / 4 });
+  }
+
+  /**
+   * A hopper and a trough: `path` is the trough floor from the hopper down to where it spills out.
+   * The hopper sits over the first point.
+   */
+  chute(path: Vec3[], width = 0.72): void {
+    this.pieces.push({ kind: "chute", path, width });
+    // Trestles under each bend, so it stands on the boards.
+    for (const point of path.slice(0, -1)) {
+      if (point.y > 0.5) this.fixture("post", point.x, 0, point.z, 0.18, point.y - 0.1, 0.18);
+    }
+  }
+
+  /** A carousel of paddles round a painted bush, turning at `speed` radians a second. */
+  carousel(x: number, z: number, opts: { y?: number; inner?: number; outer?: number; height?: number; paddles?: number; speed?: number; angle?: number } = {}): void {
+    const y = opts.y ?? 1.9;
+    const height = opts.height ?? 1.5;
+    this.fixture("column", x, 0, z, 0.36, y + height / 2 + 0.5, 0.36);
+    this.pieces.push({
+      kind: "carousel",
+      pos: { x, y: 0, z },
+      y,
+      inner: opts.inner ?? 0.45,
+      outer: opts.outer ?? 1.9,
+      height,
+      paddles: opts.paddles ?? 4,
+      speed: opts.speed ?? 0.9,
+      angle: opts.angle ?? 0,
+    });
+  }
+
+  /**
+   * A gatehouse: two stone piers, a lintel over the opening, a portcullis in it, and an iron
+   * counterweight hanging beside it. Strike the weight and the gate winds up for a while.
+   */
+  gatehouse(x: number, z: number, opts: { width?: number; height?: number; yaw?: number; weight?: { x: number; z: number } } = {}): { lintelTop: number } {
+    const width = opts.width ?? 2.6;
+    const height = opts.height ?? 2.8;
+    const yaw = opts.yaw ?? 0;
+    const pier = 1.1;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    for (const side of [-1, 1]) {
+      const offset = side * (width / 2 + pier / 2);
+      this.fixture("pier", x + offset * c, 0, z - offset * s, pier, height + 0.9, 1.2, { yaw });
+    }
+    const lintelTop = this.fixture("lintel", x, height, z, width + pier * 2, 0.9, 1.2, { yaw });
+    this.pieces.push({ kind: "gate", pos: { x, y: 0, z }, width, height, yaw });
+    const weight = opts.weight ?? { x: x + (width / 2 + pier + 0.6) * c, z: z - (width / 2 + pier + 0.6) * s };
+    this.fixture("counterweight", weight.x, 0.9, weight.z, 0.7, 0.9, 0.7, { yaw, cue: "gate" });
+    return { lintelTop };
   }
 
   /** A stagehand's wind machine: strike it and a gale blows across the stage for a while. */

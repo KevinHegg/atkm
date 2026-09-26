@@ -4,6 +4,51 @@ export const add = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z:
 const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
 const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z;
 
+export const scale = (v: Vec3, k: number): Vec3 => ({ x: v.x * k, y: v.y * k, z: v.z * k });
+
+/** A turn of `angle` radians about a unit `axis`. */
+export function axisAngle(axis: Vec3, angle: number): Quat {
+  const s = Math.sin(angle / 2);
+  return { x: axis.x * s, y: axis.y * s, z: axis.z * s, w: Math.cos(angle / 2) };
+}
+
+/** The rotation that takes x, y, z to the given right-handed orthonormal axes. */
+export function quatFromBasis(x: Vec3, y: Vec3, z: Vec3): Quat {
+  const trace = x.x + y.y + z.z;
+  if (trace > 0) {
+    const s = Math.sqrt(trace + 1) * 2;
+    return { w: s / 4, x: (y.z - z.y) / s, y: (z.x - x.z) / s, z: (x.y - y.x) / s };
+  }
+  if (x.x > y.y && x.x > z.z) {
+    const s = Math.sqrt(1 + x.x - y.y - z.z) * 2;
+    return { w: (y.z - z.y) / s, x: s / 4, y: (y.x + x.y) / s, z: (z.x + x.z) / s };
+  }
+  if (y.y > z.z) {
+    const s = Math.sqrt(1 + y.y - x.x - z.z) * 2;
+    return { w: (z.x - x.z) / s, x: (y.x + x.y) / s, y: s / 4, z: (z.y + y.z) / s };
+  }
+  const s = Math.sqrt(1 + z.z - x.x - y.y) * 2;
+  return { w: (x.y - y.x) / s, x: (z.x + x.z) / s, y: (z.y + y.z) / s, z: s / 4 };
+}
+
+/**
+ * A chute trough's frame from a down to b: `along` the run, `across` it (level), and `up` out of
+ * the floor; `rotation` takes a box's x, y, z to across, up, along.
+ */
+export function troughFrame(a: Vec3, b: Vec3): { along: Vec3; across: Vec3; up: Vec3; length: number; rotation: Quat } {
+  const run = sub(b, a);
+  const length = Math.hypot(run.x, run.y, run.z) || 1;
+  const along = scale(run, 1 / length);
+  const flat = Math.hypot(along.x, along.z) || 1;
+  const across = { x: along.z / flat, y: 0, z: -along.x / flat };
+  const up = {
+    x: along.y * across.z - along.z * across.y,
+    y: along.z * across.x - along.x * across.z,
+    z: along.x * across.y - along.y * across.x,
+  };
+  return { along, across, up, length, rotation: quatFromBasis(across, up, along) };
+}
+
 /** Rotate a vector by a unit quaternion. */
 export function rotate(q: Quat, v: Vec3): Vec3 {
   const tx = 2 * (q.y * v.z - q.z * v.y);

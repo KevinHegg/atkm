@@ -8,7 +8,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { candidateTargets, mayhemTargets, playOut, settleDrift, type PlannedShot } from "../src/sim/autoplay.js";
+import { candidateTargets, machineTargets, mayhemTargets, playOut, settleDrift, type PlannedShot } from "../src/sim/autoplay.js";
 import { LEVELS } from "../src/sim/levels.js";
 import type { StockKind } from "../src/sim/types.js";
 
@@ -42,10 +42,14 @@ for (const level of LEVELS) {
   const started = performance.now();
   const drift = await settleDrift(level);
   const targets = await candidateTargets(level);
-  const cueCount = level.pieces.filter((piece) => piece.kind === "fixture" && piece.cue).length;
+  // Stage cues and machinery head the target list: they open (and finish) two-shot lines.
+  const machines = machineTargets(level).length;
+  const cueCount = level.pieces.filter((piece) => piece.kind === "fixture" && piece.cue).length + machines;
   const kinds = (Object.keys(level.ammo) as StockKind[]).filter((kind) => (level.ammo[kind] ?? 0) > 0);
-  const moving = level.pieces.some((piece) => piece.kind === "turntable");
-  const waits = moving ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : level.crews.some((crew) => crew.patrol?.length) || level.rat ? [0, 2.5] : [0];
+  const moving = level.pieces.some((piece) => piece.kind === "turntable" || piece.kind === "carousel");
+  // The carousel's four paddles come round every couple of seconds: time it finely over one turn.
+  const carousel = level.pieces.some((piece) => piece.kind === "carousel");
+  const waits = carousel ? Array.from({ length: 21 }, (_, index) => index / 10) : moving ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : level.crews.some((crew) => crew.patrol?.length) || level.rat ? [0, 2.5] : [0];
   const singles: PlannedShot[] = [];
   for (const kind of kinds) {
     for (const at of targets) for (const wait of waits) singles.push({ ammo: kind, at: { x: round(at.x), y: round(at.y), z: round(at.z) }, wait });
@@ -71,6 +75,8 @@ for (const level of LEVELS) {
     const follows = (kind: StockKind): PlannedShot[] => [
       ...HUMPTY_OFFSETS.map((offset): PlannedShot => ({ ammo: kind, at: offset, relativeToHumpty: true })),
       ...under.map((at): PlannedShot => ({ ammo: kind, at: { x: round(at.x), y: round(at.y), z: round(at.z) } })),
+      // A second shot at the machinery: bank off the weathercock once it's turned, and so on.
+      ...targets.slice(cueCount - machines, cueCount).map((at): PlannedShot => ({ ammo: kind, at: { x: round(at.x), y: round(at.y), z: round(at.z) } })),
     ];
     for (const opener of openers) {
       for (const kind of kinds) {

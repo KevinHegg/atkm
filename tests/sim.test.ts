@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { arcPoint, solveLaunch } from "../src/sim/ballistics.js";
 import { Game, STEP } from "../src/sim/game.js";
 import { Mason, perchAt, type LevelDef } from "../src/sim/level.js";
+import { distanceToSegment } from "../src/sim/geometry.js";
 import type { GameEvent } from "../src/sim/types.js";
 
 function arena(build: (mason: Mason) => { x: number; y: number; z: number }, extra: Partial<LevelDef> = {}): LevelDef {
@@ -676,5 +677,109 @@ test("pointing at a swing rope aims at the rope, and chain shot's arc marks the 
   assert.ok(preview.cuts?.some((cut) => Math.hypot(cut.x - on.x, cut.y - on.y, cut.z - on.z) < 0.3), "the cut is marked");
   assert.ok(game.fire(picked));
   assert.ok((await run(game, 2)).some((event) => event.type === "rope-cut"), "and the chain cuts it");
+  game.destroy();
+});
+
+test("the weathercock turns an eighth of a turn each time it's struck, and bounces the shot", async () => {
+  const game = await Game.create(arena((mason) => {
+    mason.vane(4, -4, 0.3);
+    return perchAt(-6, 1, -6);
+  }, { ammo: { shot: 2 } }));
+  await stepUntilReady(game);
+  const plate = () => game.bodies.find((body) => body.material === "vane")!;
+  const yaw = () => 2 * Math.atan2(plate().rotation.y, plate().rotation.w);
+  const before = yaw();
+  assert.ok(game.fire({ ...plate().position }));
+  const events = await run(game, 1.5);
+  assert.ok(events.some((event) => event.type === "ricochet"));
+  assert.ok(events.some((event) => event.type === "turn"));
+  assert.ok(Math.abs(yaw() - before - Math.PI / 4) < 0.01, `turned ${(((yaw() - before) * 180) / Math.PI).toFixed(1)} degrees`);
+  game.destroy();
+});
+
+test("the portcullis winds up when its counterweight is struck, lets shot through, and comes down again", async () => {
+  const { GATE_RISE, GATE_TIME, GATE_FALL } = await import("../src/sim/game.js");
+  const game = await Game.create(arena((mason) => {
+    mason.gatehouse(0, -3);
+    return perchAt(-6, 1, -6);
+  }, { ammo: { shot: 2 } }));
+  await stepUntilReady(game);
+  const through = { x: 0, y: 1.2, z: -3 };
+  assert.ok((game.aim(through, "shot").hit?.z ?? -99) > -3.2, "the gate stops the arc");
+  assert.ok(game.fire({ ...game.bodies.find((body) => body.material === "counterweight")!.position }));
+  const events = await run(game, 2);
+  assert.ok(events.some((event) => event.type === "cue" && event.cue === "gate"));
+  assert.equal(game.gateView!.lift, 1);
+  assert.ok((game.aim(through, "shot").hit?.z ?? -99) < -5, "the arc passes the open gate");
+  await run(game, GATE_RISE + GATE_TIME + GATE_FALL);
+  assert.equal(game.gateView!.lift, 0);
+  game.destroy();
+});
+
+test("a bomb dropped in the hopper rolls down the chute and goes off at the far end", async () => {
+  const path = [{ x: -3.9, y: 3.6, z: -3 }, { x: -1.4, y: 1.9, z: -4.3 }, { x: 0, y: 0.62, z: -4.3 }, { x: 1.3, y: 0.3, z: -4.3 }];
+  const game = await Game.create(arena((mason) => {
+    mason.chute(path);
+    return perchAt(-7, 1, -7);
+  }, { ammo: { bomb: 1 } }));
+  await stepUntilReady(game);
+  const { hopperFrame } = await import("../src/sim/level.js");
+  assert.ok(game.fire(hopperFrame(path).mouth));
+  const events = await run(game, 6);
+  assert.ok(events.some((event) => event.type === "chute"), "it drops into the hopper");
+  const blast = events.find((event) => event.type === "explode");
+  assert.ok(blast && blast.type === "explode" && blast.at.x > 0.4 && blast.at.y < 1.2, "and goes off down at the end of the trough");
+});
+
+test("the carousel's aim arc bounces off its paddles where they will be when the shot arrives", async () => {
+  const level = arena((mason) => {
+    mason.carousel(0, -2, { y: 1.9, speed: 0.9 });
+    return perchAt(-6, 1, -6);
+  }, { ammo: { shot: 1 } });
+  // Over a spread of moments and aims, the real ball should follow the predicted bounce closely
+  // for the first quarter of a second (a graze on a paddle's very tip is the odd one out).
+  let bounced = 0;
+  let close = 0;
+  for (const wait of [0, 25, 50, 75]) {
+    for (const x of [-1.2, -0.8, 0.8, 1.2]) {
+      const game = await Game.create(level);
+      await stepUntilReady(game);
+      for (let step = 0; step < wait; step += 1) game.step();
+      const target = { x, y: 1.9, z: -2 };
+      const preview = game.aim(target, "shot");
+      assert.ok(game.fire(target));
+      let hitAt = -1;
+      let stray = 0;
+      for (let step = 0; step < 60; step += 1) {
+        game.step();
+        if (hitAt < 0 && game.drainEvents().some((event) => event.type === "ricochet")) hitAt = step;
+        const ball = game.bodies.find((body) => body.kind === "shot");
+        if (!ball || hitAt < 0 || step > hitAt + 15) continue;
+        let nearest = Infinity;
+        for (let index = 1; index < preview.points.length; index += 1) nearest = Math.min(nearest, distanceToSegment(ball.position, preview.points[index - 1]!, preview.points[index]!));
+        stray = Math.max(stray, nearest);
+      }
+      if (hitAt >= 0) {
+        bounced += 1;
+        if (stray < 0.3) close += 1;
+      }
+      game.destroy();
+    }
+  }
+  assert.ok(bounced >= 12, `${bounced} shots struck a paddle`);
+  assert.ok(close / bounced >= 0.75, `${close} of ${bounced} followed the predicted bounce`);
+});
+
+test("knock a post from under a sleeping deck and the deck comes down", async () => {
+  const game = await Game.create(arena((mason) => {
+    for (const x of [-1.05, 1.05]) mason.block("post", x, 0, -4.6, 0.24, 2.9, 0.24);
+    mason.slab("plank", 0, 2.902, -4.6, 2.5, 1.1, 0.16);
+    return perchAt(-6, 1, -6);
+  }));
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: 1.05, y: 1.5, z: -4.6 }));
+  await run(game, 3);
+  const deck = game.bodies.find((body) => body.material === "plank")!;
+  assert.ok(deck.position.y < 2, `the deck fell to ${deck.position.y.toFixed(2)} m`);
   game.destroy();
 });

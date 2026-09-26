@@ -1,6 +1,6 @@
 import { CURIOS } from "./curios.js";
 import { Game, STEP } from "./game.js";
-import type { LevelDef } from "./level.js";
+import { hopperFrame, type LevelDef } from "./level.js";
 import type { StockKind, Vec3 } from "./types.js";
 
 export interface PlannedShot {
@@ -140,6 +140,34 @@ export async function mayhemTargets(level: LevelDef): Promise<Array<{ label: str
 }
 
 /** Aim points worth trying: every structural body, Humpty, and the crews. */
+/**
+ * Where to aim at the stage machinery: the weathercock's plate, the carousel's paddles and the
+ * chute's hopper. These go first in the candidate list, as openers (and follow-ups) of two-shot lines.
+ */
+export function machineTargets(level: LevelDef): Vec3[] {
+  const points: Vec3[] = [];
+  for (const piece of level.pieces) {
+    if (piece.kind === "vane") {
+      const c = Math.cos(piece.angle);
+      const s = Math.sin(piece.angle);
+      for (const k of [0, -0.35, 0.35]) points.push({ x: piece.pos.x + k * c, y: piece.pos.y, z: piece.pos.z - k * s });
+    }
+    if (piece.kind === "chute") {
+      const mouth = hopperFrame(piece.path).mouth;
+      for (const [dx, dz] of [[0, 0], [-0.25, 0.15], [0.25, -0.15]]) points.push({ x: mouth.x + dx!, y: mouth.y, z: mouth.z + dz! });
+    }
+    if (piece.kind === "carousel") {
+      for (const r of [(piece.inner + piece.outer) / 2, piece.outer * 0.85]) {
+        for (let index = 0; index < 8; index += 1) {
+          const a = (index / 8) * Math.PI * 2;
+          points.push({ x: piece.pos.x + Math.cos(a) * r, y: piece.y, z: piece.pos.z - Math.sin(a) * r });
+        }
+      }
+    }
+  }
+  return points;
+}
+
 export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
   const game = await Game.create(level);
   try {
@@ -166,6 +194,9 @@ export async function candidateTargets(level: LevelDef): Promise<Vec3[]> {
         for (const dy of [-0.5, -0.25, 0, 0.25, 0.5]) points.push({ x: view.position.x, y: view.position.y + dy, z: view.position.z });
       }
     }
+    // The machinery goes right after the stage cues.
+    const cueCount = level.pieces.filter((piece) => piece.kind === "fixture" && piece.cue).length;
+    points.splice(cueCount, 0, ...machineTargets(level));
     for (const rope of game.ropeViews) {
       for (const k of [0.25, 0.5, 0.75]) {
         points.push({

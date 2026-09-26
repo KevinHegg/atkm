@@ -155,17 +155,17 @@
     {
       "ammo": "shot",
       "at": {
-        "x": -0.35,
-        "y": 2.14,
-        "z": -1.4
+        "x": -3.72,
+        "y": 0.8,
+        "z": -7.4
       },
       "wait": 0
     },
     {
       "ammo": "shot",
       "at": {
-        "x": 0,
-        "y": 0.2,
+        "x": 0.38,
+        "y": 0.1,
         "z": 0
       },
       "relativeToHumpty": true
@@ -200,6 +200,66 @@
         "z": 0
       },
       "relativeToHumpty": true
+    }
+  ],
+  "ride-a-cock-horse": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 5.4,
+        "y": 4.35,
+        "z": -4.4
+      },
+      "wait": 0
+    },
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 5.48,
+        "y": 4.35,
+        "z": -4.74
+      }
+    }
+  ],
+  "came-tumbling-after": [
+    {
+      "ammo": "bomb",
+      "at": {
+        "x": -2.98,
+        "y": 3.6,
+        "z": -3.38
+      },
+      "wait": 0
+    }
+  ],
+  "round-the-mulberry-bush": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 3.66,
+        "y": 4,
+        "z": -4.14
+      },
+      "wait": 1.8
+    }
+  ],
+  "london-bridge": [
+    {
+      "ammo": "shot",
+      "at": {
+        "x": 3,
+        "y": 1.35,
+        "z": -1.6
+      },
+      "wait": 0
+    },
+    {
+      "ammo": "shot",
+      "at": {
+        "x": -0.95,
+        "y": 1.45,
+        "z": -4.6
+      }
     }
   ]
 }
