@@ -833,7 +833,7 @@ export class StageView {
           ? buildCarousel(this.kit, root, carousel)
           : revolve?.kind === "revolve"
             ? buildRevolve(this.kit, root, revolve)
-            : buildFixture(this.kit, root, view.material, view.size);
+            : buildFixture(this.kit, root, view.material, view.size, view.position);
         if (view.material === "capstan") visual.capstan = fixture.findByName("capstan-head") as pc.Entity;
         if (view.material === "counterweight") visual.counterweight = fixture.findByName("counterweight-body") as pc.Entity;
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;

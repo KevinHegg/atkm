@@ -666,6 +666,23 @@ function renderTray(): void {
   tray.classList.toggle("crowded", tray.children.length >= 4);
 }
 
+/** Right-click: the next kind of shot along the tray, left to right, and round to the first again. */
+function cycleAmmo(): void {
+  const current = game;
+  if (!current || screen !== "play") return;
+  const kinds = AMMO_ORDER.filter((kind) => (kind === "blunderbuss" ? current.vermin : current.issued[kind as StockKind] > 0));
+  const from = kinds.indexOf(current.selected);
+  // Past any rack that's empty, to the next one there's still shot in.
+  for (let step = 1; step < kinds.length; step += 1) {
+    const kind = kinds[(from + step) % kinds.length]!;
+    if (current.select(kind)) {
+      audio.click();
+      renderTray();
+      return;
+    }
+  }
+}
+
 function selectAmmo(kind: AmmoKind): void {
   if (!game || screen !== "play") return;
   if (game.select(kind)) {
@@ -952,6 +969,8 @@ function release(event: PointerEvent): void {
   pointers.delete(event.pointerId);
   if (!tracked || event.type === "pointercancel") return;
   if (tracked.type === "mouse" && tracked.button === 0 && !tracked.dragged) fire();
+  // A right-click (not a right-drag, which turns the view) steps to the next kind of shot.
+  if (tracked.type === "mouse" && tracked.button === 2 && !tracked.dragged) cycleAmmo();
 }
 
 canvas.addEventListener("pointerup", release);

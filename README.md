@@ -25,7 +25,8 @@ unlock every verse.
 - **Fire:** click. On touch screens, drag to aim and tap **Fire**.
 - **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom. **C** resets the view.
   Some verses hide things behind scenery; it pays to look.
-- **Change shot:** keys **1–5**, or the tray. **6** is the Queen's blunderbuss when a rat appears.
+- **Change shot:** right-click to step along the tray (left to right, then round again), keys
+  **1–5**, or the tray. **6** is the Queen's blunderbuss when a rat appears.
 - **How high is he?** The star for a great fall asks for a drop of so many metres. The chip at the
   top says how high he sits, and a surveyor's line from his feet to the boards shows it on stage
   at the start of each verse, whenever you aim at him, or when you hover over the chip.
@@ -86,7 +87,9 @@ unlock every verse.
   timing decides where he falls. A shot on the arm spins it. His swing hangs on four
   ropes that only chain shot can cut. His see-saw is a trebuchet: drop the anvil on
   the short end. His maypole is planted in the stage, and nothing moves it but chain
-  shot, which cuts it down like a tree. A royal canopy takes a mortar blast for him.
+  shot, which cuts it down like a tree. A royal canopy takes a mortar blast for him, and in the Encore a gilt trellis in front of
+  it stops anything fired straight at him: blow the canopy away first, or bring him down
+  from below.
   The Queen's four-poster bed is all springs: knock him onto it and it throws him
   sky-high. His rock-a-bye cradle hangs from a bough on two lines, soft to land in.
 - **Stage cues.** Some verses hide a small puzzle that sets the stage. Ring the dinner

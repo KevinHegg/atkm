@@ -317,8 +317,10 @@ function theEncore(): LevelDef {
   let y = m.wall("stone", 0, -2.4, 3.3, 5, { brick: { x: 1.1, y: 0.55, z: 1.1 } });
   y = m.slab("plank", 0, y, -2.4, 3.6, 1.6, 0.16);
   y = m.tower("oak", 0, -2.4, 4, { y });
-  // He takes his curtain call under a royal canopy: mortar shells burst on the roof, not on him.
+  // He takes his curtain call under a royal canopy (mortar shells burst on the roof, not on him)
+  // behind a gilt trellis screen that no shot fired straight at him gets through.
   m.canopy(0, y, -2.4);
+  m.fixture("trellis", 0, 3.6, -1, 2.8, 2.3, 0.1);
   for (const x of [-2.2, -0.8, 0.8, 2.2]) m.hay(x, -5.6);
   for (const x of [-7.2, 7.2]) m.hay(x, -0.2);
   m.sandbag(-3.4, 1.2, -3.3);
@@ -329,7 +331,7 @@ function theEncore(): LevelDef {
     id: "the-encore",
     title: "The Encore",
     verse: ["The audience stamped and demanded one more,", "so the Queen brought the whole of the royal armoury."],
-    hint: "He's under a royal canopy, so shells burst on the roof. Strip it away first, then make it the greatest fall of all.",
+    hint: "Nothing fired straight at him gets through the gilt trellis, and shells burst on his canopy. Blow the canopy away first, then drop something on him from above. Or give him the greatest fall of all from below.",
     ammo: { shot: 5, shell: 2, grape: 3, chain: 2, bomb: 2 },
     greatFall: 4.6,
     mayhem: 1175,
@@ -456,8 +458,9 @@ function theQueensBilliards(): LevelDef {
     for (const z of [-3.9, -4.75, -5.6]) m.hay(x, z);
   }
   m.hedge(-5, -5.6, 3.2, 1.6);
-  // Hidden behind the screen: bank a shot to reach it.
-  m.chest(-1.6, -5.2);
+  // Hidden behind the screen, up on a stone plinth right where banked shots fly past: bank one
+  // off the left bumper, high, to reach it.
+  m.chest(-2, -2.2, { y: m.pillar("stone", -2, -2.2, 6, { size: 0.95, height: 0.7 }), yaw: 0.2 });
   // A baited mousetrap, tucked away downstage left: knock it out and the rat goes for the cheese.
   m.mousetrap(-5.4, 2.4, 0.5);
   return {

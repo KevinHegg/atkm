@@ -823,7 +823,7 @@ export function buildSandbag(kit: Kit, parent: pc.Entity, size: { x: number; y: 
 }
 
 /** Immovable scenery in the playing area. */
-export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { x: number; y: number; z: number }): pc.Entity {
+export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { x: number; y: number; z: number }, at?: { x: number; y: number; z: number }): pc.Entity {
   const root = kit.group(`fixture-${look}`, parent);
   const { x, y, z } = size;
   const gold = kit.material("gold", palette.gold, 0.72, 0.55);
@@ -958,6 +958,41 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
     return root;
   }
   if (look === "dresser") return buildDresser(kit, root);
+  if (look === "trellis") {
+    // A gilt trellis on two crimson poles from the boards, with a fringed valance: you can see him
+    // through it, but nothing fired straight at him gets through.
+    const parts: Box[] = [];
+    const bar = 0.035;
+    const cells = 7;
+    for (let index = 0; index <= cells; index += 1) {
+      const u = -x / 2 + (index * x) / cells;
+      parts.push({ center: [u, 0, 0], size: [bar, y, bar], color: palette.gold });
+    }
+    const rows = Math.round(y / (x / cells));
+    for (let index = 0; index <= rows; index += 1) {
+      const v = -y / 2 + (index * y) / rows;
+      parts.push({ center: [0, v, 0], size: [x, bar, bar], color: palette.gold });
+    }
+    // A heavier gilt frame, and the poles it hangs between, down to the boards.
+    for (const side of [-1, 1]) {
+      parts.push({ center: [side * (x / 2 + 0.05), 0, 0], size: [0.1, y + 0.1, 0.12], color: palette.gold });
+      parts.push({ center: [0, side * (y / 2 + 0.03), 0], size: [x + 0.2, 0.08, 0.12], color: palette.gold });
+      // Down to the boards, from wherever the trellis hangs.
+      const floor = -(at?.y ?? y / 2);
+      parts.push({ center: [side * (x / 2 + 0.18), (floor + y / 2 + 0.3) / 2, 0], size: [0.14, y / 2 + 0.3 - floor, 0.14], color: palette.king });
+      parts.push({ center: [side * (x / 2 + 0.18), y / 2 + 0.36, 0], size: [0.22, 0.12, 0.22], color: palette.gold });
+      for (const band of [0.9, 2.2]) parts.push({ center: [side * (x / 2 + 0.18), floor + band, 0], size: [0.17, 0.06, 0.17], color: palette.gold });
+    }
+    // The valance: crimson and gold tabs along the top.
+    const tabs = 11;
+    for (let index = 0; index < tabs; index += 1) {
+      const u = -x / 2 + (index + 0.5) * (x / tabs);
+      parts.push({ center: [u, y / 2 + 0.02, 0.07], size: [x / tabs - 0.03, 0.26, 0.03], color: index % 2 ? palette.gold : palette.king });
+    }
+    kit.meshEntity("trellis", kit.boxes(`trellis-${x.toFixed(2)}x${y.toFixed(2)}@${(at?.y ?? 0).toFixed(2)}`, parts), kit.paintMaterial(0.55), root);
+    kit.primitive("trellis-crest", "sphere", root, V(0, y / 2 + 0.3, 0.02), { x: 0.34, y: 0.34, z: 0.1 }, gold);
+    return root;
+  }
   if (look === "capstan") {
     // The stagehands' capstan: a crimson drum on a heavy foot, and a spoked brass head that spins.
     const oak = kit.material("oak-dark", palette.oakDark, 0.16);

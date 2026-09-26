@@ -1027,3 +1027,21 @@ test("the rat ignores a mousetrap nobody has touched, but goes for the cheese on
   assert.ok(!caught.some((event) => event.type === "rat" && event.action === "steal"), "he steals nothing that visit");
   assert.ok(caught.some((event) => event.type === "mayhem" && event.kind === "mousetrap"));
 });
+
+test("when a rack runs empty the gun moves on to the next rack along the tray, round again, and stays put with none left", async () => {
+  const game = await Game.create(arena((mason) => perchAt(0, 1, -4), { ammo: { shot: 1, shell: 1, grape: 0, chain: 1 } }));
+  await stepUntilReady(game);
+  // Start in the middle: firing the last shell moves right, past the empty grapeshot rack, to chain.
+  assert.ok(game.select("shell"));
+  assert.ok(game.fire({ x: 6, y: 0.2, z: 3 }));
+  assert.equal(game.selected, "chain");
+  await stepUntilReady(game);
+  // Chain's last shot: nothing to the right, so round to the first rack.
+  assert.ok(game.fire({ x: 6, y: 0.2, z: 3 }));
+  assert.equal(game.selected, "shot");
+  await stepUntilReady(game);
+  // The last shot of all: nowhere to go, so it stays where it is.
+  assert.ok(game.fire({ x: 6, y: 0.2, z: 3 }));
+  assert.equal(game.selected, "shot");
+  game.destroy();
+});

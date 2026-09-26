@@ -899,14 +899,25 @@ export class Game {
     this.lastShotAt = this.time;
     this.settledFor = 0;
     this.events.push({ type: "fire", ammo: kind, from, velocity });
+    // That rack's empty: on to the next one along the tray with shot in it (nothing left, stay put).
     if (this.ammo[kind as StockKind] <= 0) {
-      const next = STOCK.find((candidate) => this.ammo[candidate] > 0);
+      const next = this.nextStocked(kind as StockKind);
       if (next) {
         this.selected = next;
         this.lastStock = next;
       }
     }
     return true;
+  }
+
+  /** The next rack along the tray (to the right, then round to the first again) with shot in it. */
+  private nextStocked(from: StockKind): StockKind | undefined {
+    const start = STOCK.indexOf(from);
+    for (let step = 1; step <= STOCK.length; step += 1) {
+      const kind = STOCK[(start + step) % STOCK.length]!;
+      if (this.ammo[kind] > 0) return kind;
+    }
+    return undefined;
   }
 
   private fireBlunderbuss(from: Vec3, velocity: Vec3): void {
@@ -2092,7 +2103,7 @@ export class Game {
         this.ammo[stole] -= 1;
         state.carrying = true;
         if (this.selected !== "blunderbuss" && this.ammo[this.selected as StockKind] <= 0) {
-          this.selected = STOCK.find((kind) => this.ammo[kind] > 0) ?? this.selected;
+          this.selected = this.nextStocked(this.selected as StockKind) ?? this.selected;
         }
         this.events.push({ type: "rat", action: "steal", at, stole });
       } else {
@@ -2116,7 +2127,7 @@ export class Game {
       entity.body.setNextKinematicTranslation({ x: state.x, y: 0, z: state.z });
       entity.body.setNextKinematicRotation(yawQuat(state.heading));
     }
-    if (this.selected === "blunderbuss" && !this.vermin) this.selected = this.ammo[this.lastStock] > 0 ? this.lastStock : STOCK.find((kind) => this.ammo[kind] > 0) ?? this.lastStock;
+    if (this.selected === "blunderbuss" && !this.vermin) this.selected = this.ammo[this.lastStock] > 0 ? this.lastStock : this.nextStocked(this.lastStock) ?? this.lastStock;
   }
 
   private startleRat(): void {

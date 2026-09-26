@@ -20,7 +20,7 @@ export type StockKind = Exclude<AmmoKind, "blunderbuss">;
 export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole" | "domino";
 
 /** Static scenery in the playing area: it stops shots but never moves. */
-export type FixtureLook = "hive" | "revolve" | "capstan" | "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever" | "vane" | "pier" | "lintel" | "counterweight" | "portcullis" | "carousel" | "chock" | "dresser";
+export type FixtureLook = "hive" | "revolve" | "capstan" | "trellis" | "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever" | "vane" | "pier" | "lintel" | "counterweight" | "portcullis" | "carousel" | "chock" | "dresser";
 
 /** Stage cues: strike one and the theatre does something that helps the Queen. */
 export type CueKind = "lunch" | "wind" | "trap" | "gate" | "release" | "hive" | "revolve";
