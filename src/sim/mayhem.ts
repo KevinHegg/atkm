@@ -27,6 +27,7 @@ export type MayhemKind =
   | "stagehand"
   | "gate"
   | "chute"
+  | "combo"
   | "tower"
   | "crack";
 
@@ -61,6 +62,7 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   stagehand: { points: 75, bill: "Stagehands flattened", shout: "Oi!" },
   gate: { points: 40, bill: "Portcullises raised", shout: "Up she goes!" },
   chute: { points: 60, bill: "Bombs down the chute", shout: "Wheee!" },
+  combo: { points: 0, bill: "Trick shots", shout: "Combo!" },
   tower: { points: 75, bill: "The royal box, rattled", shout: "Steady on!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };
@@ -97,4 +99,15 @@ export interface MayhemEvent {
   kind: MayhemKind;
   points: number;
   at: Vec3;
+  /** What to shout instead of the kind's usual word ("Combo ×4!"). */
+  label?: string;
+}
+
+/**
+ * A trick shot: one shot that sets off this many different kinds of mayhem earns a bonus on top.
+ * Nothing below three; the crack and the great fall don't count towards it.
+ */
+export function comboBonus(kinds: number): number {
+  if (kinds < 3) return 0;
+  return [100, 200, 350, 500][kinds - 3] ?? 700;
 }

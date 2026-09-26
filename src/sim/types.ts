@@ -65,6 +65,7 @@ export type GameEvent =
   | { type: "fire"; ammo: AmmoKind; from: Vec3; velocity: Vec3 }
   | { type: "impact"; at: Vec3; strength: number; material: string }
   | { type: "turn"; at: Vec3 }
+  | { type: "teeter"; at: Vec3; toward: { x: number; z: number } }
   | { type: "chute"; at: Vec3 }
   | { type: "explode"; at: Vec3; radius: number; keg: boolean }
   | { type: "crack"; at: Vec3; fall: number; speed: number }

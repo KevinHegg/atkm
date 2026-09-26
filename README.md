@@ -43,6 +43,10 @@ unlock every verse.
 - **The verse ends when he cracks.** Until then, everything you break, bowl over, ring or
   startle counts as **mayhem**, and the King sends you the bill. Each verse has a spare
   round shot for exploring: spend it on mischief, but save enough to finish the job.
+- **Trick shots.** One shot that sets off three or more different kinds of mischief (a bank
+  shot that bowls a crew and startles a curio, say) earns a combo bonus on the bill.
+- **On the brink.** Nudge Humpty to the very edge of his perch without knocking him off and he
+  teeters, arms windmilling, while the audience holds its breath. One more push...
 - **Parting shots.** While he's falling the gun crew reloads at double-quick time, so
   there's room for one more shot (perhaps two) of mayhem before he lands. Never a volley.
 - **Stars:** crack him; reach the verse's target of mayhem; and find the **hidden star**.

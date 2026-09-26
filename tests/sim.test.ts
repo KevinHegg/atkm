@@ -783,3 +783,30 @@ test("knock a post from under a sleeping deck and the deck comes down", async ()
   assert.ok(deck.position.y < 2, `the deck fell to ${deck.position.y.toFixed(2)} m`);
   game.destroy();
 });
+
+test("one shot that sets off three or more kinds of mischief earns a trick-shot bonus", async () => {
+  const { comboBonus } = await import("../src/sim/mayhem.js");
+  assert.equal(comboBonus(2), 0);
+  assert.ok(comboBonus(3) > 0 && comboBonus(4) > comboBonus(3));
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("the-powder-room")!);
+  await stepUntilReady(game);
+  // Round shot into the powder under his tower: kegs, hay, masonry and the King's men all at once.
+  assert.ok(game.fire({ x: 0, y: 0.4, z: -0.95 }));
+  const events = await run(game, 8);
+  const combo = events.find((event) => event.type === "mayhem" && event.kind === "combo");
+  assert.ok(combo && combo.type === "mayhem" && combo.label?.startsWith("Combo ×"), "a combo is scored");
+  assert.equal(game.mayhem.entries.get("combo")?.count, 1);
+  game.destroy();
+});
+
+test("nudged to the very edge of his perch, Humpty teeters", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("all-the-kings-horses")!);
+  await stepUntilReady(game);
+  game.select("grape");
+  assert.ok(game.fire({ x: 0, y: 5.4, z: -1.6 }));
+  const events = await run(game, 4);
+  assert.ok(events.some((event) => event.type === "teeter"), "he teeters");
+  game.destroy();
+});

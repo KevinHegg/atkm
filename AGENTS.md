@@ -35,6 +35,11 @@ Core promises:
   where they will be when the shot arrives (`paddleHit`); keep that true if you change it.
 - Bodies start asleep so verses stand still. Anything moving briskly wakes whatever it is
   still touching (`wakeSupported`), so nothing is left hanging when its support is shot away.
+- Each stock shot opens a combo tally (`Game.combo`); it closes at the next shot, at the crack
+  (before the crack is billed) or after two quiet seconds, and three or more distinct mayhem
+  kinds earn `comboBonus`. Par lines rarely combo, so mayhem targets still come from the solver.
+- Teetering (`checkTeeter`) is a query only: a probe a hand's breadth past him, the way he was
+  last shoved. It never pushes him; rides are exempt.
 - The gun reloads `FALLING_RELOAD` times faster while Humpty is airborne, so a parting
   shot or two can add mayhem before he lands, but never a volley.
 - The verse ends when Humpty cracks. Mayhem (`src/sim/mayhem.ts`) is scored in the

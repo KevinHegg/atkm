@@ -36,7 +36,9 @@ export type Cue =
   | "trapdoor"
   | "gate"
   | "chute"
-  | "vane";
+  | "vane"
+  | "teeter"
+  | "combo";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -187,6 +189,14 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   bounce: {
     speaker: "humpty",
     lines: ["Wheeeee— I mean, stop that.", "This bed is FAR too bouncy!", "Up I go! And, er, down?"],
+  },
+  combo: {
+    speaker: "queen",
+    lines: ["Did you SEE that? All of that, with one shot!", "That, egg, is what we call a trick shot.", "Bravo me. Bravissimo me."],
+  },
+  teeter: {
+    speaker: "humpty",
+    lines: ["Whoa. Whoa. WHOA.", "Nobody move. Nobody BREATHE.", "I meant to do that. I am perfectly balanced.", "Is it windy? It feels windy up here."],
   },
   gate: {
     speaker: "queen",

@@ -360,6 +360,15 @@ export class TheatreAudio {
     this.tone(95, 0.9, 0.12, "triangle", { to: 130, delay: 0.1, attack: 0.1 });
   }
 
+  /** A trick shot: a rising run of notes, one for each kind of mischief it set off. */
+  combo(kinds: number): void {
+    const scale = [523, 659, 784, 1047, 1319, 1568, 2093];
+    for (let index = 0; index < Math.min(kinds, scale.length); index += 1) {
+      this.tone(scale[index]!, 0.22, 0.12, "triangle", { delay: index * 0.07 });
+    }
+    this.tone(scale[Math.min(kinds, scale.length) - 1]!, 0.6, 0.08, "sine", { delay: kinds * 0.07 });
+  }
+
   /** A bomb rattling down the wooden chute: a falling slide-whistle over a timber rumble. */
   chute(): void {
     this.tone(1300, 1.1, 0.1, "sine", { to: 380, attack: 0.05 });

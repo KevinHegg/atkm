@@ -681,7 +681,7 @@ function updateObjectives(): void {
 /** Points float up from wherever the mayhem happened. Rubble is counted in one pop-up, not twenty. */
 const openPopups = new Map<MayhemKind, { element: HTMLElement; points: number; count: number; until: number; at: Vec3 }>();
 
-function popup(kind: MayhemKind, points: number, at: Vec3): void {
+function popup(kind: MayhemKind, points: number, at: Vec3, label?: string): void {
   const now = performance.now();
   const open = openPopups.get(kind);
   if (open && now < open.until && (kind === "masonry" || kind === "hay" || kind === "bowled" || kind === "keg" || kind === "trap")) {
@@ -694,8 +694,8 @@ function popup(kind: MayhemKind, points: number, at: Vec3): void {
   const host = $("#popups");
   if (host.children.length > 7) host.firstElementChild?.remove();
   const element = document.createElement("div");
-  element.className = `popup${kind === "crack" ? " big" : ""}`;
-  element.innerHTML = `<b>+${points}</b><span>${MAYHEM[kind].shout}</span>`;
+  element.className = `popup${kind === "crack" ? " big" : kind === "combo" ? " combo" : ""}`;
+  element.innerHTML = `<b>+${points}</b><span>${label ?? MAYHEM[kind].shout}</span>`;
   host.append(element);
   const entry = { element, points, count: 1, until: now + 450, at: { ...at } };
   openPopups.set(kind, entry);
@@ -1151,13 +1151,25 @@ function handle(event: GameEvent): void {
       playCurio(event.id);
       break;
     case "mayhem":
-      popup(event.kind, event.points, event.at);
+      popup(event.kind, event.points, event.at, event.label);
       audio.tally(event.points);
+      if (event.kind === "combo") {
+        audio.combo(Number(event.label?.match(/\d+/)?.[0] ?? 3));
+        if (live) {
+          audio.applause(1.4);
+          toast("Trick shot!", true, `${event.label ?? "Combo"} · +${event.points}`);
+          later(0.6, () => cue("combo", 1, 4));
+        }
+      }
       if (live && event.kind === "bucket") {
         audio.clang();
         audio.laugh();
         later(0.5, () => cue("bucket", 1, 6));
       }
+      break;
+    case "teeter":
+      audio.gasp();
+      if (live) later(0.25, () => cue("teeter", 1, 5));
       break;
     case "turn":
       audio.creak();

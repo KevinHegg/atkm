@@ -476,6 +476,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .popup b { font: 700 22px/1 var(--ui); color: var(--gold); font-variant-numeric: tabular-nums; }
 .popup span { font: italic 15px/1.1 var(--serif); color: var(--paper); }
 .popup.big b { font-size: 34px; }
+.popup.combo b { font-size: 30px; color: var(--gold); }
+.popup.combo span { font: 700 20px/1.1 var(--display); color: var(--gold); text-shadow: 2px 2px 0 var(--crimson); }
 @keyframes popup {
   0% { opacity: 0; translate: 0 10px; scale: 0.6; }
   12% { opacity: 1; translate: 0 0; scale: 1.1; }

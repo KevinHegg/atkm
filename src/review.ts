@@ -40,6 +40,8 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   const stories: Array<[boolean, number, () => string]> = [
     [count("star") > 0, 95, () => `STAR FOUND HIDING IN ${(input.starFrom ?? "the scenery").toUpperCase()}`],
     [count("royal") > 0, 90, () => "KING COLE OUTRAGED IN HIS OWN BOX"],
+    [count("combo") >= 2, 88, () => `${count("combo")} TRICK SHOTS IN ONE EVENING; GUNNER DEMANDS A BIGGER STAGE`],
+    [count("combo") === 1, 64, () => "ONE SHOT, A DOZEN DISASTERS: QUEEN'S TRICK SHOT STUNS STALLS"],
     [count("tower") > 0, 72, () => "ROYAL BOX SHAKEN TO ITS STILTS; FIDDLERS MISS A BEAT"],
     [count("stagehand") > 0, 62, () => "STAGEHANDS FLATTENED; SANDWICH LOST IN THE CONFUSION"],
     [count("bounce") >= 2, 58, () => "EGG BOUNCES ON ROYAL BED; SPRINGS CONFISCATED"],

@@ -31,7 +31,7 @@ import {
 } from "./level.js";
 import { CURIOS } from "./curios.js";
 import { add, axisAngle, closestBetweenSegments, closestOnSegment, distanceToSegment, rotate, scale, segmentDistance, troughFrame, yAxisTo } from "./geometry.js";
-import { FALL_POINTS, MayhemTally, type MayhemKind } from "./mayhem.js";
+import { FALL_POINTS, MayhemTally, comboBonus, type MayhemKind } from "./mayhem.js";
 import { createRat, scareRat, stepRat, type RatState } from "./rat.js";
 import {
   distance,
@@ -298,6 +298,13 @@ export class Game {
   private freeSteps = 0;
   private contactSteps = 0;
   private lastWobble = -10;
+  /** Which way he was last shoved along his perch, and when: a teeter needs a push toward a drop. */
+  private stirDir: { x: number; z: number } | undefined;
+  private stirredAt = -99;
+  private teeter: { toward: { x: number; z: number }; since: number } | undefined;
+  private lastTeeter = -99;
+  /** The mayhem the latest shot has set off so far, for its trick-shot bonus. */
+  private combo: { kinds: Set<MayhemKind>; at: Vec3; opened: number; last: number } | undefined;
   private lastNearMiss = -10;
   private caughtAt = -10;
   private settledFor = 0;
@@ -758,6 +765,11 @@ export class Game {
   fire(target: Vec3): boolean {
     if (!this.canFire()) return false;
     const kind = this.selected;
+    // A new shot settles the last one's account; the Queen's blunderbuss is for vermin, not tricks.
+    if (kind !== "blunderbuss") {
+      this.closeCombo();
+      this.combo = { kinds: new Set(), at: { ...target }, opened: this.time, last: this.time };
+    }
     this.log.push({ step: this.steps, ammo: kind, at: { ...target } });
     const preview = this.aim(target, kind);
     const { from, velocity } = preview;
@@ -1907,6 +1919,23 @@ export class Game {
     if (!this.log.length) return;
     const earned = this.mayhem.add(kind, points);
     this.events.push({ type: "mayhem", kind, points: earned, at: { ...at } });
+    const combo = this.combo;
+    if (combo && kind !== "crack" && kind !== "great" && kind !== "combo") {
+      combo.kinds.add(kind);
+      combo.at = { ...at };
+      combo.last = this.time;
+    }
+  }
+
+  /** The shot's account is settled: three or more kinds of mischief make it a trick shot. */
+  private closeCombo(): void {
+    const combo = this.combo;
+    this.combo = undefined;
+    if (!combo || this.cracked) return;
+    const bonus = comboBonus(combo.kinds.size);
+    if (!bonus) return;
+    const earned = this.mayhem.add("combo", bonus);
+    this.events.push({ type: "mayhem", kind: "combo", points: earned, at: combo.at, label: `Combo ×${combo.kinds.size}!` });
   }
 
   /** Count masonry that has come down and hay that has been scattered, once each. */
@@ -2169,6 +2198,8 @@ export class Game {
   private crackHumpty(speed: number): void {
     const humpty = this.humpty;
     if (!humpty || this.cracked || this.phase === "lost") return;
+    // The shot that did it is a trick shot too, if it earned it: that goes on the bill first.
+    this.closeCombo();
     this.cracked = true;
     this.won = true;
     this.phase = "won";
@@ -2274,6 +2305,7 @@ export class Game {
       this.lastWobble = this.time;
       this.events.push({ type: "wobble", at: { x: p.x, y: p.y, z: p.z } });
     }
+    this.checkTeeter(humpty, p, v, touching);
 
     const resting = speed < REST_SPEED && spin < 0.6;
     this.restTimer = resting ? this.restTimer + STEP : 0;
@@ -2299,6 +2331,7 @@ export class Game {
     }
 
     if (this.humptyAirborne) this.humptyMood = "falling";
+    else if (this.teeter) this.humptyMood = "nervous";
     else if (this.time - this.caughtAt < 3) this.humptyMood = "smug";
     else if (this.time - this.lastNearMiss < 1.6 || spin > 0.8) this.humptyMood = "nervous";
     else this.humptyMood = "calm";
@@ -2616,6 +2649,42 @@ export class Game {
     for (const body of sleepers) body.wakeUp();
   }
 
+  /**
+   * Teetering: shoved along his perch toward a drop and pulled up just short of it. We look a hand's
+   * breadth past him the way he was last moving; if there's nothing under that but a long way
+   * down, he's on the brink. (Rides move him all the time, so they don't count.)
+   */
+  private checkTeeter(humpty: Entity, p: Vec3, v: Vec3, touching: boolean): void {
+    const onRide = (this.level.perch ?? "highest") !== "highest";
+    const flat = Math.hypot(v.x, v.z);
+    if (touching && !this.humptyAirborne && flat > 0.3 && this.log.length) {
+      this.stirDir = { x: v.x / flat, z: v.z / flat };
+      this.stirredAt = this.time;
+    }
+    const dir = this.stirDir;
+    let brink = false;
+    if (dir && !onRide && touching && !this.humptyAirborne && this.time - this.stirredAt < 2.5 && lengthOf(v) < 1.2 && p.y - HUMPTY_REST > 1) {
+      const ray = new RAPIER.Ray({ x: p.x + dir.x * 0.5, y: p.y - 0.1, z: p.z + dir.z * 0.5 }, { x: 0, y: -1, z: 0 });
+      brink = this.world.castRay(ray, 1.2, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, humpty.body) === null;
+    }
+    if (!brink) {
+      this.teeter = undefined;
+      return;
+    }
+    if (!this.teeter) {
+      this.teeter = { toward: { ...dir! }, since: this.time };
+      if (this.time - this.lastTeeter > 4) {
+        this.lastTeeter = this.time;
+        this.events.push({ type: "teeter", at: { x: p.x, y: p.y, z: p.z }, toward: { ...dir! } });
+      }
+    }
+  }
+
+  /** Which way he's teetering, if he's on the brink. */
+  get teeterView(): { x: number; z: number } | undefined {
+    return this.teeter?.toward;
+  }
+
   /** No shot still in the air or rolling fast, no lit fuse and no blast waiting to go off. */
   private nothingPending(): boolean {
     if (this.pendingExplosions.length) return false;
@@ -2637,6 +2706,9 @@ export class Game {
   }
 
   private updatePhase(): void {
+    // A shot's account closes once things have gone quiet for a while.
+    const combo = this.combo;
+    if (combo && this.time - combo.last > 2 && this.time - combo.opened > 3) this.closeCombo();
     // While he falls the gun crew works double-quick: time for a parting shot or two, never a volley.
     if (this.reload > 0) this.reload = Math.max(0, this.reload - STEP * (this.humptyAirborne ? FALLING_RELOAD : 1));
     if (this.phase === "won") {

@@ -928,8 +928,21 @@ export class StageView {
 
     const flail = falling ? Math.sin(t * 22) * 50 : 0;
     const wave = nervous && !falling ? Math.sin(t * 6) * 10 : 0;
-    rig.arms[0]!.setLocalEulerAngles(0, 0, 35 + (falling ? 70 + flail : wave) + (hoisting ? 90 : 0));
-    rig.arms[1]!.setLocalEulerAngles(0, 0, -35 - (falling ? 70 - flail : -wave) - (hoisting ? 90 : 0));
+    const teeter = !falling ? game.teeterView : undefined;
+    if (teeter) {
+      // On the brink: arms out, windmilling like mad, and sweating.
+      const mill = t * 15;
+      rig.arms[0]!.setLocalEulerAngles(Math.cos(mill) * 45, 0, 95 + Math.sin(mill) * 40);
+      rig.arms[1]!.setLocalEulerAngles(Math.cos(mill + Math.PI) * 45, 0, -95 - Math.sin(mill + Math.PI) * 40);
+      if (this.elapsed > this.sweatAt) {
+        this.sweatAt = this.elapsed + 0.18;
+        const head = rig.root.getPosition();
+        this.spark(V(head.x + (Math.random() < 0.5 ? -0.32 : 0.32), head.y + 0.45, head.z + 0.3), V((Math.random() - 0.5) * 0.8, 0.8, 0.4), SWEAT);
+      }
+    } else {
+      rig.arms[0]!.setLocalEulerAngles(0, 0, 35 + (falling ? 70 + flail : wave) + (hoisting ? 90 : 0));
+      rig.arms[1]!.setLocalEulerAngles(0, 0, -35 - (falling ? 70 - flail : -wave) - (hoisting ? 90 : 0));
+    }
     rig.crown.setLocalEulerAngles(falling ? Math.sin(t * 25) * 12 : 0, 0, nervous ? Math.sin(t * 11) * 4 : 0);
     // Left in peace, he keeps himself busy: the paper, a cup of tea, a polish of the crown.
     const idle = !falling && !nervous && !hoisting && mood === "calm" && !this.humptyTalk && !game.cracked && game.phase !== "won";
