@@ -342,6 +342,7 @@ function renderLevelList(): void {
   const all = total === LEVELS.length * 3;
   $("#star-total").textContent = all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`;
   $("#star-total").classList.toggle("all", all);
+  $("#build-tag").textContent = `v${__BUILD__.version} · ${__BUILD__.commit} · ${__BUILD__.date}`;
 }
 
 async function loadGame(index: number): Promise<Game> {

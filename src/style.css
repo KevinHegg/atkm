@@ -655,6 +655,10 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 #level-list .best { font: 600 11px/1 var(--ui); letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
 #level-list li.complete button { background: #fff3cf; border-color: var(--gold-dark); }
 #star-total.all { color: var(--gold-dark); font-weight: 700; }
+/* The star count, and the build in the far corner under the rightmost column. */
+.levels-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.levels-foot .controls { margin: 0; }
+.build-tag { margin: 0; font: 500 11px/1 var(--ui); letter-spacing: 0.06em; color: var(--muted); opacity: 0.7; white-space: nowrap; }
 
 .star {
   width: 20px;
