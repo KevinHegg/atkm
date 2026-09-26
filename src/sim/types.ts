@@ -20,10 +20,10 @@ export type StockKind = Exclude<AmmoKind, "blunderbuss">;
 export type BlockMaterial = "oak" | "stone" | "plank" | "beam" | "brick" | "post" | "canopy" | "anvil" | "seat" | "maypole" | "domino";
 
 /** Static scenery in the playing area: it stops shots but never moves. */
-export type FixtureLook = "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever" | "vane" | "pier" | "lintel" | "counterweight" | "portcullis" | "carousel" | "chock" | "dresser";
+export type FixtureLook = "hive" | "post" | "beam" | "hedge" | "bumper" | "drum" | "fulcrum" | "column" | "screen" | "gong" | "maypole" | "stump" | "railing" | "ladder" | "bed" | "windmachine" | "trunk" | "bough" | "lever" | "vane" | "pier" | "lintel" | "counterweight" | "portcullis" | "carousel" | "chock" | "dresser";
 
 /** Stage cues: strike one and the theatre does something that helps the Queen. */
-export type CueKind = "lunch" | "wind" | "trap" | "gate" | "release";
+export type CueKind = "lunch" | "wind" | "trap" | "gate" | "release" | "hive";
 
 /** Where a verse hides its star: in one of the King's crews, a curio, or the rat. */
 export type StarHolder = { crew: string } | { curio: CurioId } | { rat: true };
@@ -53,7 +53,8 @@ export type BodyKind =
   | "pellet"
   | "bucket"
   | "sandbag"
-  | "chest";
+  | "chest"
+  | "peel";
 
 export type Phase = "aim" | "flight" | "hoist" | "won" | "lost";
 
@@ -75,6 +76,8 @@ export type GameEvent =
   | { type: "hoist-start"; from: Vec3; to: Vec3 }
   | { type: "hoist-end"; at: Vec3 }
   | { type: "bowled"; at: Vec3; crewId: string }
+  | { type: "slip"; at: Vec3; crewId: string }
+  | { type: "stung"; at: Vec3; crewId: string }
   | { type: "airborne"; at: Vec3 }
   | { type: "wobble"; at: Vec3 }
   | { type: "say"; speaker: Speaker; line: string }

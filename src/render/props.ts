@@ -958,6 +958,21 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
     return root;
   }
   if (look === "dresser") return buildDresser(kit, root);
+  if (look === "hive") {
+    // A straw skep on a short rope from the bough: coiled straw, a dark little door at the foot.
+    const straw = kit.material("straw", palette.straw, 0.12);
+    const coil = kit.material("straw-dark", palette.strawDark, 0.1);
+    const skep = kit.group("skep", root, V(0, y / 2 - 0.02, 0));
+    const profile: Array<[number, number]> = [[0.33, -0.78], [0.35, -0.64], [0.34, -0.48], [0.31, -0.32], [0.25, -0.18], [0.17, -0.08], [0.07, -0.02], [0, 0]];
+    kit.meshEntity("skep-dome", kit.lathe("skep", profile, 20, true), straw, skep);
+    for (const [ring, r] of [[-0.7, 0.35], [-0.55, 0.345], [-0.4, 0.33], [-0.26, 0.285], [-0.13, 0.21]] as const) {
+      const band = kit.meshEntity("skep-coil", kit.torus(r, 0.022, 20, 6), coil, skep);
+      band.setLocalPosition(0, ring, 0);
+    }
+    kit.primitive("skep-door", "box", skep, V(0, -0.72, 0.31), { x: 0.14, y: 0.08, z: 0.06 }, kit.material("ink", palette.ink, 0.42), pc.Vec3.ZERO, false);
+    kit.primitive("skep-rope", "cylinder", root, V(0, y / 2 + 0.2, 0), { x: 0.035, y: 0.44, z: 0.035 }, kit.material("rope", palette.rope, 0.12), pc.Vec3.ZERO, false);
+    return root;
+  }
   if (look === "counterweight") {
     // A great iron weight on a chain from a pulley on the gatehouse: strike it and the gate rises.
     const iron = kit.material("iron", palette.iron, 0.55, 0.68);
@@ -1114,6 +1129,55 @@ function buildDresser(kit: Kit, root: pc.Entity): pc.Entity {
       kit.primitive("cup-band", "cylinder", group, V(0, 0.03, 0), { x: 0.125, y: 0.025, z: 0.125 }, blue, pc.Vec3.ZERO, false);
       kit.primitive("cup-handle", "box", group, V(0.075, 0, 0), { x: 0.03, y: 0.07, z: 0.02 }, white, pc.Vec3.ZERO, false);
     }
+  }
+  return root;
+}
+
+/** A banana skin, three limp strips splayed from the stalk end, their tips curled up off the boards. */
+export function buildPeel(kit: Kit, parent: pc.Entity, size: { x: number; y: number; z: number }): pc.Entity {
+  const root = kit.group("peel", parent);
+  const yellow = new pc.Color(0.95, 0.8, 0.2);
+  const ripe = new pc.Color(0.85, 0.64, 0.14);
+  const brown = new pc.Color(0.32, 0.2, 0.07);
+  const k = size.x / 0.8;
+  const low = -size.y / 2;
+  const parts: Box[] = [
+    // The stalk end, a stubby hump with a brown nub.
+    { center: [-0.24 * k, low + 0.05 * k, 0], size: [0.3 * k, 0.1 * k, 0.16 * k], color: yellow },
+    { center: [-0.4 * k, low + 0.06 * k, 0], size: [0.06 * k, 0.07 * k, 0.07 * k], color: brown },
+  ];
+  // Three strips fanned out from it, each a flat run and a turned-up tip with a brown end.
+  for (const [angle, tone] of [[-0.5, ripe], [0, yellow], [0.5, ripe]] as const) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    parts.push({ center: [c * 0.08 * k, low + 0.02 * k, s * 0.14 * k], size: [0.34 * k, 0.04 * k, 0.12 * k], color: tone });
+    parts.push({ center: [c * 0.27 * k, low + 0.06 * k, s * 0.24 * k], size: [0.08 * k, 0.1 * k, 0.12 * k], color: tone });
+    parts.push({ center: [c * 0.31 * k, low + 0.11 * k, s * 0.27 * k], size: [0.05 * k, 0.03 * k, 0.09 * k], color: brown });
+  }
+  kit.meshEntity("peel-body", kit.boxes(`peel-${size.x.toFixed(2)}`, parts), kit.paintMaterial(0.35), root);
+  return root;
+}
+
+/** A cloud of bees, baked into one mesh: the view spins and shakes it about the swarm's centre. */
+export function buildSwarm(kit: Kit, parent: pc.Entity): pc.Entity {
+  const root = kit.group("swarm", parent);
+  const gold = new pc.Color(0.95, 0.72, 0.1);
+  // Cartoon bees, big enough to read from the stalls: gold bodies, a black stripe, pale wings.
+  const wing = new pc.Color(0.9, 0.92, 0.95);
+  for (const [layer, count, spread] of [[0, 26, 0.75], [1, 20, 1.15]] as const) {
+    const parts: Box[] = [];
+    for (let index = 0; index < count; index += 1) {
+      // A scatter that doesn't line up (a string hash of near-identical keys falls into streaks).
+      const h = (k: number): number => {
+        const v = Math.sin(index * 12.9898 + k * 78.233 + layer * 37.719) * 43758.5453;
+        return v - Math.floor(v) - 0.5;
+      };
+      const at: [number, number, number] = [h(0) * spread * 2, h(1) * spread * 1.4, h(2) * spread * 2];
+      parts.push({ center: at, size: [0.13, 0.09, 0.09], color: gold });
+      parts.push({ center: [at[0] + 0.02, at[1], at[2]], size: [0.035, 0.095, 0.095], color: palette.ink });
+      parts.push({ center: [at[0], at[1] + 0.07, at[2]], size: [0.07, 0.02, 0.12], color: wing });
+    }
+    kit.meshEntity(`swarm-${layer}`, kit.boxes(`swarm-${layer}`, parts), kit.paintMaterial(0.4), root, false);
   }
   return root;
 }

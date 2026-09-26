@@ -196,7 +196,17 @@ export interface TrapDef {
   outer: number;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef | DresserDef;
+/** A banana skin lying on the boards: knock it under a running crew and down they go. */
+export interface PeelDef {
+  kind: "peel";
+  pos: Vec3;
+  yaw: number;
+}
+
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef | DresserDef | PeelDef;
+
+/** A banana skin's size: long, flat and slippery. */
+export const PEEL_SIZE = { x: 0.8, y: 0.14, z: 0.5 };
 
 /** A giant rat that creeps out of the wings to gnaw the Queen's powder. */
 export interface RatDef {
@@ -569,6 +579,25 @@ export class Mason {
       this.block(material, spot.x, 0, spot.z, 0.7, height, 0.12, spot.yaw);
       along += height * 0.5 + 0.12;
     }
+  }
+
+  /** A banana skin on the boards. */
+  peel(x: number, z: number, yaw = 0): void {
+    this.pieces.push({ kind: "peel", pos: { x, y: PEEL_SIZE.y / 2 + GAP, z }, yaw });
+  }
+
+  /**
+   * An orchard tree in the wings with a straw beehive hanging from its bough (a stage cue).
+   * `reach` is how far the bough stretches toward centre stage (its sign says which way).
+   */
+  beehive(trunkX: number, z: number, opts: { height?: number; reach?: number } = {}): Vec3 {
+    const height = opts.height ?? 4.2;
+    const reach = opts.reach ?? (trunkX < 0 ? 2.6 : -2.6);
+    this.fixture("trunk", trunkX, 0, z, 0.6, height + 0.6, 0.6);
+    this.fixture("bough", trunkX + reach / 2, height - 0.12, z, Math.abs(reach) + 0.3, 0.24, 0.36);
+    const hive = { x: trunkX + reach * 0.8, y: height - 0.95, z };
+    this.fixture("hive", hive.x, hive.y - 0.4, hive.z, 0.7, 0.8, 0.7, { cue: "hive" });
+    return hive;
   }
 
   /** The King's china dresser, turned to face `yaw` (0 faces the house). */

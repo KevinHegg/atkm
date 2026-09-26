@@ -43,6 +43,8 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
     [count("combo") >= 2, 88, () => `${count("combo")} TRICK SHOTS IN ONE EVENING; GUNNER DEMANDS A BIGGER STAGE`],
     [count("combo") === 1, 64, () => "ONE SHOT, A DOZEN DISASTERS: QUEEN'S TRICK SHOT STUNS STALLS"],
     [count("tower") > 0, 72, () => "ROYAL BOX SHAKEN TO ITS STILTS; FIDDLERS MISS A BEAT"],
+    [count("slip") > 0, 78, () => (count("slip") > 1 ? "BANANA SKINS FLOOR THE KING'S MEN, TWICE" : "STRETCHER CREW SLIPS ON BANANA SKIN")],
+    [count("hive") > 0, 76, () => (count("stung") > 1 ? "SWARM CHASES THE KING'S MEN ROUND THE STAGE" : "BEES LOOSED IN THE ROYAL ORCHARD")],
     [count("china") >= 6, 80, () => "THE KING'S BEST CHINA SMASHED; DISH AND SPOON AT LARGE"],
     [count("china") > 0, 60, () => "DISH RUNS AWAY WITH SPOON AFTER SHOT THROUGH ROYAL DRESSER"],
     [count("stagehand") > 0, 62, () => "STAGEHANDS FLATTENED; SANDWICH LOST IN THE CONFUSION"],
@@ -73,6 +75,8 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   if (count("keg")) extras.push(`${count("keg")} kegs of powder set off`);
   if (count("curio") + count("royal") + count("duke") + count("tower")) extras.push("the scenery thoroughly disturbed");
   if (count("stagehand")) extras.push("two stagehands knocked off their feet");
+  if (count("slip")) extras.push(`${count("slip")} slip${count("slip") > 1 ? "s" : ""} on a banana skin`);
+  if (count("stung")) extras.push(`${count("stung")} of the King's crews stung`);
   if (count("china")) extras.push(`${count("china")} pieces of the King's best china broken`);
   if (extras.length) sentences.push(`The evening also saw ${listOf(extras)}.`);
   sentences.push(`Damages to the Crown: ${input.mayhem.toLocaleString("en-GB")} crowns.`);

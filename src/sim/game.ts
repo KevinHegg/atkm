@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { AMMO, arcPoint, arcVelocity, solveLaunch } from "./ballistics.js";
-import { CREW_SPECS, TRAP_TIME, callLunch, createCrewState, crownWithBucket, dropThroughTrap, formation, slotWorld, steerCrew, type CrewState, type Threat } from "./crew.js";
+import { CREW_SPECS, TRAP_TIME, callLunch, createCrewState, crownWithBucket, dropThroughTrap, formation, slotWorld, steerCrew, sting, type CrewState, type Threat } from "./crew.js";
 import { eggHullPoints } from "./egg.js";
 import {
   BUCKET_SIZE,
@@ -29,6 +29,8 @@ import {
   type CarouselDef,
   type GateDef,
   type DresserDef,
+  type PeelDef,
+  PEEL_SIZE,
   type ChinaKind,
   DRESSER,
   dresserChina,
@@ -56,6 +58,15 @@ import {
 } from "./types.js";
 
 const STOCK: StockKind[] = ["shot", "shell", "grape", "chain", "bomb"];
+
+/** How long the bees are out once their hive is struck, how fast they fly, and how near stings. */
+export const SWARM_TIME = 12;
+const SWARM_SPEED = 4.4;
+const SWARM_REACH = 1.7;
+/** The swarm tires of one crew after this long and goes after the nearest other. */
+const SWARM_SWITCH = 4;
+/** The fastest a shot sends a banana skin skidding (m/s). */
+const PEEL_KICK = 7.5;
 
 export const STEP = 1 / 60;
 
@@ -201,6 +212,8 @@ interface Entity {
   domino?: boolean;
   /** Rocked by the wind machine. */
   windy?: boolean;
+  /** A banana skin: whether the Queen has sent it skidding, and whether it's been trodden on. */
+  peel?: { armed: boolean; spent: boolean; flickedBy?: number; ghostUntil?: number };
 }
 
 export interface RopeView {
@@ -349,6 +362,8 @@ export class Game {
   /** The King's china, piece by piece (sensors on the dresser): smashed, or about to be. */
   private readonly china = new Map<number, ChinaPiece>();
   private dishRan = false;
+  /** The bees, once their hive is struck: where they are, whom they're after, whom they've stung. */
+  private swarm: { at: Vec3; home: Vec3; until: number; target: string | undefined; since: number; stung: Set<string> } | undefined;
   private swing: { seat: Entity; def: SwingDef } | undefined;
   private seesaw: { plank: Entity; def: SeesawDef; restAngle: number } | undefined;
   private readonly ropes: Array<{ joint: RAPIER.ImpulseJoint; seat: Entity; local: Vec3; top: Vec3; cut: boolean }> = [];
@@ -390,6 +405,7 @@ export class Game {
       else if (piece.kind === "carousel") this.addCarousel(piece);
       else if (piece.kind === "gate") this.addGate(piece);
       else if (piece.kind === "dresser") this.addDresser(piece);
+      else if (piece.kind === "peel") this.addPeel(piece);
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -911,6 +927,7 @@ export class Game {
       view.prevRotation.z = view.rotation.z;
       view.prevRotation.w = view.rotation.w;
     }
+    this.updateSwarm();
     this.updateCrews();
     this.updateTurntable();
     this.updateMachines();
@@ -932,6 +949,7 @@ export class Game {
     this.sweepChains();
     this.dropBuckets();
     this.syncViews();
+    this.checkPeels();
     this.updateHumpty();
     this.cleanUp();
     if (Math.round(this.time / STEP) % 6 === 0) this.tallyWreckage();
@@ -1551,6 +1569,152 @@ export class Game {
     this.register("bucket", "paint", { x: BUCKET_SIZE.radius * 2, y: BUCKET_SIZE.height, z: BUCKET_SIZE.radius * 2 }, body, [collider]);
   }
 
+  private addPeel(def: PeelDef): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(def.pos.x, def.pos.y, def.pos.z)
+        .setRotation(yawQuat(def.yaw))
+        .setLinearDamping(0.4)
+        .setAngularDamping(1.5)
+        .setCcdEnabled(true)
+        .setSleeping(true),
+    );
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(PEEL_SIZE.x / 2, PEEL_SIZE.y / 2, PEEL_SIZE.z / 2).setMass(0.6).setFriction(0.12).setRestitution(0.05).setCollisionGroups(GROUPS.block),
+      body,
+    );
+    this.register("peel", "banana", { ...PEEL_SIZE }, body, [collider], { peel: { armed: false, spent: false } });
+  }
+
+  /**
+   * A shot that catches a banana skin flicks it skidding along the boards the way the shot was
+   * going, faster for a faster shot: far more predictable than a cannonball's real blow to
+   * something so light, which would send it clean off the stage.
+   */
+  private flickPeel(peel: Entity, shot: Entity): void {
+    const state = peel.peel!;
+    state.armed = true;
+    // One flick per shot, however it tumbles after.
+    if (state.flickedBy === shot.view.id) return;
+    state.flickedBy = shot.view.id;
+    const v = shot.lastVelocity ?? shot.body.linvel();
+    const flat = Math.hypot(v.x, v.z);
+    if (flat < 1) return;
+    const kick = Math.min(PEEL_KICK, flat * 0.35);
+    peel.body.setLinvel({ x: (v.x / flat) * kick, y: 1.2, z: (v.z / flat) * kick }, true);
+    peel.body.setAngvel({ x: 0, y: 5, z: 0 }, true);
+    // The ball rolls on past it rather than catching it up and shoving it again.
+    for (const collider of peel.colliders) collider.setCollisionGroups(groups(G.BLOCK, ALL & ~G.PROJ));
+    state.ghostUntil = this.time + 0.6;
+  }
+
+  /**
+   * A crew on the move that treads on a banana skin goes flat on its back. Only a skin the Queen
+   * has sent skidding counts (one left where it lay never trips a patrol), and each trips once.
+   */
+  private checkPeels(): void {
+    if (!this.log.length) return;
+    for (const peel of this.entities.values()) {
+      const state = peel.peel;
+      if (state?.ghostUntil !== undefined && this.time >= state.ghostUntil) {
+        state.ghostUntil = undefined;
+        for (const collider of peel.colliders) collider.setCollisionGroups(GROUPS.block);
+      }
+      if (!state?.armed || state.spent || peel.view.removed || this.cracked) continue;
+      const p = peel.view.position;
+      // Still in the air: it has to land first.
+      if (p.y > 0.25) continue;
+      for (const crew of this.crews) {
+        if (crew.speed < 0.6 || crew.mode === "stunned" || crew.mode === "recover" || crew.mode === "trapped") continue;
+        // Anywhere underfoot: from the leading man (or horse) to the one at the back.
+        const feet = crew.slots.flatMap((id) => {
+          const foot = this.entities.get(id);
+          return foot ? [foot.view.position] : [];
+        });
+        let trodden = false;
+        for (const a of feet) {
+          for (const b of feet) {
+            const flatA = { x: a.x, y: 0, z: a.z };
+            const flatB = { x: b.x, y: 0, z: b.z };
+            if (distanceToSegment({ x: p.x, y: 0, z: p.z }, flatA, flatB) < 0.7) trodden = true;
+          }
+        }
+        if (!trodden) continue;
+        state.spent = true;
+        this.stun(crew, { x: p.x, y: 0.3, z: p.z }, "slip");
+        // Up goes the skin, end over end.
+        peel.body.setLinvel({ x: Math.sin(crew.heading) * 1.2, y: 4.5, z: Math.cos(crew.heading) * 1.2 }, true);
+        peel.body.setAngvel({ x: 9, y: 2, z: 4 }, true);
+        break;
+      }
+    }
+  }
+
+  /** The hive is struck: out come the bees, unless they're out already. */
+  private releaseSwarm(hive: Entity): boolean {
+    if (this.swarm) return false;
+    const home = { ...hive.view.position };
+    this.swarm = { at: { ...home }, home, until: this.time + SWARM_TIME, target: undefined, since: this.time, stung: new Set() };
+    return true;
+  }
+
+  /**
+   * The swarm goes after the nearest crew that could catch him, and a fresh one every few seconds;
+   * anyone it gets near is stung and runs for it. When their time is up the bees go home.
+   */
+  private updateSwarm(): void {
+    const swarm = this.swarm;
+    if (!swarm) return;
+    const out = this.time < swarm.until && !this.cracked;
+    let goal = swarm.home;
+    if (out) {
+      const quarry = (crew: CrewState): boolean =>
+        CREW_SPECS[crew.kind].run > 0 && crew.mode !== "stunned" && crew.mode !== "recover" && crew.mode !== "trapped" && crew.mode !== "lunch";
+      const current = this.crews.find((crew) => crew.id === swarm.target);
+      if (!current || !quarry(current) || this.time - swarm.since > SWARM_SWITCH) {
+        const others = this.crews.filter((crew) => quarry(crew) && (crew.id !== swarm.target || !current));
+        const pool = others.length ? others : this.crews.filter(quarry);
+        let best: CrewState | undefined;
+        for (const crew of pool) {
+          if (!best || Math.hypot(crew.x - swarm.at.x, crew.z - swarm.at.z) < Math.hypot(best.x - swarm.at.x, best.z - swarm.at.z)) best = crew;
+        }
+        swarm.target = best?.id;
+        swarm.since = this.time;
+      }
+      const target = this.crews.find((crew) => crew.id === swarm.target);
+      if (target) goal = { x: target.x, y: 1.7, z: target.z };
+    }
+    const dx = goal.x - swarm.at.x;
+    const dy = goal.y - swarm.at.y;
+    const dz = goal.z - swarm.at.z;
+    const gap = Math.hypot(dx, dy, dz);
+    if (gap > 1e-6) {
+      const travel = Math.min(gap, SWARM_SPEED * STEP) / gap;
+      swarm.at = { x: swarm.at.x + dx * travel, y: swarm.at.y + dy * travel, z: swarm.at.z + dz * travel };
+    }
+    if (!out) {
+      if (gap < 0.2) this.swarm = undefined;
+      return;
+    }
+    for (const crew of this.crews) {
+      if (Math.hypot(crew.x - swarm.at.x, crew.z - swarm.at.z) > SWARM_REACH) continue;
+      if (!sting(crew, this.time, swarm.at)) continue;
+      const at = { x: crew.x, y: 1.6, z: crew.z };
+      this.events.push({ type: "stung", at, crewId: crew.id });
+      // Each crew goes on the bill once per swarm.
+      if (!swarm.stung.has(crew.id)) {
+        swarm.stung.add(crew.id);
+        this.score("stung", at);
+      }
+    }
+  }
+
+  /** Where the bees are, while they're out (and on their way home). */
+  get swarmView(): { at: Vec3; home: boolean } | undefined {
+    const swarm = this.swarm;
+    return swarm ? { at: { ...swarm.at }, home: this.time >= swarm.until || this.cracked } : undefined;
+  }
+
   /** A flying paint pot that passes over a man's head ends up on it. */
   private dropBuckets(): void {
     const crowned: Array<{ bucket: Entity; crew: CrewState }> = [];
@@ -2000,15 +2164,15 @@ export class Game {
     }
   }
 
-  private stun(crew: CrewState, at: Vec3): void {
+  private stun(crew: CrewState, at: Vec3, how: "bowled" | "slip" = "bowled"): void {
     // Nobody can bowl over a man who is already down, or down the trapdoor.
     if (crew.mode === "stunned" || crew.mode === "trapped" || this.won) return;
     crew.mode = "stunned";
     crew.modeUntil = this.time + (crew.kind === "cart" ? 3.2 : 3.8);
     crew.threatSince = -1;
     this.stats.bowled += 1;
-    this.events.push({ type: "bowled", at: { ...at }, crewId: crew.id });
-    this.score("bowled", { x: at.x, y: 1.6, z: at.z });
+    this.events.push({ type: how, at: { ...at }, crewId: crew.id });
+    this.score(how, { x: at.x, y: 1.6, z: at.z });
     const holder = this.level.star;
     if ("crew" in holder && holder.crew === crew.id) this.releaseStar({ x: at.x, y: 2, z: at.z });
   }
@@ -2137,6 +2301,7 @@ export class Game {
         const owner = this.byCollider.get(other);
         if (!owner) continue;
         if (owner.view.kind === "chest" && !free) this.openChest(owner, shot.ammo === "blunderbuss" ? undefined : shot.ammo);
+        if (owner.peel && !owner.peel.spent && !free) this.flickPeel(owner, shot);
         // A shot that strikes one of the King's men fair and square bowls his crew over.
         if (owner.crew && owner.role !== "bed" && !free && lengthOf(shot.lastVelocity ?? shot.body.linvel()) > 4) this.stun(owner.crew, owner.view.position);
         if (owner.bounce && owner.look) {
@@ -2163,12 +2328,13 @@ export class Game {
     if (cue === "trap" && !this.springTrap()) return;
     if (cue === "gate" && !this.raiseGate()) return;
     if (cue === "release") this.knockChock(fixture);
+    if (cue === "hive" && !this.releaseSwarm(fixture)) return;
     fixture.cuedAt = this.time;
     if (cue === "lunch") for (const crew of this.crews) callLunch(crew, this.time);
     if (cue === "wind") this.windUntil = this.time + WIND_TIME;
     const p = shot.body.translation();
     this.events.push({ type: "cue", cue, at: { x: p.x, y: p.y, z: p.z } });
-    if (cue !== "trap") this.score(cue === "wind" ? "wind" : cue === "gate" ? "gate" : cue === "release" ? "barrel" : "gong", { x: p.x, y: p.y, z: p.z });
+    if (cue !== "trap") this.score(cue === "wind" ? "wind" : cue === "gate" ? "gate" : cue === "release" ? "barrel" : cue === "hive" ? "hive" : "gong", { x: p.x, y: p.y, z: p.z });
   }
 
   private handleForces(): void {
@@ -2270,6 +2436,8 @@ export class Game {
           this.stun(entity.crew, entity.view.position);
           continue;
         }
+        // A blast sends a banana skin flying: wherever it comes down, it's live.
+        if (entity.peel) entity.peel.armed = true;
         if (entity.view.kind === "rat" || entity.view.kind === "turntable") continue;
         if (entity.view.kind === "chest" && gap < 2) this.openChest(entity, blast.ammo);
         if (!entity.body.isDynamic()) continue;

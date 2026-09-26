@@ -462,6 +462,79 @@ export class TheatreAudio {
     if (piece === "teapot") this.burst({ duration: 0.18, volume: 0.4, filter: "bandpass", frequency: 700, q: 1.4 });
   }
 
+  /** A slide whistle up, and a thump: somebody has trodden on a banana skin. */
+  slip(): void {
+    if (!this.throttle("slip", 300)) return;
+    this.tone(320, 0.38, 0.22, "sine", { to: 1500, attack: 0.02 });
+    this.tone(90, 0.25, 0.4, "triangle", { to: 55, delay: 0.42 });
+    this.burst({ duration: 0.2, volume: 0.3, filter: "lowpass", frequency: 500, delay: 0.42 });
+  }
+
+  /** One of the King's men, stung: a yelp. */
+  ow(): void {
+    if (!this.throttle("ow", 350)) return;
+    const pitch = 380 + Math.random() * 120;
+    this.tone(pitch, 0.22, 0.12, "sawtooth", { to: pitch * 0.62, attack: 0.01 });
+    this.burst({ duration: 0.12, volume: 0.08, filter: "bandpass", frequency: 1400, q: 2 });
+  }
+
+  /** The swarm: a restless hum held at `level` (0 to 1) while the bees are out. */
+  private hum: { source: OscillatorNode; lfo: OscillatorNode; level: GainNode; target: number; quietSince: number } | undefined;
+
+  buzz(level: number): void {
+    const audio = this.ready();
+    if (!audio) {
+      this.stopHum();
+      return;
+    }
+    const { ctx, out } = audio;
+    if (!this.hum) {
+      if (level <= 0) return;
+      const source = ctx.createOscillator();
+      source.type = "sawtooth";
+      source.frequency.value = 190;
+      // A fast wobble in pitch is what makes a drone sound like wings.
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 23;
+      const depth = ctx.createGain();
+      depth.gain.value = 14;
+      lfo.connect(depth).connect(source.frequency);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 850;
+      filter.Q.value = 1.4;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      source.connect(filter).connect(gain).connect(out);
+      source.start();
+      lfo.start();
+      this.hum = { source, lfo, level: gain, target: 0, quietSince: ctx.currentTime };
+    }
+    const hum = this.hum;
+    const now = ctx.currentTime;
+    const target = Math.max(0, Math.min(1, level)) * 0.07;
+    if (Math.abs(target - hum.target) > 0.004) {
+      hum.level.gain.setTargetAtTime(Math.max(0.0001, target), now, 0.2);
+      hum.source.frequency.setTargetAtTime(170 + level * 40, now, 0.3);
+      hum.target = target;
+    }
+    if (target > 0) hum.quietSince = now;
+    else if (now - hum.quietSince > 1) this.stopHum();
+  }
+
+  private stopHum(): void {
+    const hum = this.hum;
+    const ctx = this.context;
+    if (!hum || !ctx) return;
+    this.hum = undefined;
+    const now = ctx.currentTime;
+    hum.level.gain.cancelScheduledValues(now);
+    hum.level.gain.setValueAtTime(hum.level.gain.value, now);
+    hum.level.gain.linearRampToValueAtTime(0.0001, now + 0.1);
+    hum.source.stop(now + 0.12);
+    hum.lfo.stop(now + 0.12);
+  }
+
   // ---------------------------------------------------------------- the pit orchestra
 
   /** The pit's snare roll, held while something hangs in the balance. */

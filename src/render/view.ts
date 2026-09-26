@@ -9,6 +9,8 @@ import {
   buildBucket,
   buildChest,
   buildRunaways,
+  buildPeel,
+  buildSwarm,
   buildCannon,
   buildCartBed,
   buildCrown,
@@ -45,7 +47,7 @@ import { Curios } from "./curios.js";
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
 const DEG = 180 / Math.PI;
 /** Bodies that last the whole verse: worth batching. Shots and debris come and go too often. */
-const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag"]);
+const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag", "peel"]);
 const SWEAT = new pc.Color(0.55, 0.78, 0.95);
 /** How long a released star rises on stage before flying off to its chip in the HUD. */
 const STAR_RISE = 1.9;
@@ -79,6 +81,8 @@ interface BodyVisual {
   opened?: number;
   /** The King's china on a dresser, piece by piece. */
   china?: pc.Entity[];
+  /** A beehive's straw skep, which swings when struck. */
+  skep?: pc.Entity;
 }
 
 /** A released star, floating up off the stage. */
@@ -150,6 +154,9 @@ export class StageView {
   private readonly chains = new Map<number, pc.Entity>();
   private readonly puffs: Puff[] = [];
   private readonly splats: Splat[] = [];
+  /** The bees, when they're out, and when their hive was last struck. */
+  private readonly swarm: pc.Entity;
+  private hiveStruckAt = -99;
   /** A piece of the King's china has been smashed since the dresser was last redrawn. */
   private chinaDirty = false;
   /** The dish that ran away with the spoon, while they're still on stage. */
@@ -213,6 +220,8 @@ export class StageView {
     this.app.root.addChild(this.world);
     this.actors = this.kit.group("actors", this.world);
     this.effects = this.kit.group("effects", this.world);
+    this.swarm = buildSwarm(this.kit, this.effects);
+    this.swarm.enabled = false;
     this.camera = this.createCamera();
     this.createLights();
     this.stage = buildStage(this.kit, this.world);
@@ -342,6 +351,8 @@ export class StageView {
     this.runaways?.root.destroy();
     this.runaways = undefined;
     this.chinaDirty = false;
+    this.swarm.enabled = false;
+    this.hiveStruckAt = -99;
     this.humpty = undefined;
     this.humptyVisualId = undefined;
     this.crackAt = undefined;
@@ -541,6 +552,18 @@ export class StageView {
       if (event.id === "stagehands") this.company.stagehandsStruck(this.elapsed);
       if (event.id === "tower") this.company.towerStruck(this.elapsed);
       this.flash(event.at, 0.5);
+    } else if (event.type === "slip") {
+      this.puff(V(event.at.x, 0.2, event.at.z), V(0, 0.6, 0), 0.45, 0.8, 0, palette.cream);
+      for (let index = 0; index < 8; index += 1) {
+        const angle = (index / 8) * Math.PI * 2;
+        this.spark(V(event.at.x, 0.4, event.at.z), V(Math.cos(angle) * 2.5, 2.5 + Math.random() * 2, Math.sin(angle) * 2.5), palette.straw);
+      }
+    } else if (event.type === "stung") {
+      for (let index = 0; index < 5; index += 1) {
+        this.spark(V(event.at.x, event.at.y + 0.2, event.at.z), V((Math.random() - 0.5) * 3, 1 + Math.random() * 2, (Math.random() - 0.5) * 3), palette.gold, 0.07, 0.5, 4);
+      }
+    } else if (event.type === "cue" && event.cue === "hive") {
+      this.hiveStruckAt = this.elapsed;
     } else if (event.type === "smash") {
       // Blue-and-white shards, and a puff of dust off the shelf.
       const shards = event.piece === "teapot" ? 16 : event.piece === "plate" ? 10 : 6;
@@ -735,6 +758,7 @@ export class StageView {
     this.company.update(this.elapsed, Boolean(this.game?.hoisting));
     this.animateEffects(dt);
     this.animateChina(dt);
+    this.animateBees();
     this.animateScenery();
     this.updateCamera(realDt);
   }
@@ -792,6 +816,7 @@ export class StageView {
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
         if (view.material === "lever") visual.lever = fixture.findByName("lever-arm") as pc.Entity;
         if (view.material === "dresser") visual.china = (fixture.findByName("china") as pc.Entity).children as pc.Entity[];
+        if (view.material === "hive") visual.skep = fixture.findByName("skep") as pc.Entity;
         break;
       }
       case "chest": {
@@ -818,6 +843,9 @@ export class StageView {
         break;
       case "sandbag":
         buildSandbag(this.kit, root, view.size);
+        break;
+      case "peel":
+        buildPeel(this.kit, root, view.size);
         break;
       default:
         break;
@@ -857,7 +885,13 @@ export class StageView {
       }
       if (visual.hat) visual.hat.enabled = hatted;
       const dancing = crew.mode === "patrol" && crew.kind === "guard";
-      if (dancing) {
+      const stung = crew.mode === "stung";
+      if (stung) {
+        // Swatting at bees with both hands over his head.
+        const flap = Math.sin(this.elapsed * 22 + stride) * 35;
+        man.leftArm.setLocalEulerAngles(20, 0, -135 + flap);
+        man.rightArm.setLocalEulerAngles(-20, 0, 135 + flap);
+      } else if (dancing) {
         // Ring-a-ring o' roses: arms out, hands held, a skip in every step.
         const skip = Math.sin(this.elapsed * 7 + stride);
         man.leftArm.setLocalEulerAngles(0, 0, -95 + skip * 10);
@@ -880,7 +914,7 @@ export class StageView {
         man.leftArm.setLocalEulerAngles(-swing * 0.8, 0, 6);
         man.rightArm.setLocalEulerAngles(swing * 0.8, 0, -6);
       }
-      const bob = running ? Math.abs(Math.sin(stride * 3.2)) * 0.08 : cheering && !gameOver ? Math.abs(Math.sin(this.elapsed * 9)) * 0.12 : 0;
+      const bob = running ? Math.abs(Math.sin(stride * 3.2)) * 0.08 : stung ? Math.abs(Math.sin(this.elapsed * 11)) * 0.14 : cheering && !gameOver ? Math.abs(Math.sin(this.elapsed * 9)) * 0.12 : 0;
       man.rig.setLocalPosition(0, -0.8 + bob, 0);
       man.rig.setLocalEulerAngles(gameOver && cheering ? 18 : 0, 0, 0);
       man.daze.enabled = crew.mode === "stunned";
@@ -896,6 +930,8 @@ export class StageView {
       horse.head.setLocalEulerAngles(Math.sin(gallop) * 6 * Math.min(1, crew.speed / 3), 0, 0);
       horse.tail.setLocalEulerAngles(Math.sin(this.elapsed * 3) * 10 - crew.speed * 4, Math.sin(this.elapsed * 2.1) * 12, 0);
       horse.body.setLocalPosition(0, -1.05 + Math.abs(Math.sin(gallop)) * 0.06 * Math.min(1, crew.speed / 2), 0);
+      // Stung, the horse rears and kicks.
+      horse.body.setLocalEulerAngles(crew.mode === "stung" ? -18 + Math.sin(this.elapsed * 9) * 6 : 0, 0, 0);
     }
     if (visual.wheels) {
       for (const wheel of visual.wheels) wheel.setLocalEulerAngles(stride * -130, 0, 90);
@@ -1618,6 +1654,27 @@ export class StageView {
     }
     root.setLocalScale(0.01, 1, 0.01);
     this.splats.push({ root, age: 0 });
+  }
+
+  /** The struck skep swings on its rope; the swarm buzzes about wherever the bees have got to. */
+  private animateBees(): void {
+    const since = this.elapsed - this.hiveStruckAt;
+    for (const visual of this.visuals.values()) {
+      if (!visual.skep) continue;
+      const swing = since < 4 ? Math.sin(since * 11) * 22 * Math.exp(-since * 1.2) : 0;
+      visual.skep.setLocalEulerAngles(swing, 0, swing * 0.6);
+    }
+    const swarm = this.game?.swarmView;
+    this.swarm.enabled = Boolean(swarm);
+    if (!swarm) return;
+    const t = this.elapsed;
+    // A loose, lazy cloud on the way home; a tight, angry one on the chase.
+    const size = swarm.home ? 0.7 : 1;
+    this.swarm.setPosition(swarm.at.x + Math.sin(t * 5.3) * 0.18, swarm.at.y + Math.sin(t * 7.1) * 0.14, swarm.at.z + Math.cos(t * 4.7) * 0.18);
+    this.swarm.setLocalScale(size, size * (0.9 + Math.sin(t * 13) * 0.1), size);
+    const [inner, outer] = this.swarm.children as pc.Entity[];
+    inner?.setLocalEulerAngles(t * 240, t * 410, 0);
+    outer?.setLocalEulerAngles(0, -t * 300, t * 170);
   }
 
   /** Smashed china vanishes from the dresser; the dish and the spoon run off, hand in hand. */

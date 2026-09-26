@@ -131,13 +131,16 @@ export async function mayhemTargets(level: LevelDef): Promise<Array<{ label: str
       if (view.kind === "bucket" || view.kind === "sandbag") targets.push({ label: view.kind, at: { ...view.position } });
       if (view.kind === "man" || view.kind === "horse") targets.push({ label: view.kind, at: { ...view.position } });
       if (view.kind === "keg") targets.push({ label: "keg", at: { ...view.position } });
-      if (view.kind === "fixture" && view.material === "gong") targets.push({ label: "gong", at: { ...view.position } });
+      if (view.kind === "fixture" && (view.material === "gong" || view.material === "hive")) targets.push({ label: view.material, at: { ...view.position } });
+      if (view.kind === "peel") targets.push({ label: "peel", at: { ...view.position } });
     }
     // The King's china: a plate from each shelf, the teapot and a cup.
     const china = game.chinaView;
-    dresserChina().forEach((piece, index) => {
-      if (Math.abs(piece.local.x) < 0.3 || piece.kind === "teapot") targets.push({ label: `china ${piece.kind}`, at: { ...china[index]!.at } });
-    });
+    if (china.length) {
+      dresserChina().forEach((piece, index) => {
+        if (Math.abs(piece.local.x) < 0.3 || piece.kind === "teapot") targets.push({ label: `china ${piece.kind}`, at: { ...china[index]!.at } });
+      });
+    }
     return targets;
   } finally {
     game.destroy();

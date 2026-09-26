@@ -42,6 +42,9 @@ export type Cue =
   | "barrel"
   | "china"
   | "dish"
+  | "bees"
+  | "stung"
+  | "slip"
   | "phew";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
@@ -197,6 +200,18 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   barrel: {
     speaker: "humpty",
     lines: ["Is that a barrel? Is that a LIT barrel?", "Somebody stop that barrel! Somebody else!", "Gentlemen, I believe we are being bowled at."],
+  },
+  bees: {
+    speaker: "humpty",
+    lines: ["Bees? BEES?", "Nobody panic! Everybody panic!", "Keep them away from me, I'm mostly yolk!"],
+  },
+  stung: {
+    speaker: "queen",
+    lines: ["Run, gentlemen! Run!", "Buzz off, the lot of you.", "They'll need a stretcher for the stretcher-bearers."],
+  },
+  slip: {
+    speaker: "queen",
+    lines: ["Whoops-a-daisy.", "Mind the banana.", "The oldest joke in the theatre, and still the best."],
   },
   china: {
     speaker: "king",

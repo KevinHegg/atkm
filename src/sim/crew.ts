@@ -3,7 +3,7 @@ import type { CrewDef, Zone } from "./level.js";
 import type { Vec3 } from "./types.js";
 
 export type CrewKind = CrewDef["kind"];
-export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer" | "lunch" | "blind" | "trapped";
+export type CrewMode = "idle" | "patrol" | "run" | "stunned" | "recover" | "cheer" | "lunch" | "blind" | "trapped" | "stung";
 
 /** How long the King's men are down the trapdoor before they climb back up. */
 export const TRAP_TIME = 9;
@@ -12,6 +12,9 @@ const TRAP_DEPTH = 2.6;
 
 /** How long a man with a bucket on his head blunders about. */
 export const BUCKET_TIME = 8;
+
+/** How long a man keeps flapping and running after the bees last got at him. */
+export const STING_TIME = 2.2;
 
 /** How long the King's men are away when the dinner gong goes. */
 export const LUNCH_BREAK = 13;
@@ -83,6 +86,9 @@ export interface CrewState {
   /** Down the trapdoor: how far below the boards, and when they climb back out. */
   sink: number;
   trapUntil: number;
+  /** Chased by bees: fleeing (away from `stingFrom`) until then, catching nothing. */
+  stungUntil: number;
+  stingFrom: { x: number; z: number };
 }
 
 export function createCrewState(def: CrewDef): CrewState {
@@ -107,7 +113,20 @@ export function createCrewState(def: CrewDef): CrewState {
     bucketUntil: -1,
     sink: 0,
     trapUntil: -1,
+    stungUntil: -1,
+    stingFrom: { x: def.home.x, z: def.home.z },
   };
+}
+
+/** The bees have found them: off they run, flapping, with the swarm behind. */
+export function sting(crew: CrewState, time: number, from: { x: number; z: number }): boolean {
+  if (crew.mode === "stunned" || crew.mode === "recover" || crew.mode === "trapped" || crew.mode === "lunch") return false;
+  const fresh = crew.mode !== "stung";
+  crew.stungUntil = time + STING_TIME;
+  crew.stingFrom = { x: from.x, z: from.z };
+  crew.threatSince = -1;
+  crew.mode = "stung";
+  return fresh;
 }
 
 /** The trapdoor opens under them: a-tishoo, a-tishoo, they all fall down. */
@@ -138,6 +157,7 @@ export function callLunch(crew: CrewState, time: number): void {
 /** What a crew goes back to doing: lunch if it isn't over, otherwise their post. */
 function resume(crew: CrewState, time: number): CrewMode {
   if (crew.sink > 0) return "trapped";
+  if (time < crew.stungUntil) return "stung";
   if (time < crew.bucketUntil) return "blind";
   if (time < crew.lunchUntil) return "lunch";
   return crew.def.patrol?.length ? "patrol" : "idle";
@@ -156,6 +176,17 @@ export function predictLanding(threat: Threat, catchY: number): { x: number; z: 
     z: threat.position.z + threat.velocity.z * t,
     t,
   };
+}
+
+/** Where a crew may run when it panics: along its patrol, or a few paces either side of its post. */
+function beatOf(crew: CrewState): { minX: number; maxX: number; z: number } {
+  const patrol = crew.def.patrol;
+  if (patrol?.length) {
+    const xs = patrol.map((point) => point.x);
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), z: patrol[0]!.z };
+  }
+  const zone = crew.def.zone;
+  return { minX: Math.max(zone?.minX ?? -Infinity, crew.def.home.x - 3), maxX: Math.min(zone?.maxX ?? Infinity, crew.def.home.x + 3), z: crew.def.home.z };
 }
 
 function clampToZone(x: number, z: number, zone: Zone | undefined): { x: number; z: number } {
@@ -217,6 +248,26 @@ export function steerCrew(crew: CrewState, dt: number, time: number, threat: Thr
     }
     return;
   }
+  if (crew.mode === "stung") {
+    if (time >= crew.stungUntil) {
+      crew.mode = resume(crew, time);
+    } else if (crew.kind !== "litter") {
+      // A guard has nowhere to run and a horse only rears: they stay put, flapping and stamping.
+      crew.speed = 0;
+      if (crew.kind === "guard") crew.heading = wrapAngle(crew.heading + dt * 5);
+      crew.target = undefined;
+      return;
+    } else {
+      // Bearers run for it along their own beat, away from the bees; cornered at the end of it,
+      // they double back past them. Their beat is kept clear, so they never plough into scenery.
+      const beat = beatOf(crew);
+      const away = crew.x >= crew.stingFrom.x ? 1 : -1;
+      let x = away > 0 ? beat.maxX : beat.minX;
+      if (Math.abs(x - crew.x) < 0.5) x = away > 0 ? beat.minX : beat.maxX;
+      goal = { x, z: beat.z };
+      pace = spec.run;
+    }
+  }
   if (crew.mode === "blind") {
     if (time >= crew.bucketUntil) {
       crew.mode = resume(crew, time);
@@ -239,6 +290,8 @@ export function steerCrew(crew: CrewState, dt: number, time: number, threat: Thr
       goal = { x: crew.canteen * CANTEEN_X, z: crew.z };
       pace = Math.max(spec.walk * 2.2, spec.run * 0.6);
     }
+  } else if (crew.mode === "stung") {
+    // Nothing else on their minds.
   } else if (canCatch && threat) {
     if (crew.threatSince < 0) crew.threatSince = time;
     if (time - crew.threatSince >= spec.reaction) {

@@ -30,6 +30,9 @@ export type MayhemKind =
   | "combo"
   | "barrel"
   | "china"
+  | "slip"
+  | "hive"
+  | "stung"
   | "tower"
   | "crack";
 
@@ -67,6 +70,9 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   combo: { points: 0, bill: "Trick shots", shout: "Combo!" },
   barrel: { points: 40, bill: "Barrels sent rolling", shout: "Look out below!" },
   china: { points: 20, bill: "The King's best china", shout: "Smash!" },
+  slip: { points: 70, bill: "Slips on banana skins", shout: "Whoops!" },
+  hive: { points: 50, bill: "Beehives stirred up", shout: "Bees!" },
+  stung: { points: 35, bill: "King's men stung", shout: "Ow!" },
   tower: { points: 75, bill: "The royal box, rattled", shout: "Steady on!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };

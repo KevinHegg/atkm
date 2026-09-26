@@ -95,7 +95,10 @@ unlock every verse.
   hanging on a line, harder and harder, for a few seconds. It never bends your shot.
   Pull the stage lever and a ring of trapdoors drops the King's men beneath the boards;
   they climb back out a few seconds later. Strike a gatehouse's iron counterweight and
-  its portcullis winds up for a while.
+  its portcullis winds up for a while. In the Keep, a straw beehive hangs in the orchard
+  tree: strike it and a swarm goes after the King's stretcher crews and carts, one after
+  another, for twelve seconds. Stung bearers run up and down their beat and a stung horse
+  rears, and nobody runs to catch him until the bees have gone.
 - **Machines.** The last five verses are built round contraptions that redirect a shot.
   The Queen's weathercock is a bronze plate on a pole that turns an eighth of a turn each
   time it's struck: set it with one shot, bank the next off it. A bomb dropped in a chute's
@@ -121,6 +124,10 @@ unlock every verse.
   on the painted hill, Old King Cole in his royal box (or the stilts it stands on), or the
   two stagehands at the fly line, and see what happens. None of them change the verse, but
   each pays mayhem once, and any of them might be hiding the verse's star.
+- **Banana skins.** In All the King's Men a banana skin lies on the boards. A shot flicks it
+  skidding the way the shot was going, and any crew on the move that treads on it goes flat on
+  its back, just as if bowled over. A skin nobody has shot is just a skin, and each one trips
+  somebody only once.
 - **Gags.** A painter's pot on a stepladder, knocked onto a guard's head, blinds his crew
   for a while. A sandbag hanging from the flies swings like a wrecking ball when shot;
   chain shot cuts it loose. The stagehands who work the hoist can be seen in the wings,

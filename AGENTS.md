@@ -27,7 +27,15 @@ Core promises:
   counterweight) are fixtures any stock shot can strike; lunch lasts `LUNCH_BREAK` seconds
   and nothing, not even a falling egg, interrupts it. The trapdoor (`Mason.trapRing`) drops
   every crew standing on its ring for `TRAP_TIME` seconds; trapped crews can't be stunned
-  or sent to lunch. The portcullis (`Mason.gatehouse`) rises for `GATE_TIME` seconds.
+  or sent to lunch. The portcullis (`Mason.gatehouse`) rises for `GATE_TIME` seconds. The
+  beehive (`Mason.beehive`, cue `hive`) lets out a swarm for `SWARM_TIME` seconds that goes
+  after the nearest crew able to catch, then the next; stung crews (`sting`, mode `stung`)
+  don't run to catch him (though a bed that happens to be under him still breaks his fall). Stung bearers run only along their own beat (`beatOf`), and carts and guards
+  stay put, so a panic never ploughs a crew into scenery: keep every litter's beat clear.
+- Banana skins (`Mason.peel`) trip any crew on the move whose footprint passes over them,
+  but only once a stock shot or a blast has armed them. A shot flicks a skin (`flickPeel`) at a
+  speed set by the shot's, not with the cannonball's full blow, and the skin ignores that
+  ball for a moment so it isn't shoved twice.
 - Machines are kinematic bodies driven in `updateMachines`: the weathercock (`Mason.vane`)
   turns `step` per blow, the carousel (`Mason.carousel`) turns steadily, the portcullis
   slides. The chute (`Mason.chute`) is a fixed trough with a scoring sensor in its hopper.

@@ -59,6 +59,8 @@ function allTheKingsMen(): LevelDef {
   const top = m.tower("oak", 0, -1.5, 6, { y: base });
   // A painter left his pot on a stepladder right in front of a guard.
   m.paintPot(2.1, 2.95);
+  // And somebody dropped a banana skin.
+  m.peel(-4, 0.2, -0.3);
   const crews: CrewDef[] = [
     {
       id: "litter-a",
@@ -260,11 +262,13 @@ function theKeep(): LevelDef {
   for (const x of [-3, -1.6, 1.6, 3]) m.hay(x, -5.2);
   // Tucked in the corner, stage left, behind the rampart.
   m.chest(-8.6, -2.2, { yaw: 0.4 });
+  // The King's orchard, stage left, and a hive of bees in the old apple tree.
+  m.beehive(-10.4, 1.2);
   return {
     id: "the-keep",
     title: "The Keep",
     verse: ["All the King's horses and all the King's men", "built him a castle. Let's knock it down again."],
-    hint: "Everything you've learned, all at once. There's more than one way in.",
+    hint: "Everything you've learned, all at once. There's more than one way in, and a beehive in the orchard: stir it up and the bees chase the King's men round the stage.",
     ammo: { shot: 3, shell: 2, grape: 1, chain: 1, bomb: 1 },
     greatFall: 5,
     mayhem: 850,
@@ -285,7 +289,7 @@ function theKeep(): LevelDef {
         kind: "cart",
         home: { x: 8, y: 0, z: -4.2 },
         yaw: -Math.PI / 2,
-        zone: { minX: -12, maxX: 12, minZ: -8.5, maxZ: -3 },
+        zone: { minX: -10.2, maxX: 12, minZ: -8.5, maxZ: -3 },
       },
       { id: "guard-e1", kind: "guard", home: { x: -6.8, y: 0, z: 2.8 }, yaw: 0 },
       { id: "guard-e2", kind: "guard", home: { x: 6.8, y: 0, z: 2.8 }, yaw: 0 },

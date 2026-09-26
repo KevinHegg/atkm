@@ -856,3 +856,61 @@ test("a shot through the King's dresser smashes a plate and rattles its neighbou
   assert.ok(game.chinaView.filter((piece) => !piece.whole).length > 10, "the blast smashes the dresser's china");
   game.destroy();
 });
+
+test("a banana skin knocked into a patrol's path trips the stretcher crew; one left where it lay never does", async () => {
+  const patrol: LevelDef["crews"] = [{
+    id: "litter-p",
+    kind: "litter",
+    home: { x: -5, y: 0, z: -4.2 },
+    yaw: Math.PI / 2,
+    zone: { minX: -9, maxX: 9, minZ: -8.5, maxZ: 3.5 },
+    patrol: [{ x: -5.5, y: 0, z: -4.2 }, { x: 5.5, y: 0, z: -4.2 }],
+  }];
+  const game = await Game.create(arena((mason) => {
+    mason.peel(-4, 0.2, -0.3);
+    // This one lies right on their beat, but nobody has sent it skidding.
+    mason.peel(2, -4.2, 0);
+    return perchAt(8, 1, 3);
+  }, { ammo: { shot: 2 }, crews: patrol }));
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: 6, y: 0.2, z: 3 }));
+  const quiet = await run(game, 8);
+  assert.ok(!quiet.some((event) => event.type === "slip"), "a skin nobody has shot is just a skin");
+  await stepUntilReady(game);
+  const peel = game.bodies.filter((body) => body.kind === "peel").sort((a, b) => b.position.z - a.position.z)[0]!;
+  assert.ok(game.fire({ x: peel.position.x - 0.15, y: 0.07, z: peel.position.z }));
+  // Once it has landed on their beat, the patrol walks into it within one round of its beat.
+  const events = await run(game, 20, (event) => event.type === "slip");
+  assert.ok(events.some((event) => event.type === "slip" && event.crewId === "litter-p"), "the flicked skin trips the patrol");
+  assert.equal(game.mayhem.entries.get("slip")?.count, 1);
+  assert.equal(game.crewViews[0]!.mode, "stunned");
+  game.destroy();
+});
+
+test("struck, the beehive sends a swarm after the King's men, who run for it, and the bees go home", async () => {
+  const { SWARM_TIME } = await import("../src/sim/game.js");
+  const crews: LevelDef["crews"] = [{
+    id: "litter-b",
+    kind: "litter",
+    home: { x: -4, y: 0, z: -5 },
+    yaw: Math.PI / 2,
+    zone: { minX: -9, maxX: 9, minZ: -8.5, maxZ: 3.5 },
+    patrol: [{ x: -4, y: 0, z: -5 }, { x: 4, y: 0, z: -5 }],
+  }];
+  let hive = { x: 0, y: 0, z: 0 };
+  const game = await Game.create(arena((mason) => {
+    hive = mason.beehive(-11, -4.5);
+    return perchAt(8, 1, 3);
+  }, { crews }));
+  await stepUntilReady(game);
+  assert.ok(game.fire(hive));
+  const events = await run(game, 5);
+  assert.ok(events.some((event) => event.type === "cue" && event.cue === "hive"), "the hive is a stage cue");
+  assert.ok(events.some((event) => event.type === "stung" && event.crewId === "litter-b"), "the bees reach the crew");
+  assert.equal(game.crewViews[0]!.mode, "stung");
+  assert.equal(game.mayhem.entries.get("masonry"), undefined, "running from bees knocks nothing over");
+  await run(game, SWARM_TIME + 4);
+  assert.equal(game.swarmView, undefined, "the bees go home");
+  assert.notEqual(game.crewViews[0]!.mode, "stung");
+  game.destroy();
+});
