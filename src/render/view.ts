@@ -555,6 +555,16 @@ export class StageView {
       if (event.id === "duke") this.company.dukeStruck(this.elapsed);
       if (event.id === "stagehands") this.company.stagehandsStruck(this.elapsed);
       if (event.id === "tower") this.company.towerStruck(this.elapsed);
+      if (event.id === "pie") {
+        this.company.kingReacts("outrage", this.elapsed);
+        // Crumbs of crust, and a puff of flour.
+        const at = V(event.at.x, event.at.y, event.at.z);
+        this.puff(at.clone().add(V(0, 0.3, 0)), V(0, 0.8, 0), 0.5, 0.9, 0, palette.cream);
+        for (let index = 0; index < 10; index += 1) {
+          const angle = (index / 10) * Math.PI * 2;
+          this.spark(at.clone().add(V(0, 0.25, 0)), V(Math.cos(angle) * 2.5, 2 + Math.random() * 2, Math.sin(angle) * 2.5), new pc.Color(0.86, 0.6, 0.27), 0.08, 0.9);
+        }
+      }
       this.flash(event.at, 0.5);
     } else if (event.type === "slip") {
       this.puff(V(event.at.x, 0.2, event.at.z), V(0, 0.6, 0), 0.45, 0.8, 0, palette.cream);

@@ -127,8 +127,12 @@ unlock every verse.
 - **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the moon, Jack and
   Jill's hill, the cuckoo clock, the well, the spider, the Grand Old Duke of York's men
   on the painted hill, Old King Cole in his royal box (or the stilts it stands on), or the
-  two stagehands at the fly line, and see what happens. None of them change the verse, but
-  each pays mayhem once, and any of them might be hiding the verse's star.
+  two stagehands at the fly line, and see what happens. The King's supper hangs from the
+  flies over stage right: open that pie and four-and-twenty blackbirds fly out singing. And
+  a mouse lives on the cuckoo clock's long weight, running up the clock now and then: strike
+  it and the clock strikes one, and the mouse runs down and away into the wings. None of
+  them change the verse, but each pays mayhem once, and any of them might be hiding the
+  verse's star.
 - **Banana skins.** In All the King's Men a banana skin lies on the boards. A shot flicks it
   skidding the way the shot was going, and any crew on the move that treads on it goes flat on
   its back, just as if bowled over. A skin nobody has shot is just a skin, and each one trips

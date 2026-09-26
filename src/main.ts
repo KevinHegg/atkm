@@ -588,6 +588,8 @@ function starHolderName(holder: LevelDef["star"]): string {
       duke: "the Grand Old Duke's army",
       stagehands: "the stagehands",
       tower: "the royal box",
+      pie: "the King's pie",
+      mouse: "the clock mouse",
     };
     return names[holder.curio];
   }
@@ -1357,6 +1359,11 @@ const CURIO_SOUNDS: Record<CurioId, () => void> = {
   spider: () => audio.zip(),
   stagehands: () => audio.oof(),
   tower: () => audio.rattle(),
+  pie: () => audio.birdsong(),
+  mouse: () => {
+    audio.strikeOne();
+    audio.squeak();
+  },
 };
 
 function playCurio(id: CurioId): void {

@@ -28,6 +28,14 @@ export class Curios {
   private readonly clockDoor: pc.Entity;
   private readonly clockSwing: pc.Entity;
   private readonly pendulum: pc.Entity;
+  /** Sing a song of sixpence: the flown pie, its lid, and the four-and-twenty blackbirds inside. */
+  private readonly pieSwing: pc.Entity;
+  private readonly pieLid: pc.Entity;
+  private readonly pieHome: pc.Vec3;
+  private readonly birds: Array<{ root: pc.Entity; wings: [pc.Entity, pc.Entity] }> = [];
+  /** Hickory dickory dock: the mouse, and the marks on the clock it climbs between. */
+  private readonly mouse: pc.Entity;
+  private readonly mouseTrack: pc.Entity[];
   private readonly cat: pc.Entity;
   private readonly bell: pc.Entity;
   private readonly spider: pc.Entity;
@@ -128,6 +136,66 @@ export class Curios {
       kit.primitive("chain", "box", clock, V(side * 0.3, -0.6 - drop / 2, 0.05), { x: 0.025, y: drop, z: 0.025 }, kit.material("iron", palette.iron, 0.55, 0.68), pc.Vec3.ZERO, false);
       kit.primitive("pine-cone", "cone", clock, V(side * 0.3, -0.6 - drop - 0.14, 0.05), { x: 0.16, y: 0.34, z: 0.16 }, gold, V(180, 0, 0), false);
     }
+    // The mouse's way up the clock: from its perch on the long weight, up the chain, and up the
+    // front of the case to the little door. Marks on the clock, so the mouse swings with it.
+    this.mouseTrack = [V(-0.3, -1.42, 0.12), V(-0.3, -0.62, 0.12), V(-0.44, 0.3, 0.26)].map((mark) => kit.group("mouse-mark", clock, mark));
+    this.mouse = kit.group("mouse", this.root);
+    const fur = new pc.Color(0.56, 0.54, 0.52);
+    const pink = new pc.Color(0.92, 0.6, 0.64);
+    kit.meshEntity("mouse-body", kit.boxes("clock-mouse", [
+      { center: [0, 0.07, 0], size: [0.22, 0.13, 0.13], color: fur },
+      { center: [0.14, 0.09, 0], size: [0.1, 0.1, 0.1], color: fur },
+      { center: [0.2, 0.09, 0], size: [0.03, 0.03, 0.03], color: pink },
+      { center: [0.12, 0.17, -0.05], size: [0.02, 0.07, 0.06], color: pink },
+      { center: [0.12, 0.17, 0.05], size: [0.02, 0.07, 0.06], color: pink },
+      { center: [0.17, 0.11, -0.035], size: [0.02, 0.02, 0.02], color: palette.ink },
+      { center: [0.17, 0.11, 0.035], size: [0.02, 0.02, 0.02], color: palette.ink },
+      { center: [-0.24, 0.05, 0], size: [0.26, 0.015, 0.015], color: pink },
+    ]), kit.paintMaterial(0.3), this.mouse);
+
+    // Sing a song of sixpence: the King's supper flown in on three lines, a pie on a gilt platter.
+    // One impatient blackbird has already pecked its head out through the crust.
+    this.pieHome = at("pie");
+    this.pieSwing = kit.group("pie-flown", this.root, V(this.pieHome.x, flies, this.pieHome.z));
+    const pie = kit.group("pie", this.pieSwing, V(0, this.pieHome.y - flies - 0.1, 0));
+    for (let index = 0; index < 3; index += 1) {
+      const angle = (index / 3) * Math.PI * 2;
+      kit.primitive("pie-line", "cylinder", this.pieSwing, V(Math.cos(angle) * 0.4, (this.pieHome.y - 0.1 - flies) / 2, Math.sin(angle) * 0.4), { x: 0.03, y: flies - this.pieHome.y + 0.1, z: 0.03 }, line, pc.Vec3.ZERO, false);
+    }
+    kit.primitive("pie-platter", "cylinder", pie, V(0, 0, 0), { x: 1, y: 0.05, z: 1 }, gold);
+    kit.primitive("pie-dish", "cylinder", pie, V(0, 0.07, 0), { x: 0.74, y: 0.12, z: 0.74 }, kit.material("pewter", new pc.Color(0.62, 0.64, 0.66), 0.7, 0.8));
+    kit.primitive("pie-filling", "cylinder", pie, V(0, 0.13, 0), { x: 0.62, y: 0.03, z: 0.62 }, kit.material("pie-filling", new pc.Color(0.22, 0.09, 0.05), 0.4), pc.Vec3.ZERO, false);
+    const crust = kit.material("pie-crust", new pc.Color(0.86, 0.6, 0.27), 0.3);
+    const browned = kit.material("pie-lattice", new pc.Color(0.7, 0.44, 0.16), 0.3);
+    kit.meshEntity("pie-rim", kit.torus(0.32, 0.05, 20, 6), crust, pie).setLocalPosition(0, 0.15, 0);
+    this.pieLid = kit.group("pie-lid", pie, V(0, 0.15, 0));
+    kit.primitive("pie-dome", "sphere", this.pieLid, V(0, 0.02, 0), { x: 0.64, y: 0.28, z: 0.64 }, crust);
+    for (const k of [-0.14, 0, 0.14]) {
+      kit.primitive("pie-lattice", "box", this.pieLid, V(k, 0.14 - Math.abs(k) * 0.35, 0), { x: 0.035, y: 0.03, z: 0.52 - Math.abs(k) }, browned, pc.Vec3.ZERO, false);
+      kit.primitive("pie-lattice", "box", this.pieLid, V(0, 0.14 - Math.abs(k) * 0.35, k), { x: 0.52 - Math.abs(k), y: 0.03, z: 0.035 }, browned, pc.Vec3.ZERO, false);
+    }
+    const black = new pc.Color(0.07, 0.065, 0.06);
+    const beak = new pc.Color(0.95, 0.6, 0.1);
+    kit.primitive("pie-peeker", "sphere", this.pieLid, V(0.13, 0.19, 0.12), { x: 0.1, y: 0.1, z: 0.1 }, kit.material("blackbird", black, 0.5));
+    kit.primitive("pie-peeker-beak", "cone", this.pieLid, V(0.13, 0.19, 0.2), { x: 0.035, y: 0.08, z: 0.035 }, kit.material("beak", beak, 0.3), V(90, 0, 0), false);
+    const birdBody = kit.boxes("blackbird-body", [
+      { center: [0, 0, 0], size: [0.1, 0.1, 0.2], color: black },
+      { center: [0, 0.03, 0.12], size: [0.08, 0.08, 0.08], color: black },
+      { center: [0, 0.02, 0.19], size: [0.03, 0.03, 0.07], color: beak },
+      { center: [0, 0.01, -0.13], size: [0.07, 0.02, 0.1], color: black },
+    ]);
+    const birdWing = kit.boxes("blackbird-wing", [{ center: [0.09, 0, 0], size: [0.18, 0.015, 0.1], color: black }]);
+    const paintBird = kit.paintMaterial(0.35);
+    for (let index = 0; index < 24; index += 1) {
+      const bird = kit.group("blackbird", this.root);
+      kit.meshEntity("blackbird-body", birdBody, paintBird, bird, false);
+      // A wing each side, hinged at the shoulder (the left one is the right turned about).
+      const wings = [kit.group("wing-l", bird, V(-0.04, 0.04, 0), V(0, 180, 0)), kit.group("wing-r", bird, V(0.04, 0.04, 0))] as [pc.Entity, pc.Entity];
+      for (const wing of wings) kit.meshEntity("blackbird-wing", birdWing, paintBird, wing, false);
+      // Out of sight until the pie is opened (shrunk, not switched off: the curios are one batch).
+      bird.setLocalScale(0.001, 0.001, 0.001);
+      this.birds.push({ root: bird, wings });
+    }
 
     // Ding, dong, bell: a stone well with a bell on its gallows and a cat inside.
     const wellAt = at("well");
@@ -175,6 +243,106 @@ export class Curios {
     this.acts.set(id, { started: now });
   }
 
+  /**
+   * Hickory dickory dock. Left alone, the mouse runs up the clock and down again every so often.
+   * Struck, the clock strikes one and the mouse runs down, drops to the boards and bolts for the
+   * wings; it's back on its weight a while later.
+   */
+  private animateMouse(now: number, struck: number): void {
+    const mouse = this.mouse;
+    const [cone, chainTop, door] = this.mouseTrack.map((mark) => mark.getPosition()) as [pc.Vec3, pc.Vec3, pc.Vec3];
+    const place = (at: pc.Vec3, pitch: number, yaw: number): void => {
+      mouse.setPosition(at);
+      mouse.setEulerAngles(0, yaw, pitch);
+      mouse.setLocalScale(1.5, 1.5, 1.5);
+    };
+    const between = (a: pc.Vec3, b: pc.Vec3, k: number): pc.Vec3 => new pc.Vec3().lerp(a, b, Math.max(0, Math.min(1, k)));
+    if (struck < 12) {
+      if (struck < 0.3) {
+        // A startled hop where it sat.
+        place(cone.clone().add(new pc.Vec3(0, Math.sin((struck / 0.3) * Math.PI) * 0.15, 0)), 0, 8);
+      } else if (struck < 0.9) {
+        // Off the weight and down to the boards.
+        const k = (struck - 0.3) / 0.6;
+        const floor = new pc.Vec3(cone.x - 0.4, 0.02, cone.z + 0.3);
+        const at = between(cone, floor, k);
+        at.y = cone.y + (floor.y - cone.y) * k * k;
+        place(at, -60 * k, 8);
+      } else if (struck < 3) {
+        // And away into the wings, stage left, as fast as its legs will go.
+        const k = (struck - 0.9) / 2.1;
+        const x = cone.x - 0.4 - k * 9;
+        place(new pc.Vec3(x, 0.02 + Math.abs(Math.sin(struck * 30)) * 0.03, cone.z + 0.3), 0, 180);
+      } else {
+        mouse.setLocalScale(0.001, 0.001, 0.001);
+      }
+      return;
+    }
+    // Its round: sit on the weight, run up the chain and the case, peek, and back down.
+    const t = now % 16;
+    if (t < 5 || t >= 13) place(cone, 0, 8 + Math.sin(now * 3) * 6);
+    else if (t < 6.4) place(between(cone, chainTop, (t - 5) / 1.4), 90, 8);
+    else if (t < 7.6) place(between(chainTop, door, (t - 6.4) / 1.2), 90, 8);
+    else if (t < 9.6) place(door, 90 + Math.sin(now * 4) * 10, 8);
+    else if (t < 11) place(between(door, chainTop, (t - 9.6) / 1.4), -90, 8);
+    else place(between(chainTop, cone, (t - 11) / 2), -90, 8);
+  }
+
+  /**
+   * When the pie is opened the birds begin to sing: the lid flies off and four-and-twenty
+   * blackbirds wheel up out of it and away over the stage. The stagehands send down a fresh pie
+   * a little later.
+   */
+  private animatePie(now: number, opened: number): void {
+    const swing = opened < 4 ? Math.sin(opened * 3) * 5 * (1 - opened / 4) : Math.sin(now * 0.7) * 0.8;
+    this.pieSwing.setLocalEulerAngles(swing, now * 4, swing * 0.4);
+    if (opened > 10) {
+      this.pieLid.setLocalPosition(0, 0.15, 0);
+      this.pieLid.setLocalEulerAngles(0, 0, 0);
+      this.pieLid.setLocalScale(1, 1, 1);
+      for (const bird of this.birds) bird.root.setLocalScale(0.001, 0.001, 0.001);
+      return;
+    }
+    if (opened < 1.2) {
+      const k = opened / 1.2;
+      this.pieLid.setLocalPosition(0.6 * k, 0.15 + Math.sin(k * Math.PI) * 1 - k * 1.4, 0.3 * k);
+      this.pieLid.setLocalEulerAngles(k * 280, 0, k * 90);
+      this.pieLid.setLocalScale(1, 1, 1);
+    } else if (opened < 9) {
+      this.pieLid.setLocalScale(0.001, 0.001, 0.001);
+    } else {
+      // A fresh pie, lowered in from above.
+      const k = opened - 9;
+      this.pieLid.setLocalScale(k, k, k);
+      this.pieLid.setLocalPosition(0, 0.15, 0);
+      this.pieLid.setLocalEulerAngles(0, 0, 0);
+    }
+    const from = this.pieHome;
+    this.birds.forEach((bird, index) => {
+      const t = opened - index * 0.05;
+      if (t <= 0 || opened > 6.5) {
+        bird.root.setLocalScale(0.001, 0.001, 0.001);
+        return;
+      }
+      // Each bird wheels out on its own turn of a widening spiral, drifting away over the stage.
+      const seed = Math.sin(index * 12.9898) * 43758.5453;
+      const jitter = seed - Math.floor(seed);
+      const angle = (index / 24) * Math.PI * 2 + t * (1.4 + jitter);
+      const radius = 0.3 + t * (1.2 + jitter);
+      bird.root.setPosition(
+        from.x + Math.cos(angle) * radius - t * t * 0.4,
+        from.y + 0.2 + t * (1 + jitter * 0.8) + Math.sin(t * 5 + index) * 0.15,
+        from.z + Math.sin(angle) * radius + t * 0.5,
+      );
+      const size = 1.6 * (opened > 5.8 ? Math.max(0.001, (6.5 - opened) / 0.7) : Math.min(1, t * 4));
+      bird.root.setLocalScale(size, size, size);
+      bird.root.setEulerAngles(0, (-angle * 180) / Math.PI, 0);
+      const flap = Math.sin(now * 28 + index * 1.7) * 45;
+      bird.wings[0].setLocalEulerAngles(0, 180, flap);
+      bird.wings[1].setLocalEulerAngles(0, 0, flap);
+    });
+  }
+
   update(now: number): void {
     const age = (id: CurioId): number => {
       const act = this.acts.get(id);
@@ -213,13 +381,15 @@ export class Curios {
     tumble(this.jill, 0.5, 0.35);
     tumble(this.pail, 0.2, 0);
     // Tick, tock; and when it is struck, cuckoo! Three times, swinging on its lines.
-    const cuckoo = age("cuckoo");
+    const cuckoo = Math.min(age("cuckoo"), age("mouse"));
     this.pendulum.setLocalEulerAngles(0, 0, Math.sin(now * 4.4) * 16);
     const out = cuckoo < 2.4 ? Math.max(0, Math.sin((cuckoo / 0.8) * Math.PI)) : 0;
     this.cuckoo.setLocalPosition(0, 0.44, 0.05 + out * 0.4);
     this.clockDoor.setLocalEulerAngles(0, out > 0.05 ? -100 : 0, 0);
     const swing = cuckoo < 4 ? Math.sin(cuckoo * 2.6) * 2.2 * (1 - cuckoo / 4) : 0;
     this.clockSwing.setLocalEulerAngles(swing, 8, swing * 0.5);
+    this.animateMouse(now, age("mouse"));
+    this.animatePie(now, age("pie"));
     // Ding, dong, bell; pussy's in the well.
     const well = age("well");
     this.bell.setLocalEulerAngles(well < 2.5 ? Math.sin(well * 14) * 30 * (1 - well / 2.5) : 0, 0, 0);

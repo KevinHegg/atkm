@@ -130,7 +130,7 @@ const CHEST_EXTRA = 2;
 /** Height of the rail round the music box's seat. */
 const TURNTABLE_RAIL = 0.1;
 /** Curios with a line of their own on the King's bill; the rest are "scenery disturbed". */
-const CURIO_SCORE: Partial<Record<CurioId, MayhemKind>> = { king: "royal", duke: "duke", stagehands: "stagehand", tower: "tower" };
+const CURIO_SCORE: Partial<Record<CurioId, MayhemKind>> = { king: "royal", duke: "duke", stagehands: "stagehand", tower: "tower", pie: "pie", mouse: "mouse" };
 /** Structural bodies that are rides, not masonry. */
 const RIDES = new Set(["seat", "seesaw", "cradle"]);
 /** How tall the sides of the rock-a-bye basket are. */

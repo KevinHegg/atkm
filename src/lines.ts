@@ -289,6 +289,8 @@ export const CURIO_LINES: Readonly<Record<string, { speaker: Speaker; line: stri
   cuckoo: { speaker: "queen", line: "It's the hour of your doom, egg. Cuckoo!" },
   well: { speaker: "humpty", line: "Ding dong bell! Who put the cat in there?" },
   spider: { speaker: "queen", line: "Miss Muffet will be absolutely furious." },
+  pie: { speaker: "king", line: "My pie! Four-and-twenty blackbirds, and not one of them baked!" },
+  mouse: { speaker: "humpty", line: "The clock struck one, the mouse ran down. I, however, am staying up." },
   duke: { speaker: "humpty", line: "The Grand Old Duke of York! He had ten thousand men. Had." },
   stagehands: { speaker: "humpty", line: "Not the stagehands! Who's going to winch me back up now?" },
 };

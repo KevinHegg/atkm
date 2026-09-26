@@ -44,7 +44,7 @@ function hadAGreatFall(): LevelDef {
     ammo: { shot: 4 },
     greatFall: 4,
     mayhem: 775,
-    star: { curio: "cuckoo" },
+    star: { curio: "mouse" },
     humpty: perchAt(seat.x, seat.y, seat.z),
     pieces: m.pieces,
     crews: [],
@@ -329,7 +329,7 @@ function theEncore(): LevelDef {
     ammo: { shot: 5, shell: 2, grape: 3, chain: 2, bomb: 2 },
     greatFall: 4.6,
     mayhem: 1175,
-    star: { rat: true },
+    star: { curio: "pie" },
     humpty: perchAt(0, y, -2.4),
     pieces: m.pieces,
     crews: [

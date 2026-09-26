@@ -29,7 +29,7 @@ export type CueKind = "lunch" | "wind" | "trap" | "gate" | "release" | "hive" | 
 export type StarHolder = { crew: string } | { curio: CurioId } | { rat: true };
 
 /** Nursery-rhyme curios hidden in the scenery; striking one only does something silly. */
-export type CurioId = "cow" | "moon" | "jack-and-jill" | "cuckoo" | "well" | "spider" | "king" | "duke" | "stagehands" | "tower";
+export type CurioId = "cow" | "moon" | "jack-and-jill" | "cuckoo" | "well" | "spider" | "king" | "duke" | "stagehands" | "tower" | "pie" | "mouse";
 
 export type BodyKind =
   | "ground"

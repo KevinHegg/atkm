@@ -295,6 +295,28 @@ export class TheatreAudio {
     }
   }
 
+  /** When the pie was opened, the birds began to sing: a flutter, then a chorus of blackbirds. */
+  birdsong(): void {
+    if (!this.throttle("birds", 2000)) return;
+    this.burst({ duration: 0.5, volume: 0.25, filter: "bandpass", frequency: 2600, q: 0.8 });
+    for (let index = 0; index < 24; index += 1) {
+      const delay = 0.15 + index * 0.1 + Math.random() * 0.12;
+      const pitch = 1900 + Math.random() * 1400;
+      // A blackbird's phrase: a fluting rise, a drop, a trill.
+      this.tone(pitch, 0.12, 0.05, "sine", { to: pitch * 1.35, delay, attack: 0.01 });
+      this.tone(pitch * 1.2, 0.1, 0.04, "sine", { to: pitch * 0.8, delay: delay + 0.13, attack: 0.01 });
+      if (index % 3 === 0) for (let trill = 0; trill < 3; trill += 1) this.tone(pitch * 1.5, 0.04, 0.03, "triangle", { delay: delay + 0.26 + trill * 0.05 });
+    }
+  }
+
+  /** The clock struck one: a single deep bell, humming away. */
+  strikeOne(): void {
+    if (!this.throttle("strike", 1500)) return;
+    for (const [ratio, volume, length] of [[1, 0.28, 2.6], [2.01, 0.1, 1.6], [2.76, 0.07, 1.2], [5.4, 0.03, 0.6]] as const) {
+      this.tone(196 * ratio, length, volume, "sine", { attack: 0.003 });
+    }
+  }
+
   dingDong(): void {
     this.tone(880, 1.4, 0.2, "sine", { attack: 0.002 });
     this.tone(1763, 0.8, 0.06, "sine", { attack: 0.002 });

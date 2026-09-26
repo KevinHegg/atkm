@@ -10,10 +10,14 @@ export const CURIOS: ReadonlyArray<{ id: CurioId; at: Vec3; size: Vec3 }> = [
   { id: "jack-and-jill", at: { x: 4.2, y: 5.3, z: -9.6 }, size: { x: 1.8, y: 1.4, z: 0.7 } },
   // A big cuckoo clock flown in over stage left, low enough to clear the header and the cow.
   { id: "cuckoo", at: { x: -7.5, y: 3.9, z: -1.5 }, size: { x: 1.4, y: 3, z: 0.8 } },
+  // Hickory dickory dock: a mouse at home on the clock's long weight, below the case.
+  { id: "mouse", at: { x: -7.79, y: 2.05, z: -1.41 }, size: { x: 0.55, y: 0.7, z: 0.55 } },
   { id: "well", at: { x: 13, y: 0.8, z: 5.3 }, size: { x: 1.5, y: 1.6, z: 1.5 } },
   { id: "spider", at: { x: 6.5, y: 7.6, z: -3 }, size: { x: 0.8, y: 0.8, z: 0.8 } },
   // Old King Cole watches from a royal box high on stilts, stage right, upstage.
   { id: "king", at: { x: 10.2, y: 5.3, z: -7.3 }, size: { x: 2.4, y: 2.6, z: 2.2 } },
+  // Sing a song of sixpence: the King's supper, a pie on a gilt platter, flown in over stage right.
+  { id: "pie", at: { x: 7.6, y: 6.2, z: -2.2 }, size: { x: 0.9, y: 0.5, z: 0.9 } },
   // The box's stilts and bracing: shake them and the whole box rattles.
   { id: "tower", at: { x: 10.2, y: 2, z: -7.3 }, size: { x: 2.3, y: 4, z: 2.1 } },
   // The two stagehands at the fly line beside it, who work the hoist.

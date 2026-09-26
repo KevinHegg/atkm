@@ -948,3 +948,19 @@ test("in Pop Goes the Weasel the hay behind him catches a plain knock; turn the 
   const turned = await playOut(level, [{ ammo: "shot", at: { x: 7.4, y: 0.6, z: 3.2 } }, { ammo: "shot", at: { x: 0, y: 4.6, z: -1.4 }, wait: 3 }], 24);
   assert.ok(turned.won, "capstan, then the same knock, cracks him");
 });
+
+test("the King's pie and the clock mouse are curios: each pays once, and each hides a verse's star", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const { CURIOS } = await import("../src/sim/curios.js");
+  for (const [verse, id, kind] of [["the-encore", "pie", "pie"], ["had-a-great-fall", "mouse", "mouse"]] as const) {
+    const game = await Game.create(levelById(verse)!);
+    await stepUntilReady(game);
+    game.select("shot");
+    assert.ok(game.fire(CURIOS.find((curio) => curio.id === id)!.at));
+    const events = await run(game, 4);
+    assert.ok(events.some((event) => event.type === "curio" && event.id === id), `${id} is struck in ${verse}`);
+    assert.ok(events.some((event) => event.type === "star"), `${id} gives up ${verse}'s star`);
+    assert.equal(game.mayhem.entries.get(kind)?.count, 1);
+    game.destroy();
+  }
+});
