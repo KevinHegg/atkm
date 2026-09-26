@@ -160,6 +160,33 @@ export interface GateDef {
   yaw: number;
 }
 
+/** The King's china dresser: a painted cupboard and plate rack, its shelves full of china. */
+export interface DresserDef {
+  kind: "dresser";
+  /** Middle of its foot, on the boards. */
+  pos: Vec3;
+  yaw: number;
+}
+
+export type ChinaKind = "plate" | "cup" | "teapot";
+
+/** A dresser's size, and where its shelves and china stand (x across, y up, z out toward the house). */
+export const DRESSER = { width: 2.4, height: 2.7, base: 0.9, depth: 0.6, rack: 0.3, shelves: [1.2, 1.7, 2.2] };
+
+export function dresserChina(): Array<{ kind: ChinaKind; row: number; local: Vec3; size: Vec3 }> {
+  const pieces: Array<{ kind: ChinaKind; row: number; local: Vec3; size: Vec3 }> = [];
+  const plate = (row: number, x: number, y: number): void => {
+    pieces.push({ kind: "plate", row, local: { x, y: y + 0.19, z: -0.17 }, size: { x: 0.38, y: 0.38, z: 0.06 } });
+  };
+  // Three rows of plates on the rack, and a teapot and cups on the counter below.
+  for (const [row, y] of DRESSER.shelves.entries()) {
+    for (const x of row === 1 ? [-0.9, -0.45, 0, 0.45, 0.9] : [-0.8, -0.27, 0.27, 0.8]) plate(row, x, y);
+  }
+  pieces.push({ kind: "teapot", row: 3, local: { x: -0.6, y: DRESSER.base + 0.16, z: 0.14 }, size: { x: 0.36, y: 0.32, z: 0.28 } });
+  for (const x of [0.05, 0.4, 0.75]) pieces.push({ kind: "cup", row: 3, local: { x, y: DRESSER.base + 0.07, z: 0.16 }, size: { x: 0.16, y: 0.14, z: 0.16 } });
+  return pieces;
+}
+
 /** A ring of stage trapdoors: pull the lever and anyone standing on them drops below. */
 export interface TrapDef {
   kind: "trap";
@@ -169,7 +196,7 @@ export interface TrapDef {
   outer: number;
 }
 
-export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef;
+export type PieceDef = BlockDef | KegDef | HayDef | FixtureDef | TurntableDef | SwingDef | SeesawDef | BucketDef | SandbagDef | ChestDef | TrapDef | VaneDef | ChuteDef | CarouselDef | GateDef | DresserDef;
 
 /** A giant rat that creeps out of the wings to gnaw the Queen's powder. */
 export interface RatDef {
@@ -542,6 +569,11 @@ export class Mason {
       this.block(material, spot.x, 0, spot.z, 0.7, height, 0.12, spot.yaw);
       along += height * 0.5 + 0.12;
     }
+  }
+
+  /** The King's china dresser, turned to face `yaw` (0 faces the house). */
+  dresser(x: number, z: number, yaw = 0): void {
+    this.pieces.push({ kind: "dresser", pos: { x, y: 0, z }, yaw });
   }
 
   /** A carousel of paddles round a painted bush, turning at `speed` radians a second. */

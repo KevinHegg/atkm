@@ -451,6 +451,92 @@ export class TheatreAudio {
     this.burst({ duration: 0.5, volume: 0.12, filter: "bandpass", frequency: 2400, q: 6, delay: 0.25 });
   }
 
+  /** A piece of the King's china: a bright clink, a tinkle of shards, and for the teapot a hollow crunch. */
+  smash(piece: "plate" | "cup" | "teapot"): void {
+    if (!this.throttle("smash", 60)) return;
+    this.burst({ duration: 0.22, volume: 0.35, filter: "highpass", frequency: 3200 });
+    const pieces = piece === "teapot" ? 7 : piece === "plate" ? 5 : 3;
+    for (let index = 0; index < pieces; index += 1) {
+      this.tone(2600 + Math.random() * 2600, 0.05 + Math.random() * 0.12, 0.07, "triangle", { delay: index * 0.035 + Math.random() * 0.03 });
+    }
+    if (piece === "teapot") this.burst({ duration: 0.18, volume: 0.4, filter: "bandpass", frequency: 700, q: 1.4 });
+  }
+
+  // ---------------------------------------------------------------- the pit orchestra
+
+  /** The pit's snare roll, held while something hangs in the balance. */
+  private snare: { source: AudioBufferSourceNode; lfo: OscillatorNode; level: GainNode; filter: BiquadFilterNode; target: number; quietSince: number } | undefined;
+
+  /** Hold the snare roll at `intensity` (0 to 1): it swells in slowly and dies away when let go. */
+  roll(intensity: number): void {
+    const audio = this.ready();
+    if (!audio || !this.noise) {
+      this.stopRoll(0.05);
+      return;
+    }
+    const { ctx, out } = audio;
+    if (!this.snare) {
+      if (intensity <= 0) return;
+      const source = ctx.createBufferSource();
+      source.buffer = this.noise;
+      source.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 1500;
+      filter.Q.value = 0.9;
+      // A sawtooth run backwards through the gain: each stick stroke hits at once and decays.
+      const strokes = ctx.createGain();
+      strokes.gain.value = 0.5;
+      const lfo = ctx.createOscillator();
+      lfo.type = "sawtooth";
+      lfo.frequency.value = 15;
+      const depth = ctx.createGain();
+      depth.gain.value = -0.5;
+      lfo.connect(depth).connect(strokes.gain);
+      const level = ctx.createGain();
+      level.gain.value = 0.0001;
+      source.connect(filter).connect(strokes).connect(level).connect(out);
+      source.start();
+      lfo.start();
+      this.snare = { source, lfo, level, filter, target: 0, quietSince: ctx.currentTime };
+    }
+    const snare = this.snare;
+    const now = ctx.currentTime;
+    const target = Math.max(0, Math.min(1, intensity)) * 0.24;
+    if (Math.abs(target - snare.target) > 0.01) {
+      // Swell slowly, fall away quicker; the strokes quicken and brighten as it builds.
+      snare.level.gain.setTargetAtTime(Math.max(0.0001, target), now, target > snare.target ? 0.45 : 0.12);
+      snare.lfo.frequency.setTargetAtTime(14 + intensity * 9, now, 0.3);
+      snare.filter.frequency.setTargetAtTime(1300 + intensity * 1400, now, 0.3);
+      snare.target = target;
+    }
+    if (target > 0) snare.quietSince = now;
+    else if (now - snare.quietSince > 1.2) this.stopRoll(0.05);
+  }
+
+  private stopRoll(fade: number): void {
+    const snare = this.snare;
+    const ctx = this.context;
+    if (!snare || !ctx) return;
+    this.snare = undefined;
+    const now = ctx.currentTime;
+    snare.level.gain.cancelScheduledValues(now);
+    snare.level.gain.setValueAtTime(snare.level.gain.value, now);
+    snare.level.gain.linearRampToValueAtTime(0.0001, now + fade);
+    snare.source.stop(now + fade + 0.02);
+    snare.lfo.stop(now + fade + 0.02);
+  }
+
+  /** The roll ends on a crash: bass drum and a big ringing cymbal. */
+  cymbal(): void {
+    this.stopRoll(0.02);
+    if (!this.throttle("cymbal", 800)) return;
+    this.tone(68, 0.4, 0.55, "sine", { to: 42 });
+    this.burst({ duration: 2.4, volume: 0.42, filter: "highpass", frequency: 4800 });
+    this.burst({ duration: 1.2, volume: 0.28, filter: "bandpass", frequency: 7500, q: 1.2 });
+    for (const frequency of [3130, 4270, 5460]) this.tone(frequency, 1.6, 0.025, "triangle", { attack: 0.002 });
+  }
+
   // ---------------------------------------------------------------- the audience
 
   /** A crowd of voices shaped into a vowel, sliding in pitch: the house reacts. */
@@ -492,6 +578,22 @@ export class TheatreAudio {
   gasp(): void {
     if (!this.throttle("gasp", 2500)) return;
     this.crowd("oo", 160, 260, 1.4, 0.35);
+  }
+
+  /** A shot went close by him: the closer (`closeness` 0 to 1), the bigger the gasp. */
+  nearMiss(closeness: number): void {
+    const c = Math.max(0, Math.min(1, closeness));
+    if (c < 0.15 || !this.throttle("near", 1400)) return;
+    this.last.set("gasp", performance.now());
+    this.crowd("oo", 150 + c * 60, 230 + c * 110, 0.7 + c * 0.8, 0.1 + c * 0.32);
+    if (c > 0.75) this.crowd("aa", 260, 320, 0.8, 0.14, 0.25);
+  }
+
+  /** He's settled after all: the whole house lets its breath out. */
+  phew(): void {
+    if (!this.throttle("phew", 3000)) return;
+    this.crowd("ah", 260, 150, 1.2, 0.26);
+    this.burst({ duration: 0.9, volume: 0.08, filter: "bandpass", frequency: 900, q: 0.7 });
   }
 
   aww(): void {

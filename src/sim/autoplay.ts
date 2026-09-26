@@ -1,6 +1,6 @@
 import { CURIOS } from "./curios.js";
 import { Game, STEP } from "./game.js";
-import { hopperFrame, type LevelDef } from "./level.js";
+import { dresserChina, hopperFrame, type LevelDef } from "./level.js";
 import type { StockKind, Vec3 } from "./types.js";
 
 export interface PlannedShot {
@@ -133,6 +133,11 @@ export async function mayhemTargets(level: LevelDef): Promise<Array<{ label: str
       if (view.kind === "keg") targets.push({ label: "keg", at: { ...view.position } });
       if (view.kind === "fixture" && view.material === "gong") targets.push({ label: "gong", at: { ...view.position } });
     }
+    // The King's china: a plate from each shelf, the teapot and a cup.
+    const china = game.chinaView;
+    dresserChina().forEach((piece, index) => {
+      if (Math.abs(piece.local.x) < 0.3 || piece.kind === "teapot") targets.push({ label: `china ${piece.kind}`, at: { ...china[index]!.at } });
+    });
     return targets;
   } finally {
     game.destroy();

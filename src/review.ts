@@ -43,6 +43,8 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
     [count("combo") >= 2, 88, () => `${count("combo")} TRICK SHOTS IN ONE EVENING; GUNNER DEMANDS A BIGGER STAGE`],
     [count("combo") === 1, 64, () => "ONE SHOT, A DOZEN DISASTERS: QUEEN'S TRICK SHOT STUNS STALLS"],
     [count("tower") > 0, 72, () => "ROYAL BOX SHAKEN TO ITS STILTS; FIDDLERS MISS A BEAT"],
+    [count("china") >= 6, 80, () => "THE KING'S BEST CHINA SMASHED; DISH AND SPOON AT LARGE"],
+    [count("china") > 0, 60, () => "DISH RUNS AWAY WITH SPOON AFTER SHOT THROUGH ROYAL DRESSER"],
     [count("stagehand") > 0, 62, () => "STAGEHANDS FLATTENED; SANDWICH LOST IN THE CONFUSION"],
     [count("bounce") >= 2, 58, () => "EGG BOUNCES ON ROYAL BED; SPRINGS CONFISCATED"],
     [count("wind") > 0, 57, () => "GALE BLOWS THROUGH THEATRE; CRADLE ROCKED"],
@@ -71,6 +73,7 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   if (count("keg")) extras.push(`${count("keg")} kegs of powder set off`);
   if (count("curio") + count("royal") + count("duke") + count("tower")) extras.push("the scenery thoroughly disturbed");
   if (count("stagehand")) extras.push("two stagehands knocked off their feet");
+  if (count("china")) extras.push(`${count("china")} pieces of the King's best china broken`);
   if (extras.length) sentences.push(`The evening also saw ${listOf(extras)}.`);
   sentences.push(`Damages to the Crown: ${input.mayhem.toLocaleString("en-GB")} crowns.`);
   const critic = [

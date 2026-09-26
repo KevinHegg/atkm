@@ -39,7 +39,10 @@ export type Cue =
   | "vane"
   | "teeter"
   | "combo"
-  | "barrel";
+  | "barrel"
+  | "china"
+  | "dish"
+  | "phew";
 
 /** Lines with a recorded clip in public/audio. The text must match exactly. */
 export const RECORDED: Readonly<Record<string, string>> = {
@@ -194,6 +197,18 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   barrel: {
     speaker: "humpty",
     lines: ["Is that a barrel? Is that a LIT barrel?", "Somebody stop that barrel! Somebody else!", "Gentlemen, I believe we are being bowled at."],
+  },
+  china: {
+    speaker: "king",
+    lines: ["My best china!", "Not the willow pattern!", "That teapot was my mother's!", "Guards! Arrest that cannon!"],
+  },
+  dish: {
+    speaker: "queen",
+    lines: ["And the dish ran away with the spoon.", "Hey diddle diddle. Off they go.", "Catch that dish! No, let it go."],
+  },
+  phew: {
+    speaker: "humpty",
+    lines: ["Phew.", "Perfectly balanced. As I said.", "I was never in any danger. None whatsoever."],
   },
   combo: {
     speaker: "queen",

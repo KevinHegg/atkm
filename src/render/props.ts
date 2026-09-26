@@ -1,7 +1,7 @@
 import * as pc from "playcanvas";
 import { EGG_BASE_T, eggRadius, eggY } from "../sim/egg.js";
 import { axisAngle, troughFrame } from "../sim/geometry.js";
-import { hopperBoards } from "../sim/level.js";
+import { DRESSER, dresserChina, hopperBoards } from "../sim/level.js";
 import { hashUnit, palette, type Kit } from "./kit.js";
 
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
@@ -957,6 +957,7 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
     kit.primitive("chock-handle", "cylinder", root, V(0, y / 2 + 0.12, 0), { x: 0.3, y: 0.04, z: 0.3 }, kit.material("rope", palette.rope, 0.12), V(90, 0, 0), false);
     return root;
   }
+  if (look === "dresser") return buildDresser(kit, root);
   if (look === "counterweight") {
     // A great iron weight on a chain from a pulley on the gatehouse: strike it and the gate rises.
     const iron = kit.material("iron", palette.iron, 0.55, 0.68);
@@ -1058,6 +1059,98 @@ export function buildFixture(kit: Kit, parent: pc.Entity, look: string, size: { 
 }
 
 /** The Queen's music box: a painted disc on a brass collar, an arm and a velvet seat. */
+/**
+ * The King's dresser: a crimson-panelled cupboard with a verdigris plate rack, and on it his
+ * best blue-and-white china. Each piece is its own group (named "china-N", in `dresserChina`
+ * order) so the view can shrink a smashed one away without rebuilding the batch.
+ */
+function buildDresser(kit: Kit, root: pc.Entity): pc.Entity {
+  const { width, height, base, depth, rack, shelves } = DRESSER;
+  const back = -depth / 2;
+  const parts: Box[] = [
+    { center: [0, 0.06, 0], size: [width, 0.12, depth - 0.04], color: palette.oakDark },
+    { center: [0, base / 2 + 0.03, 0], size: [width - 0.04, base - 0.18, depth - 0.02], color: palette.oak },
+    { center: [0, base - 0.03, 0.02], size: [width + 0.06, 0.06, depth + 0.04], color: palette.oakLight },
+    { center: [0, (base + height) / 2, back + 0.03], size: [width - 0.1, height - base, 0.04], color: palette.queen },
+    { center: [0, height - 0.06, back + rack / 2], size: [width + 0.1, 0.12, rack + 0.06], color: palette.oakDark },
+    { center: [0, height - 0.13, back + rack + 0.04], size: [width + 0.1, 0.03, 0.02], color: palette.gold },
+    // A little gilt crown on the cornice: this is the King's.
+    { center: [0, height + 0.05, back + rack / 2], size: [0.3, 0.1, 0.1], color: palette.gold },
+  ];
+  for (const k of [-1, 0, 1]) parts.push({ center: [k * 0.11, height + 0.14, back + rack / 2], size: [0.05, 0.1, 0.05], color: palette.gold });
+  for (const side of [-1, 1]) {
+    parts.push({ center: [side * (width / 2 - 0.03), (base + height) / 2, back + rack / 2], size: [0.06, height - base, rack], color: palette.oak });
+    // Two crimson doors with gilt knobs.
+    parts.push({ center: [side * width * 0.25, base / 2 + 0.03, depth / 2 + 0.005], size: [width * 0.42, base - 0.3, 0.02], color: palette.king });
+    parts.push({ center: [side * 0.12, base / 2 + 0.03, depth / 2 + 0.03], size: [0.06, 0.06, 0.05], color: palette.gold });
+  }
+  for (const y of shelves) {
+    parts.push({ center: [0, y, back + rack / 2], size: [width - 0.1, 0.04, rack], color: palette.oakLight });
+    // A rail across the plates' feet stops them sliding off.
+    parts.push({ center: [0, y + 0.1, back + rack - 0.04], size: [width - 0.1, 0.025, 0.025], color: palette.gold });
+  }
+  kit.meshEntity("dresser", kit.boxes("dresser", parts), kit.paintMaterial(0.3), root);
+  const white = kit.material("china-white", new pc.Color(0.95, 0.94, 0.9), 0.85);
+  const blue = kit.material("china-blue", new pc.Color(0.13, 0.24, 0.62), 0.85);
+  const china = kit.group("china", root);
+  for (const [index, piece] of dresserChina().entries()) {
+    const group = kit.group(`china-${index}`, china, V(piece.local.x, piece.local.y, piece.local.z));
+    if (piece.kind === "plate") {
+      // Stood on edge, leaning back a touch against the rack.
+      const face = kit.group("plate", group, V(), V(82, 0, 0));
+      kit.primitive("plate-rim", "cylinder", face, V(), { x: 0.36, y: 0.03, z: 0.36 }, white);
+      kit.primitive("plate-band", "cylinder", face, V(0, 0.01, 0), { x: 0.27, y: 0.03, z: 0.27 }, blue, pc.Vec3.ZERO, false);
+      kit.primitive("plate-well", "cylinder", face, V(0, 0.02, 0), { x: 0.19, y: 0.03, z: 0.19 }, white, pc.Vec3.ZERO, false);
+      kit.primitive("plate-motif", "box", face, V(0, 0.03, 0), { x: 0.07, y: 0.02, z: 0.07 }, blue, V(0, 45, 0), false);
+    } else if (piece.kind === "teapot") {
+      kit.primitive("pot", "sphere", group, V(0, -0.02, 0), { x: 0.28, y: 0.24, z: 0.28 }, white);
+      kit.primitive("pot-band", "cylinder", group, V(0, -0.02, 0), { x: 0.285, y: 0.05, z: 0.285 }, blue, pc.Vec3.ZERO, false);
+      kit.primitive("pot-lid", "sphere", group, V(0, 0.11, 0), { x: 0.14, y: 0.06, z: 0.14 }, white, pc.Vec3.ZERO, false);
+      kit.primitive("pot-knob", "sphere", group, V(0, 0.15, 0), { x: 0.05, y: 0.05, z: 0.05 }, blue, pc.Vec3.ZERO, false);
+      kit.primitive("pot-spout", "cone", group, V(0.17, 0.02, 0), { x: 0.06, y: 0.16, z: 0.06 }, white, V(0, 0, -55), false);
+      kit.primitive("pot-handle", "box", group, V(-0.16, 0, 0), { x: 0.03, y: 0.14, z: 0.03 }, white, pc.Vec3.ZERO, false);
+    } else {
+      kit.primitive("cup", "cylinder", group, V(), { x: 0.12, y: 0.12, z: 0.12 }, white);
+      kit.primitive("cup-band", "cylinder", group, V(0, 0.03, 0), { x: 0.125, y: 0.025, z: 0.125 }, blue, pc.Vec3.ZERO, false);
+      kit.primitive("cup-handle", "box", group, V(0.075, 0, 0), { x: 0.03, y: 0.07, z: 0.02 }, white, pc.Vec3.ZERO, false);
+    }
+  }
+  return root;
+}
+
+/** The dish that ran away with the spoon: a plate on little legs, hand in hand with a silver spoon. */
+export function buildRunaways(kit: Kit, parent: pc.Entity): { root: pc.Entity; legs: pc.Entity[] } {
+  const root = kit.group("runaways", parent);
+  const white = kit.material("china-white", new pc.Color(0.95, 0.94, 0.9), 0.85);
+  const blue = kit.material("china-blue", new pc.Color(0.13, 0.24, 0.62), 0.85);
+  const silver = kit.material("spoon-silver", new pc.Color(0.78, 0.8, 0.82), 0.9, 0.9);
+  const ink = kit.material("ink", palette.ink, 0.2);
+  const legs: pc.Entity[] = [];
+  const dish = kit.group("dish", root, V(-0.26, 0.5, 0));
+  const face = kit.group("dish-face", dish, V(), V(90, 0, 0));
+  kit.primitive("dish-rim", "cylinder", face, V(), { x: 0.5, y: 0.04, z: 0.5 }, white);
+  kit.primitive("dish-band", "cylinder", face, V(0, 0.01, 0), { x: 0.38, y: 0.04, z: 0.38 }, blue, pc.Vec3.ZERO, false);
+  kit.primitive("dish-well", "cylinder", face, V(0, 0.02, 0), { x: 0.28, y: 0.04, z: 0.28 }, white, pc.Vec3.ZERO, false);
+  for (const dx of [-0.07, 0.07]) kit.primitive("dish-eye", "sphere", dish, V(dx, 0.05, 0.04), { x: 0.05, y: 0.07, z: 0.03 }, ink, pc.Vec3.ZERO, false);
+  kit.primitive("dish-grin", "box", dish, V(0, -0.07, 0.04), { x: 0.08, y: 0.02, z: 0.02 }, ink, pc.Vec3.ZERO, false);
+  for (const side of [-1, 1]) kit.primitive("dish-grin", "box", dish, V(side * 0.055, -0.055, 0.04), { x: 0.05, y: 0.02, z: 0.02 }, ink, V(0, 0, side * 40), false);
+  const spoon = kit.group("spoon", root, V(0.26, 0.5, 0));
+  kit.primitive("spoon-bowl", "sphere", spoon, V(0, 0.18, 0), { x: 0.16, y: 0.24, z: 0.06 }, silver);
+  kit.primitive("spoon-handle", "box", spoon, V(0, -0.08, 0), { x: 0.05, y: 0.34, z: 0.03 }, silver, pc.Vec3.ZERO, false);
+  for (const dx of [-0.03, 0.03]) kit.primitive("spoon-eye", "sphere", spoon, V(dx, 0.2, 0.035), { x: 0.03, y: 0.04, z: 0.02 }, ink, pc.Vec3.ZERO, false);
+  // Hand in hand.
+  kit.primitive("hands", "box", root, V(0, 0.5, 0), { x: 0.3, y: 0.025, z: 0.025 }, ink, pc.Vec3.ZERO, false);
+  for (const [who, x] of [["dish", -0.26], ["spoon", 0.26]] as const) {
+    for (const dx of [-0.06, 0.06]) {
+      const hip = kit.group(`${who}-hip`, root, V(x + dx, 0.26, 0));
+      kit.primitive("leg", "box", hip, V(0, -0.12, 0), { x: 0.025, y: 0.24, z: 0.025 }, ink, pc.Vec3.ZERO, false);
+      kit.primitive("shoe", "box", hip, V(0, -0.24, 0.03), { x: 0.06, y: 0.03, z: 0.09 }, ink, pc.Vec3.ZERO, false);
+      legs.push(hip);
+    }
+  }
+  return { root, legs };
+}
+
 export function buildTurntable(kit: Kit, parent: pc.Entity, radius: number, arm: number): { root: pc.Entity; key: pc.Entity } {
   const root = kit.group("turntable", parent);
   const gold = kit.material("gold", palette.gold, 0.72, 0.55);

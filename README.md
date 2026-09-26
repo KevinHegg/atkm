@@ -47,6 +47,9 @@ unlock every verse.
   shot that bowls a crew and startles a curio, say) earns a combo bonus on the bill.
 - **On the brink.** Nudge Humpty to the very edge of his perch without knocking him off and he
   teeters, arms windmilling, while the audience holds its breath. One more push...
+- **The house is watching.** The pit orchestra's snare roll builds while he teeters and runs on
+  through a fall, ending in a cymbal crash when he cracks (or a relieved sigh from the audience
+  if he settles). A shot that shaves past him draws a gasp: the closer it came, the bigger.
 - **Parting shots.** While he's falling the gun crew reloads at double-quick time, so
   there's room for one more shot (perhaps two) of mayhem before he lands. Never a volley.
 - **Stars:** crack him; reach the verse's target of mayhem; and find the **hidden star**.
@@ -103,6 +106,11 @@ unlock every verse.
   behind a hedge to the chock of a barrel ramp. Topple the first and the last knocks the chock
   out: a powder keg rolls down onto the cart road, fuse fizzing, bowls whatever is in its way
   and goes off wherever it has got to. (Striking the chock yourself works too.)
+- **The King's china.** In Hey Diddle Diddle, the King keeps his best blue-and-white china on a
+  dresser stage right. Shots fly straight through it (the gold ring shows when one will):
+  each piece a shot passes through smashes, and rattles the plate either side of it off the
+  shelf after it; a shell or a blast nearby clears the lot. Every piece pays mayhem once, and
+  at the first smash the dish runs away with the spoon.
 - **Bumpers and screens.** Bronze bumpers bounce round shot cleanly. Painted screens
   and hedges hide what's behind them, including hay.
 - **The rat.** In later verses a giant rat creeps out of the wings to gnaw the Queen's
@@ -165,7 +173,7 @@ src/render/   PlayCanvas presentation, reads the sim and never writes it
   view.ts       sync + interpolation, animation, aim arc, pooled effects, camera, finale
 src/main.ts   screens, HUD, input, speech bubbles, replays, the frame loop
 src/review.ts the morning papers, written from the bill of damages
-src/audio.ts  procedural foley, a music box, a theatre audience, the recorded royal voices
+src/audio.ts  procedural foley, a music box, a pit orchestra, a theatre audience, the recorded royal voices
               (the stage dips under anyone speaking)
 src/lines.ts  who says what, and when
 ```

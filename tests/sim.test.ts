@@ -829,3 +829,30 @@ test("a run of dominoes knocks the chock from under a barrel, which rolls off wi
   assert.ok(blast && blast.type === "explode" && blast.at.x > start + 6, `the barrel rolls well down the stage before it goes off (x ${blast && blast.type === "explode" ? blast.at.x.toFixed(1) : "?"})`);
   game.destroy();
 });
+
+test("a shot through the King's dresser smashes a plate and rattles its neighbours off, not the whole shelf", async () => {
+  const game = await Game.create(arena((mason) => {
+    mason.dresser(4, -3, -0.4);
+    return perchAt(-4, 1, -4);
+  }, { ammo: { shot: 2, shell: 1 } }));
+  await stepUntilReady(game);
+  const china = game.chinaView;
+  // The middle plate on the middle shelf.
+  const middle = china.reduce((best, piece) => (Math.abs(piece.at.y - 1.89) < 0.01 && Math.abs(piece.at.x - 4) < Math.abs(best.at.x - 4) ? piece : best), china[0]!);
+  assert.equal(game.aim(middle.at).passes?.what, "china", "the aim shows the shot going through the china");
+  assert.ok(game.fire(middle.at));
+  const events = await run(game, 3);
+  const smashed = events.filter((event) => event.type === "smash");
+  assert.equal(smashed.length, 3, "the plate and one either side of it");
+  assert.equal(game.mayhem.entries.get("china")?.count, 3);
+  assert.equal(events.filter((event) => event.type === "dish").length, 1, "the dish runs away with the spoon");
+  assert.equal(game.chinaView.filter((piece) => !piece.whole).length, 3);
+  // A shell bursting on the counter clears the lot.
+  await stepUntilReady(game);
+  game.select("shell");
+  const teapot = game.chinaView.find((piece) => piece.at.y < 1.1)!;
+  assert.ok(game.fire(teapot.at));
+  await run(game, 6);
+  assert.ok(game.chinaView.filter((piece) => !piece.whole).length > 10, "the blast smashes the dresser's china");
+  game.destroy();
+});

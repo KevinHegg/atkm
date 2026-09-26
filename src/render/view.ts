@@ -8,6 +8,7 @@ import {
   buildBlock,
   buildBucket,
   buildChest,
+  buildRunaways,
   buildCannon,
   buildCartBed,
   buildCrown,
@@ -76,6 +77,8 @@ interface BodyVisual {
   counterweight?: pc.Entity;
   /** How far the chest lid has opened, 0 to 1. */
   opened?: number;
+  /** The King's china on a dresser, piece by piece. */
+  china?: pc.Entity[];
 }
 
 /** A released star, floating up off the stage. */
@@ -147,6 +150,10 @@ export class StageView {
   private readonly chains = new Map<number, pc.Entity>();
   private readonly puffs: Puff[] = [];
   private readonly splats: Splat[] = [];
+  /** A piece of the King's china has been smashed since the dresser was last redrawn. */
+  private chinaDirty = false;
+  /** The dish that ran away with the spoon, while they're still on stage. */
+  private runaways: { root: pc.Entity; legs: pc.Entity[]; from: pc.Vec3; toward: number; age: number } | undefined;
   private readonly arcDots: pc.Entity[] = [];
   private readonly passRings: pc.Entity[] = [];
   private readonly reticle: pc.Entity;
@@ -332,6 +339,9 @@ export class StageView {
     this.splats.length = 0;
     for (const puff of this.puffs) this.retire(puff);
     this.puffs.length = 0;
+    this.runaways?.root.destroy();
+    this.runaways = undefined;
+    this.chinaDirty = false;
     this.humpty = undefined;
     this.humptyVisualId = undefined;
     this.crackAt = undefined;
@@ -531,6 +541,26 @@ export class StageView {
       if (event.id === "stagehands") this.company.stagehandsStruck(this.elapsed);
       if (event.id === "tower") this.company.towerStruck(this.elapsed);
       this.flash(event.at, 0.5);
+    } else if (event.type === "smash") {
+      // Blue-and-white shards, and a puff of dust off the shelf.
+      const shards = event.piece === "teapot" ? 16 : event.piece === "plate" ? 10 : 6;
+      const white = this.kit.material("china-shard", new pc.Color(0.95, 0.94, 0.9), 0.85, 0, { doubleSided: true });
+      const blue = this.kit.material("china-shard-blue", new pc.Color(0.13, 0.24, 0.62), 0.85, 0, { doubleSided: true });
+      for (let index = 0; index < shards && this.puffs.length < 180; index += 1) {
+        const shape = V(0.05 + Math.random() * 0.08, 0.015, 0.04 + Math.random() * 0.06);
+        const angle = Math.random() * Math.PI * 2;
+        const { entity, pool } = this.particle("box", index % 3 ? white : blue, V(event.at.x, event.at.y, event.at.z), shape, V(Math.random() * 360, Math.random() * 360, 0));
+        const speed = 1.5 + Math.random() * 3;
+        this.puffs.push({ entity, pool, velocity: V(Math.cos(angle) * speed, 1.5 + Math.random() * 3, Math.sin(angle) * speed + 1), age: 0, life: 1 + Math.random() * 0.5, size: 1, grow: 0, gravity: 12, spin: 300 + Math.random() * 400, shape });
+      }
+      this.puff(V(event.at.x, event.at.y, event.at.z), V(0, 0.3, 0.3), 0.3, 0.7, 0, palette.cream);
+      this.chinaDirty = true;
+    } else if (event.type === "dish") {
+      this.runaways?.root.destroy();
+      const rig = buildRunaways(this.kit, this.effects);
+      rig.root.setLocalScale(1.7, 1.7, 1.7);
+      this.runaways = { ...rig, from: V(event.at.x, event.at.y, event.at.z), toward: event.toward, age: 0 };
+      this.company.kingReacts("outrage", this.elapsed);
     } else if (event.type === "ricochet") {
       for (let index = 0; index < 6; index += 1) {
         this.spark(V(event.at.x, event.at.y, event.at.z), V((Math.random() - 0.5) * 6, 2 + Math.random() * 3, (Math.random() - 0.5) * 6), palette.gold);
@@ -704,6 +734,7 @@ export class StageView {
     this.curios.update(this.elapsed);
     this.company.update(this.elapsed, Boolean(this.game?.hoisting));
     this.animateEffects(dt);
+    this.animateChina(dt);
     this.animateScenery();
     this.updateCamera(realDt);
   }
@@ -760,6 +791,7 @@ export class StageView {
         if (view.material === "counterweight") visual.counterweight = fixture.findByName("counterweight-body") as pc.Entity;
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
         if (view.material === "lever") visual.lever = fixture.findByName("lever-arm") as pc.Entity;
+        if (view.material === "dresser") visual.china = (fixture.findByName("china") as pc.Entity).children as pc.Entity[];
         break;
       }
       case "chest": {
@@ -1586,6 +1618,38 @@ export class StageView {
     }
     root.setLocalScale(0.01, 1, 0.01);
     this.splats.push({ root, age: 0 });
+  }
+
+  /** Smashed china vanishes from the dresser; the dish and the spoon run off, hand in hand. */
+  private animateChina(dt: number): void {
+    if (this.chinaDirty && this.game) {
+      this.chinaDirty = false;
+      const whole = this.game.chinaView;
+      for (const visual of this.visuals.values()) {
+        // Shrunk away rather than disabled: switching a batched mesh off rebuilds the whole batch.
+        visual.china?.forEach((piece, index) => {
+          if (whole[index]?.whole === false) piece.setLocalScale(0.001, 0.001, 0.001);
+        });
+      }
+    }
+    const run = this.runaways;
+    if (!run) return;
+    run.age += dt;
+    const t = run.age;
+    // A hop down off the dresser toward the footlights, then away into the wings at a scamper.
+    const hop = Math.min(1, t / 0.7);
+    const floor = V(run.from.x + run.toward * 0.6, 0, run.from.z + 1.4);
+    const x = floor.x + run.toward * Math.max(0, t - 0.7) * 3.6;
+    const bob = t < 0.7 ? 0 : Math.abs(Math.sin((t - 0.7) * 14)) * 0.12;
+    const y = t < 0.7 ? run.from.y * (1 - hop) + Math.sin(hop * Math.PI) * 0.6 : bob;
+    run.root.setPosition(t < 0.7 ? run.from.x + (floor.x - run.from.x) * hop : x, y, t < 0.7 ? run.from.z + (floor.z - run.from.z) * hop : floor.z);
+    // Turned only a little toward the wings, so the house still sees their faces.
+    run.root.setLocalEulerAngles(0, t < 0.7 ? 0 : run.toward * 22, Math.sin(t * 14) * 6);
+    run.legs.forEach((leg, index) => leg.setLocalEulerAngles(t < 0.7 ? 0 : Math.sin(t * 14 + (index % 2) * Math.PI) * 35, 0, 0));
+    if (Math.abs(x) > 16 || t > 6) {
+      run.root.destroy();
+      this.runaways = undefined;
+    }
   }
 
   private animateEffects(dt: number): void {

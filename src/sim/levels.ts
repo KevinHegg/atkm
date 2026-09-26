@@ -515,6 +515,8 @@ function heyDiddleDiddle(): LevelDef {
   m.bouncyBed(0, -3.7);
   for (const x of [-3.3, 3.3]) m.hay(x, -3.7, 0, Math.PI / 2);
   m.chest(6.4, -1.6, { yaw: -0.3 });
+  // The King's china dresser, stage right: and the dish ran away with the spoon.
+  m.dresser(6.9, -3.6, -0.5);
   return {
     id: "hey-diddle-diddle",
     title: "Hey Diddle Diddle",

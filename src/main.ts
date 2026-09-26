@@ -1098,6 +1098,7 @@ function handle(event: GameEvent): void {
       // Stars are earned the moment he cracks, even if the player leaves before the curtain.
       if (live) recordStars(current);
       audio.crack();
+      audio.cymbal();
       if (live) audio.applause(3);
       hitStop = 0.16;
       crackedAt = current.time;
@@ -1174,6 +1175,17 @@ function handle(event: GameEvent): void {
     case "turn":
       audio.creak();
       if (live) later(0.5, () => cue("vane", 0.7, 6));
+      break;
+    case "smash":
+      audio.smash(event.piece);
+      if (live) later(0.5, () => cue("china", 0.8, 7));
+      break;
+    case "dish":
+      if (live) {
+        audio.laugh();
+        toast("Hey diddle diddle!", true, "The dish ran away with the spoon");
+        later(2.6, () => cue("dish", 1, 0));
+      }
       break;
     case "chute":
       audio.chute();
@@ -1339,6 +1351,82 @@ function playAmbience(current: Game, realDt: number): void {
   for (const fuse of current.fuses) audio.fizz(1 - fuse.left / BOMB_FUSE);
 }
 
+/** The house and the pit follow the physics: a roll while he teeters or falls, gasps for close shaves. */
+const SHOT_KINDS = new Set(["shot", "shell", "bomb", "grape", "chain"]);
+const crowd = {
+  game: undefined as Game | undefined,
+  /** Each shot's closest pass by Humpty so far, in metres clear of his shell. */
+  passes: new Map<number, { closest: number; seen: number; done: boolean }>(),
+  frame: 0,
+  teeterSince: -1,
+  teeterEnded: -1,
+};
+
+function listenToCrowd(current: Game): void {
+  if (crowd.game !== current) {
+    crowd.game = current;
+    crowd.passes.clear();
+    crowd.teeterSince = -1;
+    crowd.teeterEnded = -1;
+  }
+  crowd.frame += 1;
+  const teetering = Boolean(current.teeterView) && !current.cracked;
+  const falling = current.humptyAirborne && current.humptyDrop > 0.3 && !current.cracked;
+  if (teetering && crowd.teeterSince < 0) crowd.teeterSince = current.time;
+  if (!teetering && crowd.teeterSince >= 0) {
+    crowd.teeterSince = -1;
+    crowd.teeterEnded = current.time;
+  }
+  // The roll builds the longer he hangs there, holds while we wait to see which way he goes, and
+  // runs on through the fall to the crash (or the catch).
+  const waiting = crowd.teeterEnded >= 0 && !current.cracked;
+  audio.roll(teetering ? Math.min(1, 0.45 + (current.time - crowd.teeterSince) * 0.4) : falling ? 0.85 : waiting ? 0.7 : 0);
+  if (crowd.teeterEnded >= 0 && current.time - crowd.teeterEnded > 0.7) {
+    crowd.teeterEnded = -1;
+    if (!current.humptyAirborne && !current.cracked && !current.teeterView) {
+      audio.phew();
+      if (screen === "play") cue("phew", 0.6, 8);
+    }
+  }
+  const humpty = current.bodies.find((body) => body.kind === "humpty");
+  if (!humpty || current.cracked || current.humptyAirborne) {
+    crowd.passes.clear();
+    return;
+  }
+  let loudest = 0;
+  const closeness = (pass: { closest: number }): number => (pass.closest <= 0 ? 0 : 1 - pass.closest / 1.4);
+  for (const body of current.bodies) {
+    if (!SHOT_KINDS.has(body.kind) || body.removed) continue;
+    // How far the shot is clear of his shell, taking him as an egg-shaped ellipsoid (taller than wide).
+    const r = body.size.x / 2 + 0.06;
+    const across = humpty.size.x / 2 + r;
+    const tall = humpty.size.y / 2 + r;
+    const scaled = Math.hypot((body.position.x - humpty.position.x) / across, (body.position.y - humpty.position.y) / tall, (body.position.z - humpty.position.z) / across);
+    const d = (scaled - 1) * across;
+    let pass = crowd.passes.get(body.id);
+    if (!pass) {
+      pass = { closest: d, seen: crowd.frame, done: false };
+      crowd.passes.set(body.id, pass);
+    }
+    pass.seen = crowd.frame;
+    if (pass.done) continue;
+    pass.closest = Math.min(pass.closest, d);
+    // A shot that struck him is no near miss; one on its way out again is.
+    if (pass.closest <= 0) pass.done = true;
+    else if (d > pass.closest + 0.8) {
+      pass.done = true;
+      loudest = Math.max(loudest, closeness(pass));
+    }
+  }
+  for (const [id, pass] of crowd.passes) {
+    if (pass.seen === crowd.frame) continue;
+    // Gone (burst, or rolled away out of play) while still near him.
+    if (!pass.done) loudest = Math.max(loudest, closeness(pass));
+    crowd.passes.delete(id);
+  }
+  if (loudest > 0) audio.nearMiss(loudest);
+}
+
 let fusesSeen = 0;
 
 /** Little countdowns over lit bombs; Humpty notices one landing near him. */
@@ -1439,6 +1527,8 @@ function tick(realDt: number): void {
   updateStatus();
   updateFuseTags();
   if (screen === "play") playAmbience(current, realDt);
+  if (screen === "play" || screen === "replay") listenToCrowd(current);
+  else audio.roll(0);
   view.sync(Math.min(1, accumulator / STEP));
   view.frame(realDt * scale, realDt);
   positionBubbles();

@@ -44,6 +44,14 @@ Core promises:
   kinds earn `comboBonus`. Par lines rarely combo, so mayhem targets still come from the solver.
 - Teetering (`checkTeeter`) is a query only: a probe a hand's breadth past him, the way he was
   last shoved. It never pushes him; rides are exempt.
+- The King's china (`Mason.dresser`, `dresserChina`) is sensors on a fixed dresser, like
+  curios: shots pass through, each piece pays `china` mayhem once, a direct hit rattles only
+  the pieces either side of it (`shock`), a blast within 0.8 of its radius smashes what's in
+  reach. It never touches physics. The view shrinks smashed pieces rather than disabling
+  them, so the actors batch isn't rebuilt.
+- The crowd and pit orchestra (`listenToCrowd` in `src/main.ts`) only listen: a snare roll
+  while he teeters or falls, a cymbal on the crack, near-miss gasps scaled by how close each
+  shot passed his shell. Sound only; nothing in the sim depends on it.
 - The gun reloads `FALLING_RELOAD` times faster while Humpty is airborne, so a parting
   shot or two can add mayhem before he lands, but never a volley.
 - The verse ends when Humpty cracks. Mayhem (`src/sim/mayhem.ts`) is scored in the

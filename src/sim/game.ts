@@ -28,6 +28,10 @@ import {
   type ChuteDef,
   type CarouselDef,
   type GateDef,
+  type DresserDef,
+  type ChinaKind,
+  DRESSER,
+  dresserChina,
 } from "./level.js";
 import { CURIOS } from "./curios.js";
 import { add, axisAngle, closestBetweenSegments, closestOnSegment, distanceToSegment, rotate, scale, segmentDistance, troughFrame, yAxisTo } from "./geometry.js";
@@ -152,6 +156,18 @@ const GROUPS = {
 
 const DENSITY: Record<string, number> = { domino: 520, maypole: 560, oak: 520, plank: 480, beam: 560, brick: 900, stone: 1250, post: 600, canopy: 150, anvil: 4500 };
 
+/** A piece of the King's china: a sensor on the dresser, smashed by a shot or a blast (or its neighbour). */
+interface ChinaPiece {
+  kind: ChinaKind;
+  row: number;
+  at: Vec3;
+  local: Vec3;
+  broken: boolean;
+  /** When a neighbour's smash rattles it off the shelf, and how far that shock carries on. */
+  breakAt?: number;
+  shock: number;
+}
+
 interface Entity {
   view: BodyView;
   body: RAPIER.RigidBody;
@@ -231,7 +247,7 @@ export interface AimPreview {
   /** Which way the struck surface faces, so the marker can lie flat on it. */
   hitNormal?: Vec3;
   /** A curio in the scenery the shot flies through on its way (shots pass through and set it off). */
-  passes?: { at: Vec3; what: "curio" };
+  passes?: { at: Vec3; what: "curio" | "china" };
   /** Chain shot: where its chain will cut each rope it scythes through before it stops. */
   cuts?: Vec3[];
   reachable: boolean;
@@ -330,6 +346,9 @@ export class Game {
   private gate: { entity: Entity; def: GateDef; openedAt: number } | undefined;
   /** Sensors in the mouths of chute hoppers: a shot dropping in pays once. */
   private readonly hoppers = new Map<number, { scored: boolean }>();
+  /** The King's china, piece by piece (sensors on the dresser): smashed, or about to be. */
+  private readonly china = new Map<number, ChinaPiece>();
+  private dishRan = false;
   private swing: { seat: Entity; def: SwingDef } | undefined;
   private seesaw: { plank: Entity; def: SeesawDef; restAngle: number } | undefined;
   private readonly ropes: Array<{ joint: RAPIER.ImpulseJoint; seat: Entity; local: Vec3; top: Vec3; cut: boolean }> = [];
@@ -370,6 +389,7 @@ export class Game {
       else if (piece.kind === "chute") this.addChute(piece);
       else if (piece.kind === "carousel") this.addCarousel(piece);
       else if (piece.kind === "gate") this.addGate(piece);
+      else if (piece.kind === "dresser") this.addDresser(piece);
     }
     // Contraptions attach to the fixtures laid down before them.
     for (const piece of level.pieces) {
@@ -761,6 +781,9 @@ export class Game {
     for (const curio of CURIOS) {
       const inside = Math.abs(target.x - curio.at.x) <= curio.size.x / 2 + 0.05 && Math.abs(target.y - curio.at.y) <= curio.size.y / 2 + 0.05 && Math.abs(target.z - curio.at.z) <= curio.size.z / 2 + 0.05;
       if (inside) return { at: { ...target }, what: "curio" };
+    }
+    for (const piece of this.china.values()) {
+      if (!piece.broken && distance(piece.at, target) < 0.25) return { at: { ...target }, what: "china" };
     }
     return undefined;
   }
@@ -1162,6 +1185,65 @@ export class Game {
     return 1 - (t - GATE_RISE - GATE_TIME) / GATE_FALL;
   }
 
+  /** A painted dresser (fixed), with each piece of china on it a sensor a shot can smash. */
+  private addDresser(def: DresserDef): void {
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, def.pos.y, def.pos.z).setRotation(yawQuat(def.yaw)),
+    );
+    const { width, height, base, depth, rack } = DRESSER;
+    const wood = (hx: number, hy: number, hz: number, x: number, y: number, z: number): RAPIER.Collider =>
+      this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, y, z).setFriction(0.6).setCollisionGroups(GROUPS.static), body);
+    const colliders = [
+      wood(width / 2, base / 2, depth / 2, 0, base / 2, 0),
+      wood(width / 2, (height - base) / 2, 0.03, 0, (base + height) / 2, -depth / 2 + 0.03),
+      wood(0.03, (height - base) / 2, rack / 2, -width / 2 + 0.03, (base + height) / 2, -depth / 2 + rack / 2),
+      wood(0.03, (height - base) / 2, rack / 2, width / 2 - 0.03, (base + height) / 2, -depth / 2 + rack / 2),
+      ...DRESSER.shelves.map((y) => wood(width / 2, 0.02, rack / 2, 0, y, -depth / 2 + rack / 2)),
+      wood(width / 2 + 0.05, 0.06, rack / 2 + 0.03, 0, height - 0.06, -depth / 2 + rack / 2),
+    ];
+    this.register("fixture", "dresser", { x: width, y: height, z: depth }, body, colliders, { look: "dresser" });
+    for (const china of dresserChina()) {
+      const sensor = this.world.createCollider(
+        RAPIER.ColliderDesc.cuboid(china.size.x / 2, china.size.y / 2, china.size.z / 2)
+          .setTranslation(china.local.x, china.local.y, china.local.z)
+          .setSensor(true)
+          .setCollisionGroups(groups(G.STATIC, G.PROJ))
+          .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+        body,
+      );
+      const at = add(def.pos, rotate(yawQuat(def.yaw), china.local));
+      this.china.set(sensor.handle, { kind: china.kind, row: china.row, at, local: china.local, broken: false, shock: 0 });
+    }
+  }
+
+  /** Smash! A piece struck square rattles the ones either side of it off the shelf after it. */
+  private smashChina(piece: ChinaPiece, shock = 1): void {
+    if (piece.broken) return;
+    piece.broken = true;
+    this.events.push({ type: "smash", at: { ...piece.at }, piece: piece.kind });
+    this.score("china", piece.at);
+    if (shock > 0) {
+      for (const other of this.china.values()) {
+        if (other.broken || other.breakAt !== undefined || other.row !== piece.row) continue;
+        const gap = Math.abs(other.local.x - piece.local.x);
+        if (gap < 0.6) {
+          other.breakAt = this.time + 0.12 + gap * 0.2;
+          other.shock = shock - 1;
+        }
+      }
+    }
+    if (!this.dishRan && this.log.length) {
+      // Hey diddle diddle: and the dish ran away with the spoon.
+      this.dishRan = true;
+      this.events.push({ type: "dish", at: { ...piece.at }, toward: piece.at.x < 0 ? -1 : 1 });
+    }
+  }
+
+  /** The King's china, in the order `dresserChina` lays it out: where each piece is, and whether it's whole. */
+  get chinaView(): Array<{ at: Vec3; whole: boolean }> {
+    return [...this.china.values()].map((piece) => ({ at: piece.at, whole: !piece.broken }));
+  }
+
   /** The chock is knocked out from under a barrel: away it goes, and the barrel with it. */
   private knockChock(chock: Entity): void {
     const at = { ...chock.view.position };
@@ -1185,6 +1267,8 @@ export class Game {
 
   /** The machines that turn on their own: struck weathercocks, the carousel, the portcullis. */
   private updateMachines(): void {
+    // China rattled off its shelf by a neighbour's smash.
+    for (const piece of this.china.values()) if (!piece.broken && piece.breakAt !== undefined && this.time >= piece.breakAt) this.smashChina(piece, piece.shock);
     // A barrel off its chock: once it's rolling, its fuse is lit.
     for (const entity of this.entities.values()) {
       if (entity.rollFuse === undefined || entity.fuseAt !== undefined || entity.body.isSleeping()) continue;
@@ -2018,7 +2102,12 @@ export class Game {
           continue;
         }
         if (!shot?.ammo || shot.view.removed) continue;
-        if (shot.view.kind === "bomb" && shot.fuseAt === undefined && !this.curios.has(other) && !this.hoppers.has(other)) shot.fuseAt = this.time + BOMB_FUSE;
+        if (shot.view.kind === "bomb" && shot.fuseAt === undefined && !this.curios.has(other) && !this.hoppers.has(other) && !this.china.has(other)) shot.fuseAt = this.time + BOMB_FUSE;
+        const plate = this.china.get(other);
+        if (plate) {
+          if (shot.ammo !== "blunderbuss") this.smashChina(plate);
+          continue;
+        }
         const hopper = this.hoppers.get(other);
         if (hopper) {
           if (!hopper.scored && shot.ammo !== "blunderbuss") {
@@ -2169,6 +2258,7 @@ export class Game {
     }
     const blasts = this.pendingExplosions.splice(0, this.pendingExplosions.length);
     for (const blast of blasts) {
+      for (const piece of this.china.values()) if (!piece.broken && distance(piece.at, blast.at) < blast.radius * 0.8) this.smashChina(piece, 0);
       this.events.push({ type: "explode", at: blast.at, radius: blast.radius, keg: blast.keg });
       if (this.rat && this.rat.state.mode !== "off" && distance({ x: this.rat.state.x, y: 0.3, z: this.rat.state.z }, blast.at) < blast.radius + 1) this.startleRat();
       for (const entity of this.entities.values()) {
