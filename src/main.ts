@@ -253,7 +253,7 @@ function traceGhost(level: LevelDef): void {
   view.setGhost(paths);
   const note = $("#verse-ghost");
   note.hidden = !ghost || !paths?.length || Boolean(progress.royal);
-  if (ghost) note.textContent = `Your best line so far (${ghost.mayhem.toLocaleString("en-GB")} mayhem, ${ghost.stars} ${ghost.stars === 1 ? "star" : "stars"}) is traced in silver.`;
+  if (ghost) note.textContent = `Your best line so far (${ghost.mayhem.toLocaleString("en-GB")} mayhem, ${ghost.stars} ${ghost.stars === 1 ? "star" : "stars"}) is traced in pale blue.`;
 }
 
 function cue(kind: Cue, chance = 1, cooldown = 4): void {

@@ -170,7 +170,7 @@ export class StageView {
   private thunderOwed = false;
   /** Royal difficulty: the aim arc shows only its first half, and no markers. */
   private royal = false;
-  /** The ghost of the player's best line on this verse: faint silver studs where its shots flew. */
+  /** The ghost of the player's best line on this verse: faint blue studs where its shots flew. */
   private ghost: pc.Entity | undefined;
   private ghostMaterial: pc.StandardMaterial | undefined;
   /** The bees, when they're out, and when their hive was last struck. */
