@@ -854,6 +854,7 @@ function starHolderName(holder: LevelDef["star"]): string {
       cuckoo: "the cuckoo clock",
       well: "the well",
       spider: "Miss Muffet's spider",
+      box: "the royal box",
       king: "Old King Cole",
       duke: "the Grand Old Duke's army",
       stagehands: "the stagehands",
@@ -1792,7 +1793,9 @@ function handle(event: GameEvent): void {
 }
 
 const CURIO_SOUNDS: Record<CurioId, () => void> = {
-  king: () => audio.fiddle(),
+  box: () => audio.fiddle(),
+  // A clang on the crown (the box he sits in gives its fiddle-screech as well).
+  king: () => audio.clang(),
   duke: () => audio.drumroll(),
   cow: () => audio.moo(),
   moon: () => audio.wink(),
@@ -1809,12 +1812,21 @@ const CURIO_SOUNDS: Record<CurioId, () => void> = {
   },
 };
 
+/** When Old King Cole himself was last struck (performance.now()): his box's outrage keeps quiet then. */
+let kingStruckAt = -1e9;
+
 function playCurio(id: CurioId): void {
   CURIO_SOUNDS[id]();
   audio.laugh();
   if (screen !== "play") return;
-  if (id === "king" || id === "tower") {
-    cue("kingOutrage", 1, 4);
+  if (id === "king") {
+    kingStruckAt = performance.now();
+    later(0.5, () => cue("kingCrown", 1, 0));
+    return;
+  }
+  if (id === "box" || id === "tower") {
+    // A shot at the King passes through his box on the way: if it's him it struck, he says so instead.
+    later(0.35, () => performance.now() - kingStruckAt > 800 && cue("kingOutrage", 1, 4));
     return;
   }
   const line = CURIO_LINES[id];

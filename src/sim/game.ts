@@ -173,7 +173,7 @@ const CHEST_EXTRA = 3;
 /** Height of the rail round the music box's seat. */
 const TURNTABLE_RAIL = 0.1;
 /** Curios with a line of their own on the King's bill; the rest are "scenery disturbed". */
-const CURIO_SCORE: Partial<Record<CurioId, MayhemKind>> = { king: "royal", duke: "duke", stagehands: "stagehand", tower: "tower", pie: "pie", mouse: "mouse" };
+const CURIO_SCORE: Partial<Record<CurioId, MayhemKind>> = { box: "royal", king: "crown", duke: "duke", stagehands: "stagehand", tower: "tower", pie: "pie", mouse: "mouse" };
 /** Structural bodies that are rides, not masonry. */
 const RIDES = new Set(["seat", "seesaw", "cradle"]);
 /** How tall the sides of the rock-a-bye basket are. */
@@ -318,6 +318,25 @@ export interface AimPreview {
   reachable: boolean;
   from: Vec3;
   velocity: Vec3;
+}
+
+/** Where a ray enters and leaves an axis-aligned box (distances along it), if it passes through. */
+function rayThroughBox(origin: Vec3, direction: Vec3, centre: Vec3, size: Vec3): { enter: number; exit: number } | undefined {
+  let enter = 0;
+  let exit = Infinity;
+  for (const axis of ["x", "y", "z"] as const) {
+    const low = centre[axis] - size[axis] / 2;
+    const high = centre[axis] + size[axis] / 2;
+    if (Math.abs(direction[axis]) < 1e-9) {
+      if (origin[axis] < low || origin[axis] > high) return undefined;
+      continue;
+    }
+    const a = (low - origin[axis]) / direction[axis];
+    const b = (high - origin[axis]) / direction[axis];
+    enter = Math.max(enter, Math.min(a, b));
+    exit = Math.min(exit, Math.max(a, b));
+  }
+  return enter <= exit ? { enter, exit } : undefined;
 }
 
 function mulberry32(seed: number): () => number {
@@ -666,6 +685,25 @@ export class Game {
     });
     let reach = hit ? hit.timeOfImpact : maxDistance;
     let point: Vec3 | undefined = hit ? add(origin, { x: direction.x * reach, y: direction.y * reach, z: direction.z * reach }) : undefined;
+    // A curio inside another (Old King Cole in his box): pointing at him aims into him, not at the
+    // face of the one round him, or the shot could sail past him.
+    const struck = hit && this.curios.get(hit.collider.handle);
+    if (struck) {
+      const solid = this.world.castRay(ray, maxDistance, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, this.carousel?.entity.body);
+      const limit = solid ? solid.timeOfImpact : maxDistance;
+      const outer = CURIOS.find((item) => item.id === struck.id)!;
+      let inner: { volume: number; at: number } | undefined;
+      for (const curio of CURIOS) {
+        const span = rayThroughBox(origin, direction, curio.at, curio.size);
+        const volume = curio.size.x * curio.size.y * curio.size.z;
+        if (!span || span.enter >= limit || volume >= outer.size.x * outer.size.y * outer.size.z) continue;
+        if (!inner || volume < inner.volume) inner = { volume, at: (span.enter + Math.min(span.exit, limit)) / 2 };
+      }
+      if (inner) {
+        reach = inner.at;
+        point = add(origin, scale(direction, reach));
+      }
+    }
     const child = this.pickChild(origin, direction, reach);
     if (child !== undefined) {
       reach = child;

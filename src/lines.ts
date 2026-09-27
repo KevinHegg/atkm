@@ -26,6 +26,7 @@ export type Cue =
   | "timber"
   | "fizz"
   | "kingOutrage"
+  | "kingCrown"
   | "kingCheer"
   | "kingSulk"
   | "kingLaugh"
@@ -186,6 +187,10 @@ export const LINES: Record<Cue, { speaker: Speaker; lines: string[] }> = {
   kingOutrage: {
     speaker: "king",
     lines: ["Treason! In MY box?", "Call for my fiddlers three! And a new crown!", "I say! That was nearly my pipe!"],
+  },
+  kingCrown: {
+    speaker: "king",
+    lines: ["My crown! Ah. There it is.", "I am a merry old soul, madam, not a coconut shy!", "Fiddlers! Something soothing. And somebody hold my crown."],
   },
   kingCheer: {
     speaker: "king",

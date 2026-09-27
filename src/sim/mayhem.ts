@@ -39,6 +39,7 @@ export type MayhemKind =
   | "mousetrap"
   | "child"
   | "tower"
+  | "crown"
   | "trick"
   | "crack";
 
@@ -85,6 +86,7 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   mousetrap: { points: 80, bill: "Rats caught in the act", shout: "Snap!" },
   child: { points: 40, bill: "Carousel children knocked flat", shout: "Whee!" },
   tower: { points: 75, bill: "The royal box, rattled", shout: "Steady on!" },
+  crown: { points: 100, bill: "Old King Cole, uncrowned", shout: "My crown!" },
   trick: { points: 0, bill: "Trick shots", shout: "Trick shot!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };

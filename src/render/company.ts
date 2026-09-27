@@ -2,6 +2,9 @@ import * as pc from "playcanvas";
 import { CURIOS, DUKE_HILL } from "../sim/curios.js";
 import { palette, type Kit } from "./kit.js";
 
+/** What Old King Cole is doing about it just now. */
+type KingAct = "outrage" | "uncrowned" | "cheer" | "sulk" | "laugh";
+
 const V = (x = 0, y = 0, z = 0): pc.Vec3 => new pc.Vec3(x, y, z);
 
 type Box = { center: [number, number, number]; size: [number, number, number]; color: pc.Color };
@@ -29,7 +32,7 @@ export class Company {
   private readonly soldiers: Array<{ root: pc.Entity; offset: number }> = [];
   private readonly duke: pc.Entity;
   private readonly puff: (at: pc.Vec3) => void;
-  private kingAct: { kind: "outrage" | "cheer" | "sulk" | "laugh"; started: number } | undefined;
+  private kingAct: { kind: KingAct; started: number } | undefined;
   private dukeHit = -99;
   private handsHit = -99;
   private towerHit = -99;
@@ -59,7 +62,7 @@ export class Company {
     this.mopper.root.enabled = false;
 
     // Old King Cole's box, high on braced stilts at stage right, looking down on the stage.
-    const box = CURIOS.find((curio) => curio.id === "king")!.at;
+    const box = CURIOS.find((curio) => curio.id === "box")!.at;
     const floor = 4.1;
     const crimson = palette.king;
     const gold = palette.gold;
@@ -202,8 +205,11 @@ export class Company {
   }
 
   /** Something the King has an opinion about. */
-  kingReacts(kind: "outrage" | "cheer" | "sulk" | "laugh", now: number): void {
-    if (this.kingAct && this.kingAct.kind === "outrage" && now - this.kingAct.started < 3) return;
+  kingReacts(kind: KingAct, now: number): void {
+    // A shot at the King passes through his box first: being hit himself trumps the box's outrage.
+    const current = this.kingAct;
+    if (current && now - current.started < 3 && kind !== "uncrowned" && (current.kind === "outrage" || current.kind === "uncrowned")) return;
+    if (current?.kind === "uncrowned" && kind === "uncrowned" && now - current.started < 3) return;
     this.kingAct = { kind, started: now };
   }
 
@@ -326,6 +332,8 @@ export class Company {
     const age = act ? now - act.started : Infinity;
     const merry = Math.sin(now * 1.6);
     let crownLift = 0;
+    let crownForward = 0;
+    let crownSpin = 0;
     let lean = merry * 3;
     let armR = 40 + Math.sin(now * 0.8) * 6;
     let armL = 30;
@@ -337,6 +345,28 @@ export class Company {
         armR = 150 + Math.sin(age * 16) * 25;
         lean = -6;
         playing = age > 1.2;
+      } else if (act.kind === "uncrowned") {
+        // Knocked clean off: the crown pops up and clonks the canopy, tumbles forward over the
+        // rail, and he snatches it and jams it back on; then he shakes his fist while the fiddlers
+        // pick up the tune again. (It never leaves the box: the canopy is just above his head.)
+        const ease = (u: number): number => u * u * (3 - 2 * u);
+        if (age < 0.25) {
+          crownLift = Math.sin((age / 0.25) * (Math.PI / 2)) * 0.26;
+        } else if (age < 0.85) {
+          const u = (age - 0.25) / 0.6;
+          crownLift = 0.26 - u * u * 1.0;
+          crownForward = u * 0.5;
+        } else if (age < 1.5) {
+          const u = ease((age - 0.85) / 0.65);
+          crownLift = -0.74 * (1 - u);
+          crownForward = 0.5 * (1 - u);
+        }
+        crownSpin = age < 1.5 ? (age / 1.5) * 1080 : 0;
+        armR = age < 0.85 ? 170 : age < 1.5 ? 95 : 150 + Math.sin(age * 16) * 25;
+        armL = age < 0.85 ? 170 : age < 1.5 ? 95 : 40;
+        lean = age < 0.85 ? -18 : age < 1.5 ? 10 : -6;
+        headTilt = age < 0.85 ? -15 : age < 1.5 ? 12 : 0;
+        playing = age > 2.4;
       } else if (act.kind === "cheer") {
         armR = 160 + Math.sin(age * 12) * 12;
         armL = 160 + Math.sin(age * 12 + 1) * 12;
@@ -355,8 +385,8 @@ export class Company {
     }
     king.body.setLocalEulerAngles(lean, 0, 0);
     king.head.setLocalEulerAngles(headTilt, merry * 6, 0);
-    king.crown.setLocalPosition(0, 0.3 + crownLift, 0);
-    king.crown.setLocalEulerAngles(0, crownLift * 360, 0);
+    king.crown.setLocalPosition(0, 0.3 + crownLift, crownForward);
+    king.crown.setLocalEulerAngles(crownSpin * 0.2, crownSpin || crownLift * 360, crownSpin * 0.1);
     king.armR.setLocalEulerAngles(armR, 0, -10);
     king.armL.setLocalEulerAngles(armL, 0, 10);
     for (const [index, fiddler] of this.fiddlers.entries()) {

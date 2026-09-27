@@ -465,6 +465,45 @@ test("a parting shot fired while he falls still scores where it lands, just afte
   game.destroy();
 });
 
+test("Old King Cole is a target of his own in his box: a shot through him pays for both", async () => {
+  const { CURIOS } = await import("../src/sim/curios.js");
+  const king = CURIOS.find((curio) => curio.id === "king")!;
+  const box = CURIOS.find((curio) => curio.id === "box")!;
+  const level = arena(() => perchAt(-6, 1, -6), { ammo: { shot: 2 } });
+  // Straight at him: through the front of his box and on into the King.
+  let game = await Game.create(level);
+  await stepUntilReady(game);
+  assert.ok(game.fire(king.at));
+  let events = await run(game, 3);
+  let ids = events.flatMap((event) => (event.type === "curio" ? [event.id] : []));
+  assert.ok(ids.includes("box") && ids.includes("king"), `struck ${ids.join(", ")}`);
+  assert.equal(game.mayhem.entries.get("crown")?.count, 1, "the King, uncrowned");
+  assert.equal(game.mayhem.entries.get("royal")?.count, 1, "and his box, outraged");
+  game.destroy();
+  // Through a corner of the box, well wide of him: only the box.
+  game = await Game.create(level);
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: box.at.x - 1.05, y: box.at.y + 1.1, z: box.at.z + 0.9 }));
+  events = await run(game, 3);
+  ids = events.flatMap((event) => (event.type === "curio" ? [event.id] : []));
+  assert.ok(ids.includes("box") && !ids.includes("king"), `struck ${ids.join(", ")}`);
+  game.destroy();
+});
+
+test("pointing at the King aims into him, not at the face of the box round him", async () => {
+  const { CURIOS } = await import("../src/sim/curios.js");
+  const king = CURIOS.find((curio) => curio.id === "king")!;
+  const game = await Game.create(arena(() => perchAt(-6, 1, -6), { ammo: { shot: 1 } }));
+  await stepUntilReady(game);
+  const eye = { x: 1, y: 9, z: 19 };
+  const toward = { x: king.at.x - eye.x, y: king.at.y - eye.y, z: king.at.z - eye.z };
+  const length = Math.hypot(toward.x, toward.y, toward.z);
+  const picked = game.raycast(eye, { x: toward.x / length, y: toward.y / length, z: toward.z / length })!;
+  const inside = (["x", "y", "z"] as const).every((axis) => Math.abs(picked[axis] - king.at[axis]) <= king.size[axis] / 2);
+  assert.ok(inside, `picked ${JSON.stringify(picked)}`);
+  game.destroy();
+});
+
 test("each curio pays out once, however often it is struck", async () => {
   const { CURIOS } = await import("../src/sim/curios.js");
   const game = await Game.create(arena((mason) => perchAt(0, mason.wall("stone", 0, -1, 4, 5), -1)));

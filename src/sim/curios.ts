@@ -16,8 +16,10 @@ export const CURIOS: ReadonlyArray<{ id: CurioId; at: Vec3; size: Vec3 }> = [
   { id: "mouse", at: { x: -7.79, y: 2.05, z: -1.41 }, size: { x: 0.55, y: 0.7, z: 0.55 } },
   { id: "well", at: { x: 13, y: 0.8, z: 5.3 }, size: { x: 1.5, y: 1.6, z: 1.5 } },
   { id: "spider", at: { x: 6.5, y: 7.6, z: -3 }, size: { x: 0.8, y: 0.8, z: 0.8 } },
-  // Old King Cole watches from a royal box high on stilts, stage right, upstage.
-  { id: "king", at: { x: 10.2, y: 5.3, z: -7.3 }, size: { x: 2.4, y: 2.6, z: 2.2 } },
+  // Old King Cole watches from a royal box high on stilts, stage right, upstage...
+  { id: "box", at: { x: 10.2, y: 5.3, z: -7.3 }, size: { x: 2.4, y: 2.6, z: 2.2 } },
+  // ...and the merry old soul himself, on his throne in the middle of it: a target of his own.
+  { id: "king", at: { x: 10.15, y: 5.3, z: -7.2 }, size: { x: 1.1, y: 1.6, z: 0.9 } },
   // Sing a song of sixpence: the King's supper, a pie on a gilt platter, flown in over stage right.
   { id: "pie", at: { x: 7.6, y: 6.2, z: -2.2 }, size: { x: 0.9, y: 0.5, z: 0.9 } },
   // The box's stilts and bracing: shake them and the whole box rattles.

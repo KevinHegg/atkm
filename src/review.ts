@@ -43,6 +43,7 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   // The headline goes to the most memorable thing that happened.
   const stories: Array<[boolean, number, () => string]> = [
     [count("star") > 0, 95, () => `STAR FOUND HIDING IN ${(input.starFrom ?? "the scenery").toUpperCase()}`],
+    [count("crown") > 0, 92, () => "KING COLE'S CROWN KNOCKED CLEAN OFF; FIDDLERS THREE FETCH IT"],
     [count("royal") > 0, 90, () => "KING COLE OUTRAGED IN HIS OWN BOX"],
     [trick("double-bank"), 93, () => "DOUBLE BANK! SHOT GLANCES TWICE AND FELLS EGG"],
     [trick("mid-air"), 89, () => "EGG STRUCK IN MID-AIR; KING CALLS IT UNSPORTING"],
@@ -89,6 +90,7 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   if (count("keg")) extras.push(`${count("keg")} kegs of powder set off`);
   if (count("curio") + count("royal") + count("duke") + count("tower")) extras.push("the scenery thoroughly disturbed");
   if (count("stagehand")) extras.push("two stagehands knocked off their feet");
+  if (count("crown")) extras.push("the King's crown knocked off");
   if (count("slip")) extras.push(`${count("slip")} slip${count("slip") > 1 ? "s" : ""} on a banana skin`);
   if (count("stung")) extras.push(`${count("stung")} of the King's crews stung`);
   if (count("china")) extras.push(`${count("china")} pieces of the King's best china broken`);

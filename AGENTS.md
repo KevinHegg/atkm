@@ -16,7 +16,8 @@ Core promises:
   collider the shot will touch. Off a bumper it continues with the true bounce. Chain
   shot's arc follows both whirling balls (`chainOffset` predicts them to a few cm), so it
   stops where a ball first clips something, and marks each rope its chain will cut.
-  Pointing picks curio sensors and snaps onto ropes, so a player can aim at either;
+  Pointing picks curio sensors and snaps onto ropes, so a player can aim at either; a curio
+  inside another (Old King Cole, `king`, in his box, `box`) is picked in preference, aimed into;
   the arc marks a curio it flies through. Only mark what the physics will do.
 - Only chain shot cuts rope and maypoles; nothing else moves a maypole. Curios never
   change a verse's physics (they pay mayhem once and may hide its star). The rat never steals the last charge, and the blunderbuss never spends
