@@ -193,7 +193,7 @@
   ],
   "ring-of-roses": [
     {
-      "ammo": "shot",
+      "ammo": "grape",
       "at": {
         "x": 6.6,
         "y": 0.85,
@@ -213,7 +213,7 @@
   ],
   "ride-a-cock-horse": [
     {
-      "ammo": "shot",
+      "ammo": "grape",
       "at": {
         "x": 5.4,
         "y": 4.35,
@@ -254,7 +254,7 @@
   ],
   "london-bridge": [
     {
-      "ammo": "shot",
+      "ammo": "grape",
       "at": {
         "x": 3,
         "y": 1.35,
