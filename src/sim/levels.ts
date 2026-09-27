@@ -564,8 +564,9 @@ function heyDiddleDiddle(): LevelDef {
         patrol: [{ x: -5.5, y: 0, z: -7.4 }, { x: 5.5, y: 0, z: -7.4 }],
       },
     ],
-    // Up and back, so the moon he's to jump over (and its hidden star) is in the sky above him.
-    view: view({ pitch: -14, distance: 24, target: { x: -1.5, y: 4.6, z: -3.5 } }),
+    // Well back, so the moon he's to jump over (and its hidden star) is in the sky above him, and
+    // the Queen's gun at the footlights is still in view.
+    view: view({ pitch: -20, distance: 28, target: { x: -1.5, y: 2.6, z: -3.5 } }),
   };
 }
 
@@ -774,8 +775,9 @@ function londonBridge(): LevelDef {
     humpty: perchAt(0, deck, -4.6),
     pieces: m.pieces,
     crews: [],
-    // Up and back a little, so the moon (and its hidden star) clears the hint above the stage.
-    view: view({ pitch: -14, distance: 24, target: { x: -0.8, y: 4.6, z: -3.5 } }),
+    // Well back, so the moon (and its hidden star) clears the hint above the stage, and the
+    // Queen's gun at the footlights is still in view.
+    view: view({ pitch: -20, distance: 28, target: { x: -0.8, y: 2.6, z: -3.5 } }),
   };
 }
 
