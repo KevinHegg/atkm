@@ -78,6 +78,9 @@ unlock every verse.
   flight and then him all the way down (click or press a key to skip). After the curtain the
   morning papers review the performance, and **Replay** shows it again. The simulation is
   deterministic, so the replay is exact.
+- **The ghost of your best line.** Come back to a verse you've cracked and faint blue studs
+  trace where each shot of your best attempt flew (most stars, then most mayhem), bounces and
+  all. Beat it and the ghost is yours again. Royal difficulty goes without.
 - **Ordnance:**
   - **Round shot** is a flat, heavy punch.
   - **Mortar shells** lob over walls and burst on contact.

@@ -122,6 +122,8 @@ function chainOffset(t: number): { across: number; forward: number } {
 }
 /** How fast a struck weathercock swings round to its next setting (rad/s). */
 const VANE_TURN = 3;
+/** How long a shot's flight is traced for the ghost of a best line. */
+const FLIGHT_TRACE = 2.2;
 /** How far back a trick shot's story goes: blows on him longer ago than this are forgotten. */
 const TRICK_WINDOW = 4;
 /** How long a carousel child struck by a shot lies flat before she's up again. */
@@ -334,6 +336,12 @@ export class Game {
   /** For the instant replay: the shot in the log that set his last fall going, and the step he cracked. */
   fallShot: number | undefined;
   crackStep = 0;
+  /**
+   * Where each of the Queen's shots flew, by its place in the log: a point every few steps (the
+   * middle of a grapeshot volley or a chain's pair), for the ghost of a best line. Presentation only.
+   */
+  readonly flights: Array<Vec3[] | undefined> = [];
+  private tracing = new Map<number, { entities: Entity[]; from: number }>();
   /** What the Queen's fire has done to him lately, and when he last sat still. */
   private blows: Blow[] = [];
   private stillAt = 0;
@@ -1049,6 +1057,7 @@ export class Game {
     this.updateHumpty();
     this.cleanUp();
     if (Math.round(this.time / STEP) % 6 === 0) this.tallyWreckage();
+    if (this.tracing.size && this.steps % 3 === 0) this.traceFlights();
     this.updatePhase();
   }
 
@@ -2320,7 +2329,35 @@ export class Game {
     const collider = this.world.createCollider(desc, body);
     const entity = this.register(kind, kind, { x: radius * 2, y: radius * 2, z: radius * 2 }, body, [collider], { ammo });
     entity.shot = this.log.length - 1;
+    if (ammo !== "blunderbuss") {
+      let trace = this.tracing.get(entity.shot);
+      if (!trace) {
+        trace = { entities: [], from: this.time };
+        this.tracing.set(entity.shot, trace);
+        this.flights[entity.shot] = [{ ...from }];
+      }
+      trace.entities.push(entity);
+    }
     return entity;
+  }
+
+  /** Follow each shot still in flight, until it comes to a stop or has flown `FLIGHT_TRACE` seconds. */
+  private traceFlights(): void {
+    for (const [shot, trace] of this.tracing) {
+      const live = trace.entities.filter((entity) => !entity.view.removed);
+      const middle = { x: 0, y: 0, z: 0 };
+      let speed = 0;
+      for (const entity of live) {
+        const p = entity.body.translation();
+        middle.x += p.x / live.length;
+        middle.y += p.y / live.length;
+        middle.z += p.z / live.length;
+        speed = Math.max(speed, lengthOf(entity.body.linvel()));
+      }
+      if (live.length) this.flights[shot]?.push(middle);
+      const flown = this.time - trace.from;
+      if (!live.length || flown > FLIGHT_TRACE || (speed < 3 && flown > 0.3)) this.tracing.delete(shot);
+    }
   }
 
   private addCrew(def: LevelDef["crews"][number]): void {

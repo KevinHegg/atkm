@@ -180,6 +180,7 @@ Core promises:
   hoist a perch to return him to; fall back to the highest perch when the ride is
   spent.
 - Browser storage holds only per-player progress (stars, best mayhem, whether the
-  finale has played, mute) and must tolerate being unavailable. Bump `STORAGE_KEY` in
+  finale has played, mute, and the ghost of each verse's best line: where its shots flew, from
+  `Game.flights`) and must tolerate being unavailable. Bump `STORAGE_KEY` in
   `src/main.ts` (listing the old key for removal) only when a scoring change makes old
   stars meaningless. Winning all `LEVELS.length * 3` stars plays the Grand Finale once.

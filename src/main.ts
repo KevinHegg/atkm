@@ -44,6 +44,14 @@ interface Progress {
   crowns?: Record<string, true>;
   /** Named trick shots pulled off, anywhere. */
   tricks?: Partial<Record<TrickKind, true>>;
+  /** The ghost of the best line per verse: its stars, mayhem, and where each shot flew (x, y, z, ...). */
+  ghosts?: Record<string, Ghost>;
+}
+
+interface Ghost {
+  stars: number;
+  mayhem: number;
+  paths: number[][];
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
@@ -58,7 +66,7 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {} };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {}, ghosts: parsed.ghosts ?? {} };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
@@ -216,9 +224,36 @@ function recordStars(current: Game): void {
   if (current.challengeMet) (progress.challenges ??= {})[id] = true;
   if (royalRun) (progress.crowns ??= {})[id] = true;
   for (const trick of current.tricks) (progress.tricks ??= {})[trick] = true;
+  recordGhost(current);
   // Marked as seen only once it actually plays (a restart or reload before then keeps it owed).
   if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = true;
   saveProgress();
+}
+
+/** The attempt the ghost was last taken from: it may be retaken as its shots finish flying. */
+let ghostFrom: Game | undefined;
+
+/** A crack better than the ghost on file (more stars, or as many and more mayhem) becomes the new ghost. */
+function recordGhost(current: Game): void {
+  const id = current.level.id;
+  const stars = current.stars().count;
+  const mayhem = current.mayhem.total;
+  const old = progress.ghosts?.[id];
+  if (old && ghostFrom !== current && (old.stars > stars || (old.stars === stars && old.mayhem >= mayhem))) return;
+  ghostFrom = current;
+  const round = (value: number): number => Math.round(value * 100) / 100;
+  const paths = current.flights.flatMap((path) => (path && path.length > 1 ? [path.flatMap((p) => [round(p.x), round(p.y), round(p.z)])] : []));
+  (progress.ghosts ??= {})[id] = { stars, mayhem, paths };
+}
+
+/** Trace the ghost of the player's best line on this verse, if there is one. */
+function traceGhost(level: LevelDef): void {
+  const ghost = progress.ghosts?.[level.id];
+  const paths = ghost?.paths.map((flat) => Array.from({ length: Math.floor(flat.length / 3) }, (_, index) => ({ x: flat[index * 3]!, y: flat[index * 3 + 1]!, z: flat[index * 3 + 2]! })));
+  view.setGhost(paths);
+  const note = $("#verse-ghost");
+  note.hidden = !ghost || !paths?.length || Boolean(progress.royal);
+  if (ghost) note.textContent = `Your best line so far (${ghost.mayhem.toLocaleString("en-GB")} mayhem, ${ghost.stars} ${ghost.stars === 1 ? "star" : "stars"}) is traced in silver.`;
 }
 
 function cue(kind: Cue, chance = 1, cooldown = 4): void {
@@ -319,6 +354,7 @@ function show(next: Screen): void {
   if (next !== "finale") $("#finale-screen").hidden = true;
   $("#replay-banner").hidden = next !== "replay";
   document.body.classList.toggle("replaying", next === "replay");
+  view.showGhost(next === "play");
   const playing = next === "play" || next === "result";
   $("#hud-top").hidden = !playing;
   $("#hud-bottom").hidden = next !== "play";
@@ -424,6 +460,8 @@ async function startLevel(index: number): Promise<void> {
     royalRun = Boolean(progress.royal);
     $("#royal-badge").hidden = !royalRun;
     view.setRoyal(royalRun);
+    traceGhost(level);
+    view.showGhost(true);
     const timing = hintShot?.wait ? " Timing matters: the stars are fickle." : "";
     $("#hint").textContent = hintShot
       ? `The Court Astrologer has marked a winning shot with a green ring. Aim anywhere inside it and he'll fire ${AMMO[hintShot.ammo].name.toLowerCase()} exactly where it should go.${timing}`

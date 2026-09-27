@@ -170,6 +170,9 @@ export class StageView {
   private thunderOwed = false;
   /** Royal difficulty: the aim arc shows only its first half, and no markers. */
   private royal = false;
+  /** The ghost of the player's best line on this verse: faint silver studs where its shots flew. */
+  private ghost: pc.Entity | undefined;
+  private ghostMaterial: pc.StandardMaterial | undefined;
   /** The bees, when they're out, and when their hive was last struck. */
   private readonly swarm: pc.Entity;
   private hiveStruckAt = -99;
@@ -493,6 +496,49 @@ export class StageView {
   /** Royal difficulty on or off: half an aim arc, and no markers. */
   setRoyal(on: boolean): void {
     this.royal = on;
+  }
+
+  /**
+   * Trace the ghost of a best line: a stud every half metre along each shot's flight, baked into
+   * one mesh (one draw call however many shots). Undefined clears it.
+   */
+  setGhost(paths: ReadonlyArray<ReadonlyArray<Vec3>> | undefined): void {
+    // The mesh is the ghost's own (not one of the kit's shared ones), so it goes with the entity.
+    this.ghost?.destroy();
+    this.ghost = undefined;
+    const points: Vec3[] = [];
+    for (const path of paths ?? []) {
+      let carried = 0.3;
+      for (let index = 1; index < path.length; index += 1) {
+        const a = path[index - 1]!;
+        const b = path[index]!;
+        const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+        let along = carried;
+        for (; along < length; along += 0.5) {
+          const k = along / length;
+          points.push({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k });
+        }
+        carried = along - length;
+      }
+    }
+    if (!points.length) return;
+    if (!this.ghostMaterial) {
+      const material = new pc.StandardMaterial();
+      material.name = "ghost-line";
+      material.diffuse = new pc.Color(0.62, 0.74, 0.95);
+      material.emissive = new pc.Color(0.3, 0.42, 0.72);
+      material.opacity = 0.62;
+      material.blendType = pc.BLEND_NORMAL;
+      material.depthWrite = false;
+      material.update();
+      this.ghostMaterial = material;
+    }
+    this.ghost = this.kit.meshEntity("ghost-line", this.kit.studs(points, 0.07), this.ghostMaterial, this.effects, false);
+  }
+
+  /** The ghost shows while aiming, and not in Royal difficulty (no hints there). */
+  showGhost(on: boolean): void {
+    if (this.ghost) this.ghost.enabled = on && !this.royal;
   }
 
   kingHead(): Vec3 {

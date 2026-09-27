@@ -563,7 +563,8 @@ function heyDiddleDiddle(): LevelDef {
         patrol: [{ x: -5.5, y: 0, z: -7.4 }, { x: 5.5, y: 0, z: -7.4 }],
       },
     ],
-    view: view({ pitch: -24, distance: 21, target: { x: 0, y: 2.4, z: -3 } }),
+    // Up and back, so the moon he's to jump over (and its hidden star) is in the sky above him.
+    view: view({ pitch: -14, distance: 24, target: { x: -1.5, y: 4.6, z: -3.5 } }),
   };
 }
 

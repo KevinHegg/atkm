@@ -190,6 +190,35 @@ export class Kit {
   }
 
   /**
+   * Little diamonds (octahedra) at each point, baked into one mesh. Not shared: whoever asks for
+   * it owns it, and destroys it when it's done with it.
+   */
+  studs(points: ReadonlyArray<{ x: number; y: number; z: number }>, radius: number): pc.Mesh {
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const indices: number[] = [];
+    for (const point of points) {
+      for (const sx of [1, -1]) {
+        for (const sy of [1, -1]) {
+          for (const sz of [1, -1]) {
+            // One face per octant, wound outwards.
+            const corners = [[sx, 0, 0], [0, sy, 0], [0, 0, sz]];
+            if (sx * sy * sz < 0) corners.reverse();
+            const base = positions.length / 3;
+            const n = 1 / Math.sqrt(3);
+            for (const [cx, cy, cz] of corners) {
+              positions.push(point.x + cx! * radius, point.y + cy! * radius, point.z + cz! * radius);
+              normals.push(sx * n, sy * n, sz * n);
+            }
+            indices.push(base, base + 1, base + 2);
+          }
+        }
+      }
+    }
+    return this.build(positions, indices, { normals });
+  }
+
+  /**
    * A flat ring (an annulus with walls) lying in the XZ plane, `height` thick, in vertex colours:
    * `colour(sector, band)` paints each sector of each band (bands run from the inside out).
    */

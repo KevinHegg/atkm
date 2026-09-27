@@ -800,6 +800,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 #verse-card .ammo-list { margin: 0 0 18px; font: 600 14px/1.3 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; color: var(--crimson); }
 #verse-card .couplet { margin-bottom: 14px; }
 #verse-card .secrets { margin: -8px 0 16px; font: italic 15px/1.3 var(--serif); color: var(--gold-dark); }
+#verse-card .ghost-note { margin: -8px 0 16px; font: italic 15px/1.3 var(--serif); color: #6f7f94; }
+#verse-card .ghost-note::before { content: "◆ "; font-style: normal; color: #9fb0c6; }
 
 @media (max-width: 720px) {
   #hud-top { flex-wrap: wrap; left: 12px; right: 12px; gap: 8px; }

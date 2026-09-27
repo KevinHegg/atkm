@@ -383,6 +383,22 @@ test("the par lines earn the tricks their verses are built on: banks, a rug pull
   }
 });
 
+test("each shot's flight is traced for the ghost of a best line: from the gun until it stops", async () => {
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1), { ammo: { shot: 1, grape: 1 } }));
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: 3, y: 1, z: -1 }));
+  await run(game, 4);
+  const flight = game.flights[0]!;
+  assert.ok(flight.length > 5 && flight.length < 50, `${flight.length} points`);
+  assert.ok(flight[0]!.z > 5, "it starts at the gun");
+  assert.ok(flight.some((point) => point.z < 0), "and follows the ball out to the stage");
+  game.select("grape");
+  assert.ok(game.fire({ x: -3, y: 1, z: -1 }));
+  await run(game, 4);
+  assert.ok((game.flights[1]?.length ?? 0) > 5, "a grapeshot volley is traced by its middle");
+  game.destroy();
+});
+
 test("mayhem is tallied until the crack and not a moment after", async () => {
   const game = await Game.create(arena((mason) => perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1)));
   await stepUntilReady(game);
