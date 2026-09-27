@@ -682,7 +682,8 @@ export function buildCarousel(kit: Kit, parent: pc.Entity, def: { inner: number;
       { center: [def.outer - 0.04, 0, 0], size: [0.08, def.height, 0.14], color: palette.oakDark },
     ];
     for (const side of [-1, 1]) {
-      const z = side * 0.06;
+      // Proud of the frame's face (it stands 0.07 out), so her feet don't flicker against it.
+      const z = side * 0.085;
       parts.push(
         { center: [reach, -0.2, z], size: [0.46, 0.7, 0.02], color: frock },
         { center: [reach, 0.3, z], size: [0.3, 0.32, 0.02], color: palette.skin },

@@ -4,7 +4,7 @@ import { arcPoint, solveLaunch } from "../src/sim/ballistics.js";
 import { Game, STEP } from "../src/sim/game.js";
 import { Mason, perchAt, type LevelDef } from "../src/sim/level.js";
 import { distanceToSegment } from "../src/sim/geometry.js";
-import type { GameEvent } from "../src/sim/types.js";
+import type { GameEvent, Vec3 } from "../src/sim/types.js";
 
 function arena(build: (mason: Mason) => { x: number; y: number; z: number }, extra: Partial<LevelDef> = {}): LevelDef {
   const mason = new Mason();
@@ -809,16 +809,18 @@ test("a bomb dropped in the hopper rolls down the chute and goes off at the far 
   assert.ok(blast && blast.type === "explode" && blast.at.x > 0.4 && blast.at.y < 1.2, "and goes off down at the end of the trough");
 });
 
-test("the carousel's aim arc bounces off its paddles where they will be when the shot arrives", async () => {
+test("the carousel's aim arc bounces off a child standing still, and stops where a dancing child will strike", async () => {
   const level = arena((mason) => {
-    mason.carousel(0, -2, { y: 1.9, speed: 0.9 });
+    mason.carousel(0, -2, { y: 1.9, speed: 1.5, rest: 2 });
     return perchAt(-6, 1, -6);
   }, { ammo: { shot: 1 } });
-  // Over a spread of moments and aims, the real ball should follow the predicted bounce closely
-  // for the first quarter of a second (a graze on a paddle's very tip is the odd one out).
+  // Over a spread of moments through a rest and a step, and a spread of aims: off a child standing
+  // still the real ball follows the drawn bounce; off one dancing past it strikes where the arc stops.
   let bounced = 0;
   let close = 0;
-  for (const wait of [0, 25, 50, 75]) {
+  let struck = 0;
+  let there = 0;
+  for (const wait of [0, 30, 60, 90, 110, 130, 150, 170]) {
     for (const x of [-1.2, -0.8, 0.8, 1.2]) {
       const game = await Game.create(level);
       await stepUntilReady(game);
@@ -827,25 +829,35 @@ test("the carousel's aim arc bounces off its paddles where they will be when the
       const preview = game.aim(target, "shot");
       assert.ok(game.fire(target));
       let hitAt = -1;
+      let strike: Vec3 | undefined;
       let stray = 0;
       for (let step = 0; step < 60; step += 1) {
         game.step();
-        if (hitAt < 0 && game.drainEvents().some((event) => event.type === "ricochet")) hitAt = step;
+        const ricochet = game.drainEvents().find((event) => event.type === "ricochet");
+        if (hitAt < 0 && ricochet?.type === "ricochet") {
+          hitAt = step;
+          strike = ricochet.at;
+        }
         const ball = game.bodies.find((body) => body.kind === "shot");
         if (!ball || hitAt < 0 || step > hitAt + 15) continue;
         let nearest = Infinity;
         for (let index = 1; index < preview.points.length; index += 1) nearest = Math.min(nearest, distanceToSegment(ball.position, preview.points[index - 1]!, preview.points[index]!));
         stray = Math.max(stray, nearest);
       }
-      if (hitAt >= 0) {
+      if (preview.glance && hitAt >= 0) {
         bounced += 1;
         if (stray < 0.3) close += 1;
+      } else if (!preview.glance && preview.hitKind === "fixture" && preview.hit && Math.hypot(preview.hit.x, preview.hit.z + 2) < 2.1) {
+        struck += 1;
+        if (strike && Math.hypot(strike.x - preview.hit.x, strike.y - preview.hit.y, strike.z - preview.hit.z) < 0.5) there += 1;
       }
       game.destroy();
     }
   }
-  assert.ok(bounced >= 12, `${bounced} shots struck a paddle`);
-  assert.ok(close / bounced >= 0.75, `${close} of ${bounced} followed the predicted bounce`);
+  assert.ok(bounced >= 8, `${bounced} shots glanced off a child standing still`);
+  assert.ok(close / bounced >= 0.75, `${close} of ${bounced} followed the drawn bounce`);
+  assert.ok(struck >= 3, `${struck} shots met a dancing child`);
+  assert.ok(there / struck >= 0.75, `${there} of ${struck} struck where the arc stopped`);
 });
 
 test("knock a post from under a sleeping deck and the deck comes down", async () => {
@@ -1070,7 +1082,7 @@ test("every verse's side challenge can be done: a recorded line cracks him with 
     "ring-of-roses": [S("shot", 0, 1, 1), S("shot", 3.2, 1, -2.2), S("shot", 6.6, 0.85, 0.2), H("shot", 0, 0.2, 0)],
     "ride-a-cock-horse": [S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.48, 4.35, -4.74)],
     "came-tumbling-after": [S("bomb", 1.8, 0.402, -3.75)],
-    "round-the-mulberry-bush": [S("shot", 6, 4, -7), S("shot", 5.18, 4, -7, 3)],
+    "round-the-mulberry-bush": [S("shot", 6, 4, -7), S("shot", 5.1, 4, -5.82, 5)],
     "london-bridge": [S("shot", -4.6, 0.4, -5.4), S("shot", 3, 1.35, -1.6), S("shot", -0.95, 1.45, -4.6)],
   };
   for (const level of LEVELS) {
@@ -1129,13 +1141,25 @@ test("the carousel's children stop between steps, and a shot glanced off one the
   const game = await Game.create(levelById("round-the-mulberry-bush")!);
   await stepUntilReady(game);
   assert.ok(game.carouselResting, "they start out doing the actions");
-  const preview = game.aim({ x: 5.18, y: 4, z: -7 }, "shot");
+  const preview = game.aim({ x: 5.1, y: 4, z: -5.82 }, "shot");
   assert.equal(preview.hitKind, "humpty", "the arc glances off a child and on to him");
-  // Then they dance a step round, and stop again.
-  await run(game, 3.2);
+  assert.ok(preview.glance, "and marks where");
+  // Pointing at the child at the front right picks her face.
+  const eye = { x: 0, y: 9, z: 16 };
+  const toward = { x: preview.glance.x - eye.x, y: preview.glance.y - eye.y, z: preview.glance.z - eye.z };
+  const length = Math.hypot(toward.x, toward.y, toward.z);
+  const ray = { x: toward.x / length, y: toward.y / length, z: toward.z / length };
+  const picked = game.raycast(eye, ray)!;
+  // Then they dance a step round: the arc stops at whoever's dancing past, and the aim holds steady
+  // on where the next child will stand.
+  await run(game, 4.8);
   assert.ok(!game.carouselResting, "dancing");
-  await run(game, 1.4);
+  assert.ok(!game.aim({ x: 5.1, y: 4, z: -5.82 }, "shot").glance, "no bounce drawn off a dancing child");
+  const during = game.raycast(eye, ray)!;
+  assert.ok(Math.hypot(during.x - picked.x, during.y - picked.y, during.z - picked.z) < 0.01, "the aim point stays put");
+  await run(game, 1.1);
   assert.ok(game.carouselResting, "stopped again");
+  assert.equal(game.aim({ x: 5.1, y: 4, z: -5.82 }, "shot").hitKind, "humpty", "and the next child sends it at him");
   game.destroy();
 });
 

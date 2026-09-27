@@ -125,6 +125,8 @@ let verseOpen = false;
 let attractTimer = 0;
 const pointer = { x: 0, y: 0, inside: false };
 const PAR = parSolutions as Record<string, PlannedShot[]>;
+/** The most lines the King's bill runs to before the smallest are lumped together as sundries. */
+const BILL_LINES = 7;
 /** Verses lost this session; after a loss the Court Astrologer marks a winning shot. */
 const losses = new Map<string, number>();
 let hintShot: PlannedShot | undefined;
@@ -571,7 +573,9 @@ async function startLevel(index: number, today?: Daily): Promise<void> {
     // Today's racks aren't the verse's, so its ghost stays away.
     traceGhost(today ? undefined : level);
     view.showGhost(true);
-    const timing = hintShot?.wait ? " Timing matters: the stars are fickle." : "";
+    const timing = hintShot && !hintShot.relativeToHumpty && next.onCarousel(hintShot.at)
+      ? " It shows while the child stands still: fire then."
+      : hintShot?.wait ? " Timing matters: the stars are fickle." : "";
     $("#hint").textContent = hintShot
       ? `The Court Astrologer has marked a winning shot with a green ring. Aim anywhere inside it and he'll fire ${AMMO[hintShot.ammo].name.toLowerCase()} exactly where it should go.${timing}`
       : level.hint;
@@ -746,17 +750,27 @@ function showResult(): void {
   $("#paper-body").textContent = notice.body;
   $("#paper-critic").textContent = notice.critic;
   const lines = current.mayhem.lines();
+  // A long bill folds its smallest items into sundries, so it fits the card as a printed bill does.
+  const kept = new Set(lines.length <= BILL_LINES ? lines : [...lines]
+    .sort((a, b) => Number(b.kind === "crack" || b.kind === "great") - Number(a.kind === "crack" || a.kind === "great") || b.points - a.points)
+    .slice(0, BILL_LINES - 1));
+  const sundries = lines.filter((line) => !kept.has(line));
+  const billLine = (bill: string, detail: string, points: number): string =>
+    `<li><span>${bill}${detail ? ` <em>${detail}</em>` : ""}</span><b>${points.toLocaleString("en-GB")}</b></li>`;
   $("#bill-lines").innerHTML = lines.length
     ? lines
+      .filter((line) => kept.has(line))
       .map((line) => {
         const detail = line.kind === "crack"
           ? `${current.stats.fall.toFixed(1)} m fall`
           : line.kind === "trick"
             ? current.tricks.map((trick) => TRICKS[trick].name).join(", ")
             : line.count > 1 ? `×${line.count}` : "";
-        return `<li><span>${line.bill}${detail ? ` <em>${detail}</em>` : ""}</span><b>${line.points.toLocaleString("en-GB")}</b></li>`;
+        return billLine(line.bill, detail, line.points);
       })
-      .join("")
+      .join("") + (sundries.length
+      ? billLine("Sundries, various", `×${sundries.reduce((sum, line) => sum + line.count, 0)}`, sundries.reduce((sum, line) => sum + line.points, 0))
+      : "")
     : `<li class="none"><span>Nothing broken. Not even the egg.</span><b>0</b></li>`;
   $("#bill-total").textContent = current.mayhem.total.toLocaleString("en-GB");
   const best = daily ? (progress.daily?.[daily.day]?.mayhem ?? 0) : (progress.best[level.id] ?? 0);
@@ -1119,7 +1133,10 @@ function hintAim(current: Game): { aim: Vec3; ring: Vec3; ammo: StockKind } | un
     ? humpty && { x: humpty.x + hintShot.at.x, y: humpty.y + hintShot.at.y, z: humpty.z + hintShot.at.z }
     : hintShot.at;
   if (!aim) return undefined;
-  return { aim, ring: current.aim(aim, hintShot.ammo).hit ?? aim, ammo: hintShot.ammo };
+  const preview = current.aim(aim, hintShot.ammo);
+  // On the carousel the ring marks the child to glance off, and only while she stands still for it.
+  if (current.onCarousel(aim)) return preview.glance && { aim, ring: preview.glance, ammo: hintShot.ammo };
+  return { aim, ring: preview.hit ?? aim, ammo: hintShot.ammo };
 }
 
 function fire(): void {

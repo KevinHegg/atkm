@@ -726,11 +726,12 @@ function cameTumblingAfter(): LevelDef {
 function roundTheMulberryBush(): LevelDef {
   const m = new Mason();
   // He sits behind a gilt trellis that stops anything fired straight at him. Upstage, the
-  // children go round the mulberry bush on a carousel: they dance a step, then stop to do the
-  // actions, and while they're still a shot glanced off one comes back at him from behind.
+  // children go round the mulberry bush on a carousel: they skip a step round, then stop a good
+  // while to do the actions, and while they're still, the child who has come round to the front
+  // right faces him: a shot glanced off her comes back at him from behind.
   m.fixture("trellis", -1.5, 0, -1.6, 3.6, 5.4, 0.1);
   const top = m.pillar("stone", -1.5, -3.8, 4, { size: 1, height: 0.9 });
-  m.carousel(4, -7, { y: 4, height: 1.6, outer: 1.9, speed: 1.2, rest: 3, angle: 0.786 });
+  m.carousel(4, -7, { y: 4, height: 1.6, outer: 1.9, speed: 1.5, rest: 5, angle: 0.75 });
   for (const x of [-3.6, -2.4]) m.hay(x, -5.4);
   m.chest(-5, -2.2, { yaw: 0.3 });
   return {
@@ -738,10 +739,10 @@ function roundTheMulberryBush(): LevelDef {
     weather: "snow",
     title: "Round the Mulberry Bush",
     verse: ["Here we go round the mulberry bush, so early in the morning;", "the children bat the cannonballs about without a word of warning."],
-    hint: "Nothing fired straight at him gets through the trellis. The children on the carousel dance a step, then stop to do the actions: while they're still, glance a shot off one and it comes back at him from behind. A child you hit goes flat for a moment (she's quite all right).",
+    hint: "Nothing fired straight at him gets through the trellis. The carousel children skip a step round, then stop to do the actions: while they're still, glance a shot off the child at the front right and it comes back at him from behind (the arc shows it). A child you hit goes flat for a moment.",
     ammo: { shot: 5, grape: 2, chain: 1 },
     greatFall: 3.4,
-    mayhem: 810,
+    mayhem: 1000,
     star: { crew: "bush-guard" },
     humpty: perchAt(-1.5, top, -3.8),
     pieces: m.pieces,

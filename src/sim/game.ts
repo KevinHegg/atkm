@@ -127,23 +127,28 @@ const FLIGHT_TRACE = 2.2;
 /** How far back a trick shot's story goes: blows on him longer ago than this are forgotten. */
 const TRICK_WINDOW = 4;
 /** How long a carousel child struck by a shot lies flat before she's up again. */
-const CHILD_DOWN = 5;
+const CHILD_DOWN = 3;
 /**
- * How far round the carousel has turned `time` seconds into the verse, and how fast it is turning
- * then. Children who rest between steps stand still, then dance one child's step round, eased.
+ * How far round the carousel has turned `time` seconds into the verse, how fast it is turning
+ * then, and where it will next stand still (where it is now, if it's stopped or never stops).
+ * Children who rest between steps stand still, then dance one child's step round, eased.
  */
-function carouselTurn(def: CarouselDef, time: number): { angle: number; spin: number } {
-  if (!def.rest) return { angle: def.angle + def.speed * time, spin: def.speed };
+function carouselTurn(def: CarouselDef, time: number): { angle: number; spin: number; stop: number } {
+  if (!def.rest) return { angle: def.angle + def.speed * time, spin: def.speed, stop: def.angle + def.speed * time };
   const step = (Math.PI * 2) / def.paddles;
   const move = step / Math.abs(def.speed);
   const count = Math.floor(time / (def.rest + move));
   const u = Math.max(0, time - count * (def.rest + move) - def.rest) / move;
   const sign = Math.sign(def.speed);
-  return { angle: def.angle + sign * step * (count + u * u * (3 - 2 * u)), spin: sign * (step / move) * 6 * u * (1 - u) };
+  return {
+    angle: def.angle + sign * step * (count + u * u * (3 - 2 * u)),
+    spin: sign * (step / move) * 6 * u * (1 - u),
+    stop: def.angle + sign * step * (count + (u > 0 ? 1 : 0)),
+  };
 }
-/** The carousel's paddles: thickness, and how cleanly shots glance off them. */
+/** The carousel's paddles: thickness, and how cleanly shots glance off them (like a mirror). */
 const PADDLE_THICK = 0.14;
-const PADDLE_BOUNCE = 0.85;
+const PADDLE_BOUNCE = 1;
 /** The portcullis: up in `GATE_RISE`, held for `GATE_TIME`, then lowered over `GATE_FALL` seconds. */
 export const GATE_RISE = 0.9;
 export const GATE_TIME = 8;
@@ -289,6 +294,8 @@ export interface AimPreview {
   hitKind: BodyKind | undefined;
   /** Which way the struck surface faces, so the marker can lie flat on it. */
   hitNormal?: Vec3;
+  /** Where it glances off a carousel child standing still, on its way. */
+  glance?: Vec3;
   /** A curio in the scenery the shot flies through on its way (shots pass through and set it off). */
   passes?: { at: Vec3; what: "curio" | "china" };
   /** Chain shot: where its chain will cut each rope it scythes through before it stops. */
@@ -628,12 +635,17 @@ export class Game {
    */
   raycast(origin: Vec3, direction: Vec3, maxDistance = 200): Vec3 | undefined {
     const ray = new RAPIER.Ray(origin, direction);
-    const hit = this.world.castRay(ray, maxDistance, true, undefined, undefined, undefined, undefined, (collider) => {
+    const hit = this.world.castRay(ray, maxDistance, true, undefined, undefined, undefined, this.carousel?.entity.body, (collider) => {
       const owner = this.byCollider.get(collider.handle);
       return !owner || owner.view.kind !== "shard";
     });
     let reach = hit ? hit.timeOfImpact : maxDistance;
     let point: Vec3 | undefined = hit ? add(origin, { x: direction.x * reach, y: direction.y * reach, z: direction.z * reach }) : undefined;
+    const child = this.pickChild(origin, direction, reach);
+    if (child !== undefined) {
+      reach = child;
+      point = add(origin, scale(direction, reach));
+    }
     const end = add(origin, { x: direction.x * maxDistance, y: direction.y * maxDistance, z: direction.z * maxDistance });
     for (const rope of this.ropeViews) {
       const near = closestBetweenSegments(origin, end, rope.bottom, rope.top);
@@ -671,6 +683,7 @@ export class Game {
     const dt = 0.03;
     const range = kind === "blunderbuss" ? 40 : 220;
     let hitNormal: Vec3 | undefined;
+    let glance: Vec3 | undefined;
     const flags = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS;
     const filter = groups(G.PROJ, ALL & ~G.PROJ & ~G.DEBRIS);
     // Chain shot's balls whirl up to a chain's length apart: the arc must stop where either ball
@@ -726,17 +739,14 @@ export class Game {
       if (paddle && paddle.u < stop) {
         const at = { x: previous.x + segment.x * paddle.u, y: previous.y + segment.y * paddle.u, z: previous.z + segment.z * paddle.u };
         points.push(at);
-        if (bounces < 3 && kind !== "shell" && kind !== "bomb") {
-          // Glance off the paddle as it sweeps past: a mirror bounce, carried along by the paddle.
+        // A child standing still sends it on with a mirror bounce. One dancing past bats it off
+        // wherever her step has got to, so the arc stops where she'll strike it rather than whip about.
+        if (bounces < 3 && kind !== "shell" && kind !== "bomb" && paddle.still) {
+          glance ??= at;
           const v = arcVelocity(launch, (step - 1 + paddle.u) * dt);
-          const rel = { x: v.x - paddle.surface.x, y: v.y - paddle.surface.y, z: v.z - paddle.surface.z };
-          const into = rel.x * paddle.normal.x + rel.y * paddle.normal.y + rel.z * paddle.normal.z;
+          const into = v.x * paddle.normal.x + v.y * paddle.normal.y + v.z * paddle.normal.z;
           const k = into < 0 ? (1 + PADDLE_BOUNCE) * into : 0;
-          launch = {
-            x: rel.x - k * paddle.normal.x + paddle.surface.x,
-            y: rel.y - k * paddle.normal.y + paddle.surface.y,
-            z: rel.z - k * paddle.normal.z + paddle.surface.z,
-          };
+          launch = { x: v.x - k * paddle.normal.x, y: v.y - k * paddle.normal.y, z: v.z - k * paddle.normal.z };
           // Start the rest of the flight just clear of the paddle's face.
           origin = { x: at.x + paddle.normal.x * 0.02, y: at.y + paddle.normal.y * 0.02, z: at.z + paddle.normal.z * 0.02 };
           step = 0;
@@ -817,7 +827,7 @@ export class Game {
     }
     const last = points[points.length - 1]!;
     if (aimedRope >= 0 && !cut.has(aimedRope) && distance(last, target) < CHAIN_LENGTH) cuts.unshift({ ...target });
-    return { points, hit, hitKind, ...(hitNormal ? { hitNormal } : {}), ...(passes ? { passes } : {}), ...(cuts.length ? { cuts } : {}), reachable: solution.reachable, from, velocity };
+    return { points, hit, hitKind, ...(hitNormal ? { hitNormal } : {}), ...(glance ? { glance } : {}), ...(passes ? { passes } : {}), ...(cuts.length ? { cuts } : {}), reachable: solution.reachable, from, velocity };
   }
 
   /**
@@ -849,13 +859,35 @@ export class Game {
     return !!carousel?.def.rest && carouselTurn(carousel.def, this.time).spin === 0;
   }
 
+  /** Is this point among the carousel's children, within the ring they dance round? */
+  onCarousel(point: Vec3): boolean {
+    const def = this.carousel?.def;
+    return !!def && Math.hypot(point.x - def.pos.x, point.z - def.pos.z) < def.outer + 0.3 && Math.abs(point.y - def.y) < def.height / 2 + 0.3;
+  }
+
+  /**
+   * How far along a pointer's ray it meets a carousel child where she will next stand still, if
+   * it does before `maxDistance`: aiming at them holds steady while they dance a step round.
+   */
+  private pickChild(origin: Vec3, direction: Vec3, maxDistance: number): number | undefined {
+    const carousel = this.carousel;
+    if (!carousel) return undefined;
+    const { def } = carousel;
+    const body = carousel.entity.body;
+    // Turn the ray back by however far they have still to go, and cast it at them as they are now.
+    const back = yawQuat(carousel.angle - carouselTurn(def, this.time).stop);
+    const from = add({ x: def.pos.x, y: 0, z: def.pos.z }, rotate(back, { x: origin.x - def.pos.x, y: origin.y, z: origin.z - def.pos.z }));
+    const hit = this.world.castRay(new RAPIER.Ray(from, rotate(back, direction)), maxDistance, true, undefined, undefined, undefined, undefined, (collider) => collider.parent()?.handle === body.handle && collider.isEnabled());
+    return hit?.timeOfImpact;
+  }
+
   /**
    * Where a shot's path from a to b (flown t0 to t1 seconds after firing) first meets a carousel
    * paddle, with each paddle where it will be by then. The path is turned back by however far the
    * carousel will have turned, and swept, as the real ball, against the real paddles as they stand
-   * now. `u` is how far along a-b; `normal` faces the shot; `surface` is the paddle's velocity there.
+   * now. `u` is how far along a-b; `normal` faces the shot; `still`: the child is standing still then.
    */
-  private paddleHit(a: Vec3, b: Vec3, t0: number, t1: number, radius: number): { u: number; normal: Vec3; surface: Vec3 } | undefined {
+  private paddleHit(a: Vec3, b: Vec3, t0: number, t1: number, radius: number): { u: number; normal: Vec3; still: boolean } | undefined {
     const carousel = this.carousel;
     if (!carousel) return undefined;
     const { def } = carousel;
@@ -874,13 +906,10 @@ export class Game {
     const hit = this.world.castShape(from, { x: 0, y: 0, z: 0, w: 1 }, { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z }, shape, 0, 1, false, undefined, undefined, undefined, undefined, (collider) => collider.parent()?.handle === body.handle && collider.isEnabled());
     if (!hit) return undefined;
     const u = hit.time_of_impact;
-    const at = { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
     // Rapier gives the struck face's normal (world space, facing the shot): turn it forward again.
     const when = t0 + (t1 - t0) * u;
     const normal = rotate(yawQuat(turned(when)), { x: hit.normal1.x, y: hit.normal1.y, z: hit.normal1.z });
-    const r = { x: at.x - axis.x, z: at.z - axis.z };
-    const spin = carouselTurn(def, this.time + when).spin;
-    return { u, normal, surface: { x: spin * r.z, y: 0, z: -spin * r.x } };
+    return { u, normal, still: carouselTurn(def, this.time + when).spin === 0 };
   }
 
   /** Is the aim point on a curio? Shots fly straight through them, setting them off. */

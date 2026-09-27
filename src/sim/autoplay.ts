@@ -174,9 +174,10 @@ export function machineTargets(level: LevelDef): Vec3[] {
       for (const [dx, dz] of [[0, 0], [-0.25, 0.15], [0.25, -0.15]]) points.push({ x: mouth.x + dx!, y: mouth.y, z: mouth.z + dz! });
     }
     if (piece.kind === "carousel") {
+      // Across each child where she stands still (and between them), mid-board and near the tip.
       for (const r of [(piece.inner + piece.outer) / 2, piece.outer * 0.85]) {
-        for (let index = 0; index < 8; index += 1) {
-          const a = (index / 8) * Math.PI * 2;
+        for (let index = 0; index < piece.paddles * 2; index += 1) {
+          const a = piece.angle + (index / (piece.paddles * 2)) * Math.PI * 2;
           points.push({ x: piece.pos.x + Math.cos(a) * r, y: piece.y, z: piece.pos.z - Math.sin(a) * r });
         }
       }

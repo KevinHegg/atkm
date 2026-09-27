@@ -60,7 +60,10 @@ Core promises:
   turns `step` per blow, the carousel (`Mason.carousel`) turns steadily or, with `rest`, dances
   one child's step round and stops to do the actions (`carouselTurn`), the portcullis slides. The chute (`Mason.chute`) is a fixed trough with a scoring sensor in its hopper.
   The aim arc leaves the carousel out of its casts and sweeps the ball against its paddles
-  where they will be when the shot arrives (`paddleHit`); keep that true if you change it.
+  where they will be when the shot arrives (`paddleHit`); keep that true if you change it. It
+  draws the bounce only off a child standing still (`glance`); off one dancing past it stops
+  where she'll strike. Pointing picks the children where they'll next stand still (`pickChild`),
+  so the aim holds steady while they turn. Their boards hold still too (no hopping): they're mirrors.
 - Dominoes (`Mason.dominoes`, material `domino`) are ordinary blocks, except that one
   toppling onto a stage cue calls it, as a shot would. `Mason.barrelRamp` lays a keg on its
   side behind a chock (cue `release`); its fuse lights once it's rolling. Keep every domino's
@@ -124,7 +127,8 @@ Core promises:
   Anything that makes the simulation depend on wall-clock time or `Math.random` breaks
   replays and the solver.
 - The Court Astrologer's hint is the first shot of the recorded par line; aiming
-  inside its ring fires exactly that shot.
+  inside its ring fires exactly that shot. On the carousel its ring marks the child to glance
+  off, and shows only while the shot would meet her standing still.
 - Every verse must stand still until the first shot and must have a recorded
   winning line in `src/sim/par.json`. The obvious lazy shot (round shot straight at
   Humpty, a shell on his head) should not be what wins a verse built around a mechanic;

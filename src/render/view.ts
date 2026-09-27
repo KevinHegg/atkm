@@ -90,8 +90,8 @@ interface BodyVisual {
   skep?: pc.Entity;
   /** The capstan's spoked head, which turns while the revolve does. */
   capstan?: pc.Entity;
-  /** The carousel's children, each on her hinge: how far over each has gone (degrees), and her hop. */
-  children?: Array<{ board: pc.Entity; tilt: number; hop: number }>;
+  /** The carousel's children, each on her hinge: how far over each has gone (degrees). */
+  children?: Array<{ board: pc.Entity; tilt: number }>;
   /** A mousetrap's spring bail and its cheese, and how far the bail has snapped over (0 set, 1 shut). */
   trap?: { bail: pc.Entity; cheese: pc.Entity; shut: number };
 }
@@ -177,8 +177,6 @@ export class StageView {
   private readonly swarm: pc.Entity;
   private hiveStruckAt = -99;
   private capstanTurn = 0;
-  /** How long the carousel's children have been stopped doing the actions (they hop meanwhile). */
-  private dance = 0;
   /** A piece of the King's china has been smashed since the dresser was last redrawn. */
   private chinaDirty = false;
   /** The dish that ran away with the spoon, while they're still on stage. */
@@ -909,7 +907,7 @@ export class StageView {
             ? buildRevolve(this.kit, root, revolve)
             : buildFixture(this.kit, root, view.material, view.size, view.position);
         if (view.material === "capstan") visual.capstan = fixture.findByName("capstan-head") as pc.Entity;
-        if (view.material === "carousel") visual.children = (fixture.find((node) => node.name === "paddle") as pc.Entity[]).map((board) => ({ board, tilt: 0, hop: 0 }));
+        if (view.material === "carousel") visual.children = (fixture.find((node) => node.name === "paddle") as pc.Entity[]).map((board) => ({ board, tilt: 0 }));
         if (view.material === "counterweight") visual.counterweight = fixture.findByName("counterweight-body") as pc.Entity;
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
         if (view.material === "lever") visual.lever = fixture.findByName("lever-arm") as pc.Entity;
@@ -1776,18 +1774,11 @@ export class StageView {
 
   /** The struck skep swings on its rope; the swarm buzzes about wherever the bees have got to. */
   private animateBees(dt: number): void {
-    // Carousel children knocked flat topple over on their hinges, and scramble back up.
-    // While they stop to do the actions, the children hop on the spot (a hand's breadth, no more).
+    // Carousel children knocked flat topple over on their hinges, and scramble back up. Standing,
+    // they hold still: they're what the Queen is aiming at.
     const standing = this.game?.carouselView;
-    const resting = this.game?.carouselResting ?? false;
-    this.dance = resting ? this.dance + dt : 0;
     for (const visual of this.visuals.values()) {
       visual.children?.forEach((child, index) => {
-        const hop = resting && standing?.[index] !== false ? 0.07 * Math.abs(Math.sin(this.dance * 5 + index * 0.8)) : 0;
-        if (hop !== child.hop) {
-          child.hop = hop;
-          child.board.setLocalPosition(0, hop, 0);
-        }
         const target = standing?.[index] === false ? 84 : 0;
         if (child.tilt === target) return;
         child.tilt = target > child.tilt ? Math.min(target, child.tilt + dt * 420) : Math.max(target, child.tilt - dt * 160);
