@@ -123,6 +123,19 @@ function chainOffset(t: number): { across: number; forward: number } {
 const VANE_TURN = 3;
 /** How long a carousel child struck by a shot lies flat before she's up again. */
 const CHILD_DOWN = 5;
+/**
+ * How far round the carousel has turned `time` seconds into the verse, and how fast it is turning
+ * then. Children who rest between steps stand still, then dance one child's step round, eased.
+ */
+function carouselTurn(def: CarouselDef, time: number): { angle: number; spin: number } {
+  if (!def.rest) return { angle: def.angle + def.speed * time, spin: def.speed };
+  const step = (Math.PI * 2) / def.paddles;
+  const move = step / Math.abs(def.speed);
+  const count = Math.floor(time / (def.rest + move));
+  const u = Math.max(0, time - count * (def.rest + move) - def.rest) / move;
+  const sign = Math.sign(def.speed);
+  return { angle: def.angle + sign * step * (count + u * u * (3 - 2 * u)), spin: sign * (step / move) * 6 * u * (1 - u) };
+}
 /** The carousel's paddles: thickness, and how cleanly shots glance off them. */
 const PADDLE_THICK = 0.14;
 const PADDLE_BOUNCE = 0.85;
@@ -806,6 +819,12 @@ export class Game {
     return this.carousel?.down.map((until) => until < 0);
   }
 
+  /** Have the carousel's children stopped between steps to do the actions? */
+  get carouselResting(): boolean {
+    const carousel = this.carousel;
+    return !!carousel?.def.rest && carouselTurn(carousel.def, this.time).spin === 0;
+  }
+
   /**
    * Where a shot's path from a to b (flown t0 to t1 seconds after firing) first meets a carousel
    * paddle, with each paddle where it will be by then. The path is turned back by however far the
@@ -817,7 +836,9 @@ export class Game {
     if (!carousel) return undefined;
     const { def } = carousel;
     const axis = { x: def.pos.x, y: 0, z: def.pos.z };
-    const back = (point: Vec3, t: number): Vec3 => add(axis, rotate(yawQuat(-def.speed * t), { x: point.x - axis.x, y: point.y, z: point.z - axis.z }));
+    // How much further round it will have turned t seconds from now.
+    const turned = (t: number): number => carouselTurn(def, this.time + t).angle - carousel.angle;
+    const back = (point: Vec3, t: number): Vec3 => add(axis, rotate(yawQuat(-turned(t)), { x: point.x - axis.x, y: point.y, z: point.z - axis.z }));
     const from = back(a, t0);
     const to = back(b, t1);
     let shape = paddleProbes.get(radius);
@@ -831,9 +852,11 @@ export class Game {
     const u = hit.time_of_impact;
     const at = { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
     // Rapier gives the struck face's normal (world space, facing the shot): turn it forward again.
-    const normal = rotate(yawQuat(def.speed * (t0 + (t1 - t0) * u)), { x: hit.normal1.x, y: hit.normal1.y, z: hit.normal1.z });
+    const when = t0 + (t1 - t0) * u;
+    const normal = rotate(yawQuat(turned(when)), { x: hit.normal1.x, y: hit.normal1.y, z: hit.normal1.z });
     const r = { x: at.x - axis.x, z: at.z - axis.z };
-    return { u, normal, surface: { x: def.speed * r.z, y: 0, z: -def.speed * r.x } };
+    const spin = carouselTurn(def, this.time + when).spin;
+    return { u, normal, surface: { x: spin * r.z, y: 0, z: -spin * r.x } };
   }
 
   /** Is the aim point on a curio? Shots fly straight through them, setting them off. */
@@ -1435,7 +1458,7 @@ export class Game {
     }
     const carousel = this.carousel;
     if (carousel) {
-      carousel.angle += carousel.def.speed * STEP;
+      carousel.angle = carouselTurn(carousel.def, this.time + STEP).angle;
       carousel.entity.body.setNextKinematicRotation(yawQuat(carousel.angle));
       // Knocked-flat children scramble back up and dance on.
       carousel.down.forEach((until, index) => {

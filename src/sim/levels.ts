@@ -723,28 +723,28 @@ function cameTumblingAfter(): LevelDef {
 
 function roundTheMulberryBush(): LevelDef {
   const m = new Mason();
-  // A screen hides him; beside it, the children go round and round the mulberry bush on a
-  // carousel. A shot that glances off one of them goes wherever the carousel has turned it.
-  m.fixture("screen", -0.8, 0, -1.3, 5.4, 6, 0.4);
-  const top = m.pillar("stone", -1.2, -4.2, 4, { size: 1, height: 0.9 });
-  // Slow enough to time a bank off one of the children as she comes round.
-  m.carousel(4.8, -3, { y: 4, height: 1.6, outer: 1.9, speed: 0.3 });
-  for (const x of [-2.4, -1.1, 0.2]) m.hay(x, -5.9);
+  // He sits behind a gilt trellis that stops anything fired straight at him. Upstage, the
+  // children go round the mulberry bush on a carousel: they dance a step, then stop to do the
+  // actions, and while they're still a shot glanced off one comes back at him from behind.
+  m.fixture("trellis", -1.5, 0, -1.6, 3.6, 5.4, 0.1);
+  const top = m.pillar("stone", -1.5, -3.8, 4, { size: 1, height: 0.9 });
+  m.carousel(4, -7, { y: 4, height: 1.6, outer: 1.9, speed: 1.2, rest: 3, angle: 0.786 });
+  for (const x of [-3.6, -2.4]) m.hay(x, -5.4);
   m.chest(-5, -2.2, { yaw: 0.3 });
   return {
     id: "round-the-mulberry-bush",
     weather: "snow",
     title: "Round the Mulberry Bush",
     verse: ["Here we go round the mulberry bush, so early in the morning;", "the children bat the cannonballs about without a word of warning."],
-    hint: "He's behind the screen, but the children on the carousel bat shots about. Watch the arc as they turn, and fire when it glances round to him. A child you hit goes flat for a moment (she's quite all right).",
+    hint: "Nothing fired straight at him gets through the trellis. The children on the carousel dance a step, then stop to do the actions: while they're still, glance a shot off one and it comes back at him from behind. A child you hit goes flat for a moment (she's quite all right).",
     ammo: { shot: 5, grape: 2, chain: 1 },
     greatFall: 3.4,
     mayhem: 750,
     star: { crew: "bush-guard" },
-    humpty: perchAt(-1.2, top, -4.2),
+    humpty: perchAt(-1.5, top, -3.8),
     pieces: m.pieces,
-    crews: [{ id: "bush-guard", kind: "guard", home: { x: 7.2, y: 0, z: -5.2 }, yaw: -0.4 }],
-    view: view({ pitch: -20, distance: 22, target: { x: 1.4, y: 2.8, z: -2 } }),
+    crews: [{ id: "bush-guard", kind: "guard", home: { x: 7.4, y: 0, z: -4.4 }, yaw: -0.4 }],
+    view: view({ pitch: -20, distance: 22, target: { x: 1.2, y: 3, z: -3.4 } }),
   };
 }
 

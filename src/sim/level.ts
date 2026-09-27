@@ -148,6 +148,11 @@ export interface CarouselDef {
   /** Radians per second (positive turns anticlockwise seen from above), and the starting turn. */
   speed: number;
   angle: number;
+  /**
+   * Seconds the children stop between steps to do the actions (wash their clothes, comb their
+   * hair). They then dance one child's step round at `speed` on average. 0: they turn steadily.
+   */
+  rest: number;
 }
 
 /** A portcullis between two piers. Strike its counterweight and it winds up for a while. */
@@ -660,7 +665,7 @@ export class Mason {
   }
 
   /** A carousel of paddles round a painted bush, turning at `speed` radians a second. */
-  carousel(x: number, z: number, opts: { y?: number; inner?: number; outer?: number; height?: number; paddles?: number; speed?: number; angle?: number } = {}): void {
+  carousel(x: number, z: number, opts: { y?: number; inner?: number; outer?: number; height?: number; paddles?: number; speed?: number; angle?: number; rest?: number } = {}): void {
     const y = opts.y ?? 1.9;
     const height = opts.height ?? 1.5;
     this.fixture("column", x, 0, z, 0.36, y + height / 2 + 0.5, 0.36);
@@ -674,6 +679,7 @@ export class Mason {
       paddles: opts.paddles ?? 4,
       speed: opts.speed ?? 0.9,
       angle: opts.angle ?? 0,
+      rest: opts.rest ?? 0,
     });
   }
 

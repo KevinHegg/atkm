@@ -114,8 +114,9 @@ unlock every verse.
   The Queen's weathercock is a bronze plate on a pole that turns an eighth of a turn each
   time it's struck: set it with one shot, bank the next off it. A bomb dropped in a chute's
   hopper rolls down the trough, fuse fizzing, to wherever it leads. The mulberry-bush
-  carousel's cut-out children bat shots about as they turn; its aim arc shows where they
-  will be when the shot arrives, so wait for the arc to swing round, then fire.
+  carousel's cut-out children dance a step round, then stop to do the actions (hopping on
+  the spot): while they're still, a shot glanced off one comes back at Humpty from behind
+  his gilt trellis. The aim arc shows where they will be when the shot arrives.
 - **Dominoes and the barrel ramp.** In All the King's Horses, a run of dominoes curls round
   behind a hedge to the chock of a barrel ramp. Topple the first and the last knocks the chock
   out: a powder keg rolls down onto the cart road, fuse fizzing, bowls whatever is in its way

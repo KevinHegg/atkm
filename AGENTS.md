@@ -57,8 +57,8 @@ Core promises:
   speed set by the shot's, not with the cannonball's full blow, and the skin ignores that
   ball for a moment so it isn't shoved twice.
 - Machines are kinematic bodies driven in `updateMachines`: the weathercock (`Mason.vane`)
-  turns `step` per blow, the carousel (`Mason.carousel`) turns steadily, the portcullis
-  slides. The chute (`Mason.chute`) is a fixed trough with a scoring sensor in its hopper.
+  turns `step` per blow, the carousel (`Mason.carousel`) turns steadily or, with `rest`, dances
+  one child's step round and stops to do the actions (`carouselTurn`), the portcullis slides. The chute (`Mason.chute`) is a fixed trough with a scoring sensor in its hopper.
   The aim arc leaves the carousel out of its casts and sweeps the ball against its paddles
   where they will be when the shot arrives (`paddleHit`); keep that true if you change it.
 - Dominoes (`Mason.dominoes`, material `domino`) are ordinary blocks, except that one

@@ -993,7 +993,7 @@ test("every verse's side challenge can be done: a recorded line cracks him with 
     "ring-of-roses": [S("shot", 0, 1, 1), S("shot", 3.2, 1, -2.2), S("shot", 6.6, 0.85, 0.2), H("shot", 0, 0.2, 0)],
     "ride-a-cock-horse": [S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.48, 4.35, -4.74)],
     "came-tumbling-after": [S("bomb", 1.8, 0.402, -3.75)],
-    "round-the-mulberry-bush": [S("shot", 3.18, 4, -3), S("shot", 3.18, 4, -3, 5)],
+    "round-the-mulberry-bush": [S("shot", 6, 4, -7), S("shot", 5.18, 4, -7, 3)],
     "london-bridge": [S("shot", -4.6, 0.4, -5.4), S("shot", 3, 1.35, -1.6), S("shot", -0.95, 1.45, -4.6)],
   };
   for (const level of LEVELS) {
@@ -1047,11 +1047,26 @@ test("when a rack runs empty the gun moves on to the next rack along the tray, r
   game.destroy();
 });
 
+test("the carousel's children stop between steps, and a shot glanced off one then comes back at him", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("round-the-mulberry-bush")!);
+  await stepUntilReady(game);
+  assert.ok(game.carouselResting, "they start out doing the actions");
+  const preview = game.aim({ x: 5.18, y: 4, z: -7 }, "shot");
+  assert.equal(preview.hitKind, "humpty", "the arc glances off a child and on to him");
+  // Then they dance a step round, and stop again.
+  await run(game, 3.2);
+  assert.ok(!game.carouselResting, "dancing");
+  await run(game, 1.4);
+  assert.ok(game.carouselResting, "stopped again");
+  game.destroy();
+});
+
 test("a carousel child struck by a shot goes flat on her back (mayhem), and is up again a few seconds later", async () => {
   const { levelById } = await import("../src/sim/levels.js");
   const game = await Game.create(levelById("round-the-mulberry-bush")!);
   await stepUntilReady(game);
-  assert.ok(game.fire({ x: 3.18, y: 4, z: -3 }));
+  assert.ok(game.fire({ x: 6, y: 4, z: -7 }));
   const events = await run(game, 3, (event) => event.type === "child");
   const child = events.find((event) => event.type === "child");
   assert.ok(child && child.type === "child", "the shot knocks a child flat");
