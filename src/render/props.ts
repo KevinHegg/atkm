@@ -670,7 +670,9 @@ export function buildCarousel(kit: Kit, parent: pc.Entity, def: { inner: number;
   kit.primitive("hub-low", "cylinder", root, V(0, -def.height / 2 + 0.05, 0), { x: def.inner * 2 + 0.2, y: 0.1, z: def.inner * 2 + 0.2 }, gold);
   for (let index = 0; index < def.paddles; index += 1) {
     const turn = (index / def.paddles) * 360;
-    const arm = kit.group("paddle", root, V(), V(0, turn, 0));
+    const turnGroup = kit.group("paddle-arm", root, V(), V(0, turn, 0));
+    // Hinged along her arm, so a child struck by a shot can go flat on her back.
+    const arm = kit.group("paddle", turnGroup);
     const frock = frocks[index % frocks.length]!;
     // A painted board with a child on each face, arms out, holding hands round the bush.
     const parts: Box[] = [

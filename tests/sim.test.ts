@@ -461,9 +461,9 @@ test("any munition that reaches a chest forces it open and tops up the battery",
     assert.ok(game.fire(chest));
     const events = await run(game, 2);
     const opened = events.find((event) => event.type === "chest");
-    assert.ok(opened && opened.type === "chest" && opened.gained[ammo] === 3, `${ammo} should force the chest`);
-    assert.equal(game.ammo[ammo], 4, "one spent, three gained");
-    assert.equal(game.issued[ammo], 5);
+    assert.ok(opened && opened.type === "chest" && opened.gained[ammo] === 4, `${ammo} should force the chest`);
+    assert.equal(game.ammo[ammo], 5, "one spent, four gained");
+    assert.equal(game.issued[ammo], 6);
     game.destroy();
   }
 });
@@ -620,9 +620,10 @@ test("a chest replaces the shot that opened it, then fills the emptiest racks, l
   assert.ok(game.fire({ ...game.bodies.find((body) => body.kind === "chest")!.position }));
   const opened = (await run(game, 2)).find((event) => event.type === "chest");
   assert.ok(opened && opened.type === "chest");
-  // Round shot back (3 of 3), the empty shell rack next (1 of 1), then a three-way tie: leftmost wins.
-  assert.deepEqual(opened.gained, { shot: 2, shell: 1 });
-  assert.deepEqual({ shot: game.ammo.shot, shell: game.ammo.shell, bomb: game.ammo.bomb }, { shot: 4, shell: 1, bomb: 2 });
+  // Round shot back (3 of 3), the empty shell rack next (1 of 1), then a three-way tie (leftmost,
+  // round shot, wins), then a tie between shell and bomb (shell, the left of the two).
+  assert.deepEqual(opened.gained, { shot: 2, shell: 2 });
+  assert.deepEqual({ shot: game.ammo.shot, shell: game.ammo.shell, bomb: game.ammo.bomb }, { shot: 4, shell: 2, bomb: 2 });
   game.destroy();
 });
 
@@ -992,7 +993,7 @@ test("every verse's side challenge can be done: a recorded line cracks him with 
     "ring-of-roses": [S("shot", 0, 1, 1), S("shot", 3.2, 1, -2.2), S("shot", 6.6, 0.85, 0.2), H("shot", 0, 0.2, 0)],
     "ride-a-cock-horse": [S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.48, 4.35, -4.74)],
     "came-tumbling-after": [S("bomb", 1.8, 0.402, -3.75)],
-    "round-the-mulberry-bush": [S("shot", 3.66, 4, -4.14), S("shot", 3.66, 4, -4.14, 2.45)],
+    "round-the-mulberry-bush": [S("shot", 3.18, 4, -3), S("shot", 3.18, 4, -3, 5)],
     "london-bridge": [S("shot", -4.6, 0.4, -5.4), S("shot", 3, 1.35, -1.6), S("shot", -0.95, 1.45, -4.6)],
   };
   for (const level of LEVELS) {
@@ -1043,5 +1044,20 @@ test("when a rack runs empty the gun moves on to the next rack along the tray, r
   // The last shot of all: nowhere to go, so it stays where it is.
   assert.ok(game.fire({ x: 6, y: 0.2, z: 3 }));
   assert.equal(game.selected, "shot");
+  game.destroy();
+});
+
+test("a carousel child struck by a shot goes flat on her back (mayhem), and is up again a few seconds later", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const game = await Game.create(levelById("round-the-mulberry-bush")!);
+  await stepUntilReady(game);
+  assert.ok(game.fire({ x: 3.18, y: 4, z: -3 }));
+  const events = await run(game, 3, (event) => event.type === "child");
+  const child = events.find((event) => event.type === "child");
+  assert.ok(child && child.type === "child", "the shot knocks a child flat");
+  assert.equal(game.carouselView?.[child.index], false);
+  assert.equal(game.mayhem.entries.get("child")?.count, 1);
+  await run(game, 6);
+  assert.ok(game.carouselView?.every((standing) => standing), "she's up again");
   game.destroy();
 });

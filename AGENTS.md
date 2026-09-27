@@ -89,10 +89,15 @@ Core promises:
   or the rat; released when a munition knocks that figure down). Set mayhem targets with
   `npm run solve -- --mayhem`: about the par line's mayhem plus one good exploring shot.
 - Every verse has one treasure chest (`Mason.chest`): any munition that reaches it, or a
-  blast within 2 m, opens it for three rounds: one of the kind that opened it (a keg's
-  blast counts as the last shot fired), then `CHEST_EXTRA` more, one at a time, to the
+  blast within 2 m, opens it for four rounds: one of the kind that opened it (a keg's
+  blast counts as the last shot fired), then `CHEST_EXTRA` (3) more, one at a time, to the
   rack emptiest against the verse's starting stock, left to right on a tie (`Game.issued`
   tracks the totals for the tray). Nothing opens after the crack.
+- The tray runs in the order a verse lists its `ammo` (`Game.tray`): list the verse's most
+  useful kind first. It's loaded at the start, the number keys follow the tray, and an empty
+  rack moves on to the next one to the right.
+- A carousel child struck by a stock shot goes flat for `CHILD_DOWN` seconds (her paddle's
+  collider off, so the aim arc and the physics agree) and pays `child` mayhem.
 - With the battery empty, the verse is lost as soon as Humpty has come down safe and
   nothing is flying, fizzing or about to blow; it does not wait for swinging scenery.
 - A shot that strikes one of the King's men fair and square bowls his crew over, as well

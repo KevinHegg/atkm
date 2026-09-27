@@ -25,8 +25,10 @@ unlock every verse.
 - **Fire:** click. On touch screens, drag to aim and tap **Fire**.
 - **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom. **C** resets the view.
   Some verses hide things behind scenery; it pays to look.
-- **Change shot:** right-click to step along the tray (left to right, then round again), keys
-  **1–5**, or the tray. **6** is the Queen's blunderbuss when a rat appears.
+- **Change shot:** right-click to step along the tray (left to right, then round again), the
+  number keys (**1** is the leftmost rack), or the tray. **6** is the Queen's blunderbuss when a
+  rat appears. Each verse puts its most useful kind of shot leftmost, and that's what's loaded
+  when the curtain goes up.
 - **How high is he?** The star for a great fall asks for a drop of so many metres. The chip at the
   top says how high he sits, and a surveyor's line from his feet to the boards shows it on stage
   at the start of each verse, whenever you aim at him, or when you hover over the chip.
@@ -63,8 +65,9 @@ unlock every verse.
 - **A great fall** (at least the verse's height, shown by the surveyor's line) earns a
   mayhem bonus on top of the crack.
 - **Treasure chests.** Every verse has an iron-bound chest of spare powder somewhere on
-  stage. Any munition that reaches it forces it open for three rounds: one to replace the
-  shot that opened it, then one each to whichever racks are emptiest (left to right on a tie).
+  stage. Any munition that reaches it forces it open for four rounds: one to replace the
+  shot that opened it, then three more, one at a time, to whichever racks are emptiest (left
+  to right on a tie).
 - **Reviews and replays.** After the curtain the morning papers review the performance,
   and **Replay** shows the final shot again in slow motion. The simulation is
   deterministic, so the replay is exact.

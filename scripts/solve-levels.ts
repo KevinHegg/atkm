@@ -47,9 +47,11 @@ for (const level of LEVELS) {
   const cueCount = level.pieces.filter((piece) => piece.kind === "fixture" && piece.cue).length + machines;
   const kinds = (Object.keys(level.ammo) as StockKind[]).filter((kind) => (level.ammo[kind] ?? 0) > 0);
   const moving = level.pieces.some((piece) => piece.kind === "turntable" || piece.kind === "carousel");
-  // The carousel's four paddles come round every couple of seconds: time it finely over one turn.
-  const carousel = level.pieces.some((piece) => piece.kind === "carousel");
-  const waits = carousel ? Array.from({ length: 21 }, (_, index) => index / 10) : moving ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : level.crews.some((crew) => crew.patrol?.length) || level.rat ? [0, 2.5] : [0];
+  // The carousel's children come round one after another: time it finely over one child's turn.
+  const carouselDef = level.pieces.find((piece) => piece.kind === "carousel");
+  const carousel = carouselDef?.kind === "carousel";
+  const period = carouselDef?.kind === "carousel" ? (2 * Math.PI) / carouselDef.paddles / Math.abs(carouselDef.speed) : 0;
+  const waits = carousel ? Array.from({ length: Math.ceil(period * 10) + 1 }, (_, index) => index / 10) : moving ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : level.crews.some((crew) => crew.patrol?.length) || level.rat ? [0, 2.5] : [0];
   const singles: PlannedShot[] = [];
   for (const kind of kinds) {
     for (const at of targets) for (const wait of waits) singles.push({ ammo: kind, at: { x: round(at.x), y: round(at.y), z: round(at.z) }, wait });

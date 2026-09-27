@@ -16,8 +16,10 @@ import type { AmmoKind, CurioId, GameEvent, StockKind, Vec3 } from "./sim/types.
 
 const BASE = import.meta.env.BASE_URL;
 /** Tray order and the number keys: 1 shot, 2 shell, 3 grape, 4 chain, 5 bomb, 6 the Queen's blunderbuss. */
-const AMMO_ORDER: AmmoKind[] = ["shot", "shell", "grape", "chain", "bomb", "blunderbuss"];
-const STOCK_ORDER: StockKind[] = ["shot", "shell", "grape", "chain", "bomb"];
+/** The tray as it stands: the verse's racks in its own order, then the blunderbuss while the rat's about. */
+function trayKinds(current: Game): AmmoKind[] {
+  return [...current.tray, ...(current.vermin ? (["blunderbuss"] as const) : [])];
+}
 const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
 const numeral = (index: number): string => NUMERALS[index] ?? String(index + 1);
 /** Bumped to wipe everyone's stars when the scoring changed (v1 had a different third star). */
@@ -408,7 +410,7 @@ async function startLevel(index: number): Promise<void> {
     });
     $("#verse-hint").textContent = level.hint;
     showChallenge($("#verse-challenge"), level, Boolean(progress.challenges?.[level.id]));
-    $("#verse-ammo").textContent = STOCK_ORDER.filter((kind) => (level.ammo[kind] ?? 0) > 0)
+    $("#verse-ammo").textContent = (Object.keys(level.ammo) as StockKind[]).filter((kind) => (level.ammo[kind] ?? 0) > 0)
       .map((kind) => `${level.ammo[kind]} × ${AMMO[kind].name}`)
       .join("  ·  ");
     // Royal difficulty: no help from the Court Astrologer.
@@ -661,20 +663,22 @@ function renderTray(): void {
   const tray = $("#ammo-tray");
   tray.replaceChildren();
   if (!current) return;
-  AMMO_ORDER.forEach((kind, index) => {
+  trayKinds(current).forEach((kind, index) => {
     const blunderbuss = kind === "blunderbuss";
-    const total = blunderbuss ? (current.vermin ? 1 : 0) : current.issued[kind as StockKind];
+    const total = blunderbuss ? 1 : current.issued[kind as StockKind];
     if (total <= 0) return;
+    // Number keys follow the tray, left to right; the blunderbuss is always 6.
+    const key = blunderbuss ? 6 : index + 1;
     const left = blunderbuss ? 1 : current.ammo[kind];
     const button = document.createElement("button");
     button.type = "button";
     button.className = `ammo${current.selected === kind ? " selected" : ""}${left <= 0 ? " empty" : ""}${blunderbuss ? " vermin" : ""}`;
-    button.title = `${AMMO[kind].name} (${index + 1}): ${AMMO[kind].blurb}`;
+    button.title = `${AMMO[kind].name} (${key}): ${AMMO[kind].blurb}`;
     button.setAttribute("aria-pressed", String(current.selected === kind));
     const pips = blunderbuss
       ? "<em>RAT!</em>"
       : Array.from({ length: total }, (_, pip) => `<b class="${pip < left ? "" : "spent"}"></b>`).join("") + `<small>${left > 0 ? `${left} left` : "none left"}</small>`;
-    button.innerHTML = `${ammoIcon(kind)}<span class="label"><strong>${AMMO[kind].name}</strong><span class="pips">${pips}</span></span><kbd>${index + 1}</kbd>`;
+    button.innerHTML = `${ammoIcon(kind)}<span class="label"><strong>${AMMO[kind].name}</strong><span class="pips">${pips}</span></span><kbd>${key}</kbd>`;
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       selectAmmo(kind);
@@ -688,7 +692,7 @@ function renderTray(): void {
 function cycleAmmo(): void {
   const current = game;
   if (!current || screen !== "play") return;
-  const kinds = AMMO_ORDER.filter((kind) => (kind === "blunderbuss" ? current.vermin : current.issued[kind as StockKind] > 0));
+  const kinds = trayKinds(current);
   const from = kinds.indexOf(current.selected);
   // Past any rack that's empty, to the next one there's still shot in.
   for (let step = 1; step < kinds.length; step += 1) {
@@ -1010,8 +1014,8 @@ window.addEventListener("keydown", (event) => {
   if (screen === "play") {
     const index = ["1", "2", "3", "4", "5", "6"].indexOf(event.key);
     if (index >= 0) {
-      // Keys match the numbers printed on the tray: 1 shot, 2 shell, 3 grape, 4 chain, 5 bomb, 6 blunderbuss.
-      const kind = AMMO_ORDER[index];
+      // Keys match the numbers printed on the tray: its racks from 1, left to right; 6 the blunderbuss.
+      const kind = index === 5 ? "blunderbuss" : game?.tray[index];
       if (kind) selectAmmo(kind);
       return;
     }
@@ -1197,6 +1201,10 @@ function handle(event: GameEvent): void {
         });
         later(2.6, () => cue("challenge", 0.8, 0));
       }
+      break;
+    case "child":
+      audio.whee();
+      if (live) audio.laugh();
       break;
     case "revolved":
       audio.clunk();

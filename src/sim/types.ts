@@ -68,6 +68,7 @@ export type GameEvent =
   | { type: "impact"; at: Vec3; strength: number; material: string }
   | { type: "turn"; at: Vec3 }
   | { type: "revolved"; at: Vec3 }
+  | { type: "child"; at: Vec3; index: number }
   | { type: "smash"; at: Vec3; piece: "plate" | "cup" | "teapot" }
   | { type: "dish"; at: Vec3; toward: number }
   | { type: "teeter"; at: Vec3; toward: { x: number; z: number } }

@@ -121,6 +121,8 @@ function chainOffset(t: number): { across: number; forward: number } {
 }
 /** How fast a struck weathercock swings round to its next setting (rad/s). */
 const VANE_TURN = 3;
+/** How long a carousel child struck by a shot lies flat before she's up again. */
+const CHILD_DOWN = 5;
 /** The carousel's paddles: thickness, and how cleanly shots glance off them. */
 const PADDLE_THICK = 0.14;
 const PADDLE_BOUNCE = 0.85;
@@ -129,7 +131,7 @@ export const GATE_RISE = 0.9;
 export const GATE_TIME = 8;
 export const GATE_FALL = 2.5;
 /** A forced chest: one to replace the shot that opened it, and two more for the emptiest racks. */
-const CHEST_EXTRA = 2;
+const CHEST_EXTRA = 3;
 /** Height of the rail round the music box's seat. */
 const TURNTABLE_RAIL = 0.1;
 /** Curios with a line of their own on the King's bill; the rest are "scenery disturbed". */
@@ -318,6 +320,8 @@ export class Game {
   steps = 0;
   /** The verse's hidden star has been knocked loose. */
   starFound = false;
+  /** The verse's kinds of shot in tray order, left to right (its most useful kind first). */
+  readonly tray: StockKind[];
   /** Shot issued so far, per kind: the verse's stock plus whatever the chests held. */
   readonly issued: Record<StockKind, number>;
   /** Until when the wind machine is blowing. */
@@ -366,7 +370,8 @@ export class Game {
   private lastStock: StockKind = "shot";
   private turntable: { entity: Entity; def: TurntableDef; angle: number; omega: number } | undefined;
   private readonly vanes: Array<{ entity: Entity; angle: number; target: number; step: number }> = [];
-  private carousel: { entity: Entity; def: CarouselDef; angle: number } | undefined;
+  /** The carousel: how far round it is, and when each knocked-flat child gets back up (-1: standing). */
+  private carousel: { entity: Entity; def: CarouselDef; angle: number; down: number[] } | undefined;
   /** The revolving stage: how far round it has been turned, and when its current turn began. */
   private revolve: { entity: Entity; def: RevolveDef; angle: number; startedAt: number | undefined; previous?: number } | undefined;
   private gate: { entity: Entity; def: GateDef; openedAt: number } | undefined;
@@ -398,7 +403,9 @@ export class Game {
     this.queue = new RAPIER.EventQueue(true);
     this.ammo = { shot: 0, shell: 0, grape: 0, chain: 0, bomb: 0, ...level.ammo };
     this.issued = { ...this.ammo };
-    this.selected = STOCK.find((kind) => this.ammo[kind] > 0) ?? "shot";
+    // The tray runs in the order the verse lists its shot: its most useful kind first.
+    this.tray = (Object.keys(level.ammo) as StockKind[]).filter((kind) => STOCK.includes(kind) && (level.ammo[kind] ?? 0) > 0);
+    this.selected = this.tray[0] ?? "shot";
     this.lastStock = this.selected;
     this.perch = { ...level.humpty };
     this.peakY = level.humpty.y;
@@ -777,6 +784,29 @@ export class Game {
   }
 
   /**
+   * A shot has struck one of the carousel's children (after bouncing off her): she goes flat on her
+   * back for a few seconds, and her board with her, so the ring has a gap in it until she's up.
+   */
+  private knockChild(carousel: Entity, handle: number): void {
+    const state = this.carousel;
+    if (!state || state.entity !== carousel) return;
+    const index = carousel.colliders.findIndex((collider) => collider.handle === handle);
+    if (index < 0 || state.down[index]! >= 0) return;
+    state.down[index] = this.time + CHILD_DOWN;
+    carousel.colliders[index]!.setEnabled(false);
+    const turn = state.angle + (index / state.def.paddles) * Math.PI * 2;
+    const reach = (state.def.inner + state.def.outer) / 2;
+    const at = { x: state.def.pos.x + Math.cos(turn) * reach, y: state.def.y, z: state.def.pos.z - Math.sin(turn) * reach };
+    this.events.push({ type: "child", at, index });
+    this.score("child", at);
+  }
+
+  /** Which of the carousel's children are standing (false: knocked flat for now). */
+  get carouselView(): boolean[] | undefined {
+    return this.carousel?.down.map((until) => until < 0);
+  }
+
+  /**
    * Where a shot's path from a to b (flown t0 to t1 seconds after firing) first meets a carousel
    * paddle, with each paddle where it will be by then. The path is turned back by however far the
    * carousel will have turned, and swept, as the real ball, against the real paddles as they stand
@@ -796,7 +826,7 @@ export class Game {
       paddleProbes.set(radius, shape);
     }
     const body = carousel.entity.body;
-    const hit = this.world.castShape(from, { x: 0, y: 0, z: 0, w: 1 }, { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z }, shape, 0, 1, false, undefined, undefined, undefined, undefined, (collider) => collider.parent()?.handle === body.handle);
+    const hit = this.world.castShape(from, { x: 0, y: 0, z: 0, w: 1 }, { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z }, shape, 0, 1, false, undefined, undefined, undefined, undefined, (collider) => collider.parent()?.handle === body.handle && collider.isEnabled());
     if (!hit) return undefined;
     const u = hit.time_of_impact;
     const at = { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, z: a.z + (b.z - a.z) * u };
@@ -912,9 +942,10 @@ export class Game {
 
   /** The next rack along the tray (to the right, then round to the first again) with shot in it. */
   private nextStocked(from: StockKind): StockKind | undefined {
-    const start = STOCK.indexOf(from);
-    for (let step = 1; step <= STOCK.length; step += 1) {
-      const kind = STOCK[(start + step) % STOCK.length]!;
+    const tray = this.tray;
+    const start = tray.indexOf(from);
+    for (let step = 1; step <= tray.length; step += 1) {
+      const kind = tray[(start + step + tray.length) % tray.length]!;
       if (this.ammo[kind] > 0) return kind;
     }
     return undefined;
@@ -1204,7 +1235,7 @@ export class Game {
       ));
     }
     const entity = this.register("fixture", "carousel", { x: def.outer * 2, y: def.height, z: def.outer * 2 }, body, colliders, { look: "carousel", bounce: PADDLE_BOUNCE });
-    this.carousel = { entity, def, angle: def.angle };
+    this.carousel = { entity, def, angle: def.angle, down: colliders.map(() => -1) };
   }
 
   /**
@@ -1406,6 +1437,12 @@ export class Game {
     if (carousel) {
       carousel.angle += carousel.def.speed * STEP;
       carousel.entity.body.setNextKinematicRotation(yawQuat(carousel.angle));
+      // Knocked-flat children scramble back up and dance on.
+      carousel.down.forEach((until, index) => {
+        if (until < 0 || this.time < until) return;
+        carousel.down[index] = -1;
+        carousel.entity.colliders[index]?.setEnabled(true);
+      });
     }
     const gate = this.gate;
     if (gate) {
@@ -1932,7 +1969,8 @@ export class Game {
   private openChest(chest: Entity, spent?: StockKind): void {
     if (chest.view.open || this.cracked || this.phase === "lost") return;
     chest.view.open = true;
-    const stocked = STOCK.filter((kind) => (this.level.ammo[kind] ?? 0) > 0);
+    // Its racks, left to right as they sit in the tray (ties go to the leftmost).
+    const stocked = this.tray;
     if (!stocked.length) return;
     const gained: Partial<Record<StockKind, number>> = {};
     const give = (kind: StockKind): void => {
@@ -2477,6 +2515,7 @@ export class Game {
           const v = shot.lastVelocity ?? shot.body.linvel();
           const p = shot.body.translation();
           if (owner.look === "vane" && !free) this.turnVane(owner);
+          if (owner.look === "carousel" && !free) this.knockChild(owner, other);
           this.events.push({ type: "ricochet", at: { x: p.x, y: p.y, z: p.z }, look: owner.look, strength: Math.min(1, lengthOf(v) / 20) });
           if (shot.ammo !== "blunderbuss") this.score("ricochet", { x: p.x, y: p.y, z: p.z });
         } else if (owner.cue && shot.ammo !== "blunderbuss") {

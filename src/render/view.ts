@@ -88,6 +88,8 @@ interface BodyVisual {
   skep?: pc.Entity;
   /** The capstan's spoked head, which turns while the revolve does. */
   capstan?: pc.Entity;
+  /** The carousel's children, each on her hinge, and how far over each has gone (degrees). */
+  children?: Array<{ board: pc.Entity; tilt: number }>;
   /** A mousetrap's spring bail and its cheese, and how far the bail has snapped over (0 set, 1 shut). */
   trap?: { bail: pc.Entity; cheese: pc.Entity; shut: number };
 }
@@ -857,6 +859,7 @@ export class StageView {
             ? buildRevolve(this.kit, root, revolve)
             : buildFixture(this.kit, root, view.material, view.size, view.position);
         if (view.material === "capstan") visual.capstan = fixture.findByName("capstan-head") as pc.Entity;
+        if (view.material === "carousel") visual.children = (fixture.find((node) => node.name === "paddle") as pc.Entity[]).map((board) => ({ board, tilt: 0 }));
         if (view.material === "counterweight") visual.counterweight = fixture.findByName("counterweight-body") as pc.Entity;
         if (view.material === "windmachine") visual.drum = fixture.findByName("wind-drum") as pc.Entity;
         if (view.material === "lever") visual.lever = fixture.findByName("lever-arm") as pc.Entity;
@@ -1723,6 +1726,16 @@ export class StageView {
 
   /** The struck skep swings on its rope; the swarm buzzes about wherever the bees have got to. */
   private animateBees(dt: number): void {
+    // Carousel children knocked flat topple over on their hinges, and scramble back up.
+    const standing = this.game?.carouselView;
+    for (const visual of this.visuals.values()) {
+      visual.children?.forEach((child, index) => {
+        const target = standing?.[index] === false ? 84 : 0;
+        if (child.tilt === target) return;
+        child.tilt = target > child.tilt ? Math.min(target, child.tilt + dt * 420) : Math.max(target, child.tilt - dt * 160);
+        child.board.setLocalEulerAngles(child.tilt, 0, 0);
+      });
+    }
     // The mousetrap's bail slams over when it springs, and the cheese is gone.
     for (const visual of this.visuals.values()) {
       const trap = visual.trap;

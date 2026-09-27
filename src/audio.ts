@@ -342,6 +342,14 @@ export class TheatreAudio {
     lfo.stop(start + 2.9);
   }
 
+  /** A carousel child goes over: a delighted squeal (it's all part of the game to her). */
+  whee(): void {
+    if (!this.throttle("whee", 400)) return;
+    this.tone(700, 0.35, 0.1, "triangle", { to: 1300, attack: 0.02 });
+    this.tone(1300, 0.3, 0.08, "triangle", { to: 800, delay: 0.3 });
+    this.burst({ duration: 0.2, volume: 0.25, filter: "lowpass", frequency: 600, delay: 0.25 });
+  }
+
   /** A mousetrap snapping shut: a hard wooden crack and a spring's twang. */
   snap(): void {
     if (!this.throttle("snap", 300)) return;

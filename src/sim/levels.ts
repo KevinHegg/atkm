@@ -275,7 +275,7 @@ function theKeep(): LevelDef {
     title: "The Keep",
     verse: ["All the King's horses and all the King's men", "built him a castle. Let's knock it down again."],
     hint: "Everything you've learned, all at once. There's more than one way in, and a beehive in the orchard: stir it up and the bees chase the King's men round the stage.",
-    ammo: { shot: 3, shell: 2, grape: 1, chain: 1, bomb: 1 },
+    ammo: { shell: 2, bomb: 1, shot: 3, chain: 1, grape: 1 },
     greatFall: 5,
     mayhem: 850,
     star: { crew: "guard-e3" },
@@ -341,7 +341,7 @@ function theEncore(): LevelDef {
     title: "The Encore",
     verse: ["The audience stamped and demanded one more,", "so the Queen brought the whole of the royal armoury."],
     hint: "Nothing fired straight at him gets through the gilt trellis, and shells burst on his canopy. Blow the canopy away first, then drop something on him from above. Or give him the greatest fall of all from below.",
-    ammo: { shot: 5, shell: 2, grape: 3, chain: 2, bomb: 2 },
+    ammo: { bomb: 2, shell: 2, shot: 5, chain: 2, grape: 3 },
     greatFall: 4.6,
     mayhem: 1175,
     star: { curio: "pie" },
@@ -671,7 +671,7 @@ function rideACockHorse(): LevelDef {
     ammo: { shot: 4 },
     greatFall: 3.4,
     mayhem: 825,
-    star: { curio: "well" },
+    star: { curio: "cuckoo" },
     humpty: perchAt(-1, top, -4),
     pieces: m.pieces,
     crews: [],
@@ -713,7 +713,7 @@ function cameTumblingAfter(): LevelDef {
     ammo: { bomb: 3 },
     greatFall: 4,
     mayhem: 1400,
-    star: { curio: "jack-and-jill" },
+    star: { curio: "well" },
     humpty: perchAt(cx, y, seat),
     pieces: m.pieces,
     crews: [],
@@ -727,7 +727,8 @@ function roundTheMulberryBush(): LevelDef {
   // carousel. A shot that glances off one of them goes wherever the carousel has turned it.
   m.fixture("screen", -0.8, 0, -1.3, 5.4, 6, 0.4);
   const top = m.pillar("stone", -1.2, -4.2, 4, { size: 1, height: 0.9 });
-  m.carousel(4.8, -3, { y: 4, height: 1.6, outer: 1.9, speed: 0.8 });
+  // Slow enough to time a bank off one of the children as she comes round.
+  m.carousel(4.8, -3, { y: 4, height: 1.6, outer: 1.9, speed: 0.3 });
   for (const x of [-2.4, -1.1, 0.2]) m.hay(x, -5.9);
   m.chest(-5, -2.2, { yaw: 0.3 });
   return {
@@ -735,7 +736,7 @@ function roundTheMulberryBush(): LevelDef {
     weather: "snow",
     title: "Round the Mulberry Bush",
     verse: ["Here we go round the mulberry bush, so early in the morning;", "the children bat the cannonballs about without a word of warning."],
-    hint: "He's behind the screen, but the children on the carousel bat shots about. Watch the arc as they turn, and fire when it glances round to him.",
+    hint: "He's behind the screen, but the children on the carousel bat shots about. Watch the arc as they turn, and fire when it glances round to him. A child you hit goes flat for a moment (she's quite all right).",
     ammo: { shot: 5 },
     greatFall: 3.4,
     mayhem: 750,
