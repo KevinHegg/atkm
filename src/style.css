@@ -505,6 +505,15 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 #replay-banner button { padding: 6px 12px; background: var(--paper); color: var(--ink); font: 700 14px/1 var(--ui); letter-spacing: 0.1em; text-transform: uppercase; }
 @keyframes blink { 50% { opacity: 0; } }
 
+/* The instant replay's letterbox: two bars slide in from the edges, like a newsreel. */
+#letterbox { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+#letterbox::before,
+#letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 8vh; background: #0d0b0a; transform: scaleY(0); transition: transform 0.45s ease; }
+#letterbox::before { top: 0; transform-origin: top; }
+#letterbox::after { bottom: 0; transform-origin: bottom; }
+.replaying #letterbox::before,
+.replaying #letterbox::after { transform: scaleY(1); }
+
 #toast {
   position: absolute;
   z-index: 6;

@@ -349,6 +349,40 @@ test("a stone wall keeps a blast from setting off the powder behind it", async (
   }
 });
 
+test("a direct knock with the battery's last round is named, and billed before the crack", async () => {
+  const game = await Game.create(arena((mason) => perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1), { ammo: { shot: 1 } }));
+  await stepUntilReady(game);
+  const h = game.humptyPosition!;
+  assert.ok(game.fire({ x: h.x, y: h.y + 0.2, z: h.z }));
+  const events = await run(game, 6, (event) => event.type === "crack");
+  assert.deepEqual(game.tricks, ["last-round"], "no bank: nothing in the way");
+  assert.ok(events.some((event) => event.type === "trick" && event.trick === "last-round"));
+  assert.equal(game.fallShot, 0, "the replay starts from the shot that knocked him off");
+  const kinds = game.mayhem.lines().map((line) => line.kind);
+  assert.ok(kinds.indexOf("trick") >= 0 && kinds.indexOf("trick") < kinds.indexOf("crack"), "tricks go on the bill before the crack");
+  game.destroy();
+});
+
+test("mid-air needs a second shot (a grapeshot volley's stragglers are the same shot); banks are counted", async () => {
+  const { judgeTricks } = await import("../src/sim/tricks.js");
+  const knock = { time: 1, shot: 0, banks: 0, airborne: false };
+  assert.deepEqual(judgeTricks({ blows: [knock, { ...knock, time: 1.1, airborne: true }], stock: 2 }), []);
+  assert.deepEqual(judgeTricks({ blows: [knock, { time: 1.6, shot: 1, banks: 0, airborne: true }], stock: 2 }), ["mid-air"]);
+  assert.deepEqual(judgeTricks({ blows: [{ ...knock, banks: 2 }], stock: 0 }), ["double-bank", "last-round"]);
+  assert.deepEqual(judgeTricks({ blows: [{ ...knock, shot: -1, blast: "keg" }], stock: 1 }), ["powder"]);
+  assert.deepEqual(judgeTricks({ blows: [], stock: 1 }), ["rug-pull"]);
+});
+
+test("the par lines earn the tricks their verses are built on: banks, a rug pulled, a powder keg", async () => {
+  const { levelById } = await import("../src/sim/levels.js");
+  const { playOut } = await import("../src/sim/autoplay.js");
+  const par = (await import("../src/sim/par.json", { with: { type: "json" } })).default as Record<string, Parameters<typeof playOut>[1]>;
+  for (const [id, trick] of [["round-the-mulberry-bush", "bank"], ["the-queens-billiards", "bank"], ["hanging-by-a-thread", "rug-pull"], ["remember-remember", "powder"]] as const) {
+    const result = await playOut(levelById(id)!, par[id]!, 30);
+    assert.ok(result.won && result.tricks.includes(trick), `${id}: ${result.tricks.join(", ") || "no tricks"}`);
+  }
+});
+
 test("mayhem is tallied until the crack and not a moment after", async () => {
   const game = await Game.create(arena((mason) => perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1)));
   await stepUntilReady(game);

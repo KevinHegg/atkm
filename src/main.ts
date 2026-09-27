@@ -9,6 +9,7 @@ import { BOMB_FUSE, Game, HUMPTY_REST, STEP } from "./sim/game.js";
 import { HUMPTY_BASE } from "./sim/level.js";
 import { MAYHEM, type MayhemKind } from "./sim/mayhem.js";
 import { LEVELS } from "./sim/levels.js";
+import { TRICKS, type TrickKind } from "./sim/tricks.js";
 import parSolutions from "./sim/par.json" with { type: "json" };
 import type { PlannedShot } from "./sim/autoplay.js";
 import type { LevelDef } from "./sim/level.js";
@@ -41,6 +42,8 @@ interface Progress {
   royal?: boolean;
   /** Verses cracked with Royal difficulty on. */
   crowns?: Record<string, true>;
+  /** Named trick shots pulled off, anywhere. */
+  tricks?: Partial<Record<TrickKind, true>>;
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
@@ -55,7 +58,7 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {} };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {} };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
@@ -212,6 +215,7 @@ function recordStars(current: Game): void {
   progress.best[id] = Math.max(progress.best[id] ?? 0, current.mayhem.total);
   if (current.challengeMet) (progress.challenges ??= {})[id] = true;
   if (royalRun) (progress.crowns ??= {})[id] = true;
+  for (const trick of current.tricks) (progress.tricks ??= {})[trick] = true;
   // Marked as seen only once it actually plays (a restart or reload before then keeps it owed).
   if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = true;
   saveProgress();
@@ -314,7 +318,8 @@ function show(next: Screen): void {
   $("#result-screen").hidden = next !== "result";
   if (next !== "finale") $("#finale-screen").hidden = true;
   $("#replay-banner").hidden = next !== "replay";
-  const playing = next === "play" || next === "result" || next === "replay";
+  document.body.classList.toggle("replaying", next === "replay");
+  const playing = next === "play" || next === "result";
   $("#hud-top").hidden = !playing;
   $("#hud-bottom").hidden = next !== "play";
   if (next !== "play") $("#fall-meter").hidden = true;
@@ -359,7 +364,8 @@ function renderLevelList(): void {
     list.append(item);
   });
   const all = total === LEVELS.length * 3;
-  $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "") + (crowns ? ` · ${crowns} won in Royal` : "");
+  const tricks = Object.keys(progress.tricks ?? {}).length;
+  $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "") + (crowns ? ` · ${crowns} won in Royal` : "") + (tricks ? ` · ${tricks} of ${Object.keys(TRICKS).length} trick shots` : "");
   $("#royal-toggle").setAttribute("aria-pressed", String(Boolean(progress.royal)));
   $("#star-total").classList.toggle("all", all);
   $("#build-tag").textContent = `v${__BUILD__.version} · ${__BUILD__.commit} · ${__BUILD__.date}`;
@@ -440,6 +446,8 @@ async function startLevel(index: number): Promise<void> {
 interface ReplayRun {
   original: Game;
   shadow: Game;
+  /** Played by itself after the crack (then the result card follows), rather than asked for. */
+  auto: boolean;
   shots: Game["log"];
   next: number;
   lastStep: number;
@@ -461,23 +469,39 @@ function fireDue(target: Game, run: ReplayRun): void {
   }
 }
 
-/** The instant replay: re-run the verse quietly up to the final shot, then show it again, slowly. */
-async function startReplay(): Promise<void> {
+/**
+ * The instant replay: re-run the verse quietly up to the shot that set his fall going, then show
+ * it again, slowly, from the side. It plays by itself after a crack (`auto`), and on request.
+ */
+async function startReplay(auto = false): Promise<void> {
   const original = game;
-  if (!original?.cracked || !original.log.length || loading || replaying) return;
+  if (!original?.cracked || !original.log.some((shot) => shot.ammo !== "blunderbuss") || loading || replaying) {
+    if (auto) finishVerse();
+    return;
+  }
   loading = true;
   try {
     const shadow = await Game.create(original.level);
     const shots = original.log;
     const lastStep = shots[shots.length - 1]!.step;
-    // Start just before the last real shot (a blunderbuss blast may have come after it).
-    const finale = [...shots].reverse().find((shot) => shot.ammo !== "blunderbuss") ?? shots[shots.length - 1]!;
-    replaying = { original, shadow, shots, next: 0, lastStep, from: Math.max(0, finale.step - 75), ready: false };
+    // From just before the shot that started his fall (or the last real shot, if nothing did),
+    // but never more than a few seconds before the crack, and never less than a moment.
+    const last = [...shots].reverse().find((shot) => shot.ammo !== "blunderbuss") ?? shots[shots.length - 1]!;
+    const opener = original.fallShot !== undefined ? shots[original.fallShot] ?? last : last;
+    const crack = Math.max(original.crackStep, last.step);
+    const from = Math.max(0, Math.min(crack - 90, Math.max(opener.step - 24, crack - 60 * 7)));
+    replaying = { original, shadow, auto, shots, next: 0, lastStep, from, ready: false };
     $("#replay-banner span").textContent = "Rewinding…";
     show("replay");
   } finally {
     loading = false;
   }
+}
+
+/** The verse is over: the result card, or the Grand Finale if that was the last star. */
+function finishVerse(): void {
+  if (finalePending && game?.cracked) startFinale();
+  else showResult();
 }
 
 /** Rewind a few milliseconds' worth of steps per frame, so a long verse never freezes the page. */
@@ -497,7 +521,8 @@ function rewindReplay(run: ReplayRun): void {
   crackedAt = -1;
   for (const bubble of [...bubbles]) dismissBubble(bubble);
   $("#popups").replaceChildren();
-  $("#replay-banner span").textContent = "Replay";
+  const tricks = run.original.tricks.map((trick) => TRICKS[trick].name).join(" · ");
+  $("#replay-banner span").textContent = tricks ? `Replay · ${tricks}` : "Replay";
   view.bind(run.shadow);
   view.setCameraMode("replay");
 }
@@ -510,7 +535,9 @@ function endReplay(): void {
   game = run.original;
   view.bind(run.original);
   view.setCameraMode("play");
-  show("result");
+  $("#toast").replaceChildren();
+  if (run.auto) finishVerse();
+  else show("result");
 }
 
 function closeVerse(): void {
@@ -548,6 +575,7 @@ function showResult(): void {
     shots: current.stats.shots,
     title: level.title,
     starFrom: starHolderName(level.star),
+    tricks: current.tricks,
   });
   $("#paper-name").textContent = notice.paper;
   $("#paper-date").textContent = `Verse ${numeral(levelIndex)} · price one penny`;
@@ -558,7 +586,11 @@ function showResult(): void {
   $("#bill-lines").innerHTML = lines.length
     ? lines
       .map((line) => {
-        const detail = line.kind === "crack" ? `${current.stats.fall.toFixed(1)} m fall` : line.count > 1 ? `×${line.count}` : "";
+        const detail = line.kind === "crack"
+          ? `${current.stats.fall.toFixed(1)} m fall`
+          : line.kind === "trick"
+            ? current.tricks.map((trick) => TRICKS[trick].name).join(", ")
+            : line.count > 1 ? `×${line.count}` : "";
         return `<li><span>${line.bill}${detail ? ` <em>${detail}</em>` : ""}</span><b>${line.points.toLocaleString("en-GB")}</b></li>`;
       })
       .join("")
@@ -1030,6 +1062,9 @@ window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") show("levels");
     if (event.key === "ArrowLeft") view.look(-30);
     if (event.key === "ArrowRight") view.look(30);
+  } else if (screen === "replay" && (event.key === "Enter" || event.key === " " || event.key === "Escape")) {
+    event.preventDefault();
+    endReplay();
   } else if (screen === "result" && (event.key === "Enter" || event.key === " ")) {
     event.preventDefault();
     if (game?.cracked && levelIndex + 1 < LEVELS.length) void startLevel(levelIndex + 1);
@@ -1126,6 +1161,10 @@ $("#replay-skip").addEventListener("click", () => {
   audio.click();
   endReplay();
 });
+// A click on the stage skips the replay too.
+canvas.addEventListener("click", () => {
+  if (screen === "replay") endReplay();
+});
 $("#retry-button").addEventListener("click", () => {
   audio.click();
   void startLevel(levelIndex);
@@ -1195,13 +1234,27 @@ function handle(event: GameEvent): void {
       break;
     case "challenge":
       if (live) {
-        later(1.3, () => {
+        // After the trick shots have been named.
+        const after = 1.3 + current.tricks.length * 1.6;
+        later(after, () => {
           audio.flourish();
           toast("Side challenge done!", true, CHALLENGES[current.level.id]?.text);
         });
-        later(2.6, () => cue("challenge", 0.8, 0));
+        later(after + 1.3, () => cue("challenge", 0.8, 0));
       }
       break;
+    case "trick": {
+      // Named one after another once "Cracked!" has had its moment, in the replay as well.
+      const rule = TRICKS[event.trick];
+      const delay = (live ? 1.3 : 0.5) + current.tricks.indexOf(event.trick) * 1.6;
+      window.setTimeout(() => {
+        if (game !== current || (screen !== "play" && screen !== "replay")) return;
+        toast(`${rule.name}!`, true, rule.blurb);
+        audio.flourish();
+        if (live) audio.applause(1.6);
+      }, delay * 1000);
+      break;
+    }
     case "child":
       audio.whee();
       if (live) audio.laugh();
@@ -1261,7 +1314,7 @@ function handle(event: GameEvent): void {
         audio.combo(Number(event.label?.match(/\d+/)?.[0] ?? 3));
         if (live) {
           audio.applause(1.4);
-          toast("Trick shot!", true, `${event.label ?? "Combo"} · +${event.points}`);
+          toast("Combo!", true, `${event.label ?? "Combo"} · +${event.points}`);
           later(0.6, () => cue("combo", 1, 4));
         }
       }
@@ -1425,8 +1478,8 @@ function handle(event: GameEvent): void {
       break;
     case "result":
       if (live) {
-        // Leave time to see the stagehand come on with his mop.
-        resultTimer = event.won ? 1.6 : 1.4;
+        // Leave time to see the stagehand come on with his mop, and to hear the trick shots named.
+        resultTimer = event.won ? 1.6 + current.tricks.length * 0.8 : 1.4;
         if (!event.won) {
           cue("lose", 1, 0);
           losses.set(current.level.id, (losses.get(current.level.id) ?? 0) + 1);
@@ -1680,7 +1733,8 @@ function tick(realDt: number): void {
   if (screen === "finale" && $("#finale-screen").hidden && view.finaleAge > 9.5) revealFinaleCard();
   if (screen === "replay" && replaying) {
     const late = current.steps > replaying.lastStep + 60 * 14;
-    if ((current.cracked && current.time - crackedAt > 2.4) || late) endReplay();
+    // Long enough to see him in pieces, not to sit through the stagehand's mop.
+    if ((current.cracked && current.time - crackedAt > 1.4) || late) endReplay();
   }
   if (screen === "play" || screen === "replay") updateObjectives();
   if (screen === "play") {
@@ -1691,7 +1745,8 @@ function tick(realDt: number): void {
     if (resultTimer > 0) {
       resultTimer -= realDt;
       if (resultTimer <= 0) {
-        if (finalePending && current.cracked) startFinale();
+        // A crack earns an instant replay first; the result card comes after it.
+        if (current.cracked) void startReplay(true);
         else showResult();
       }
     }

@@ -1,4 +1,5 @@
 import type { MayhemEvent } from "./mayhem.js";
+import type { TrickKind } from "./tricks.js";
 
 export interface Vec3 {
   x: number;
@@ -97,7 +98,8 @@ export type GameEvent =
   | MayhemEvent
   | { type: "spin"; at: Vec3; speed: number }
   | { type: "rat"; action: "enter" | "gnaw" | "steal" | "scared" | "trapped" | "gone"; at: Vec3; stole?: StockKind }
-  | { type: "challenge"; at: Vec3 };
+  | { type: "challenge"; at: Vec3 }
+  | { type: "trick"; trick: TrickKind; at: Vec3 };
 
 export interface BodyView {
   id: number;

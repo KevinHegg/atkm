@@ -39,6 +39,7 @@ export type MayhemKind =
   | "mousetrap"
   | "child"
   | "tower"
+  | "trick"
   | "crack";
 
 export interface MayhemRule {
@@ -58,7 +59,7 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   curio: { points: 75, bill: "Scenery disturbed", shout: "Encore!" },
   royal: { points: 150, bill: "Royal box, outraged", shout: "Treason!" },
   duke: { points: 75, bill: "The Grand Old Duke's men", shout: "About turn!" },
-  ricochet: { points: 15, bill: "Bank shots", shout: "Clang!" },
+  ricochet: { points: 15, bill: "Ricochets", shout: "Clang!" },
   rope: { points: 30, bill: "Ropes cut", shout: "Snip!" },
   maypole: { points: 40, bill: "Maypoles felled", shout: "Timber!" },
   rat: { points: 40, bill: "Rats routed", shout: "Shoo!" },
@@ -72,7 +73,7 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   stagehand: { points: 75, bill: "Stagehands flattened", shout: "Oi!" },
   gate: { points: 40, bill: "Portcullises raised", shout: "Up she goes!" },
   chute: { points: 60, bill: "Bombs down the chute", shout: "Wheee!" },
-  combo: { points: 0, bill: "Trick shots", shout: "Combo!" },
+  combo: { points: 0, bill: "Combos", shout: "Combo!" },
   barrel: { points: 40, bill: "Barrels sent rolling", shout: "Look out below!" },
   china: { points: 20, bill: "The King's best china", shout: "Smash!" },
   slip: { points: 70, bill: "Slips on banana skins", shout: "Whoops!" },
@@ -84,6 +85,7 @@ export const MAYHEM: Record<MayhemKind, MayhemRule> = {
   mousetrap: { points: 80, bill: "Rats caught in the act", shout: "Snap!" },
   child: { points: 40, bill: "Carousel children knocked flat", shout: "Whee!" },
   tower: { points: 75, bill: "The royal box, rattled", shout: "Steady on!" },
+  trick: { points: 0, bill: "Trick shots", shout: "Trick shot!" },
   crack: { points: 300, bill: "One egg, cracked", shout: "Cracked!" },
 };
 

@@ -46,8 +46,13 @@ unlock every verse.
 - **The verse ends when he cracks.** Until then, everything you break, bowl over, ring or
   startle counts as **mayhem**, and the King sends you the bill. Each verse has a spare
   round shot for exploring: spend it on mischief, but save enough to finish the job.
-- **Trick shots.** One shot that sets off three or more different kinds of mischief (a bank
+- **Combos.** One shot that sets off three or more different kinds of mischief (a bank
   shot that bowls a crew and startles a curio, say) earns a combo bonus on the bill.
+- **Named trick shots.** How he came off is judged at the crack, and a stylish fall is named on
+  stage and paid for: a **Bank Shot** (or **Double Bank**) glanced off the scenery on its way
+  to him, **Mid-Air** catches him with another shot on his way down, a **Rug Pull** never
+  touches him at all, a **Powder Trick** is a keg's blast, and a **Last Round** empties the
+  battery. The verses screen keeps count of the six you've pulled off.
 - **On the brink.** Nudge Humpty to the very edge of his perch without knocking him off and he
   teeters, arms windmilling, while the audience holds its breath. One more push...
 - **The house is watching.** The pit orchestra's snare roll builds while he teeters and runs on
@@ -68,8 +73,10 @@ unlock every verse.
   stage. Any munition that reaches it forces it open for four rounds: one to replace the
   shot that opened it, then three more, one at a time, to whichever racks are emptiest (left
   to right on a tie).
-- **Reviews and replays.** After the curtain the morning papers review the performance,
-  and **Replay** shows the final shot again in slow motion. The simulation is
+- **Reviews and replays.** Every crack earns an instant replay: letterboxed, in slow motion,
+  from just before the shot that set his fall going, with the camera following the ball in
+  flight and then him all the way down (click or press a key to skip). After the curtain the
+  morning papers review the performance, and **Replay** shows it again. The simulation is
   deterministic, so the replay is exact.
 - **Ordnance:**
   - **Round shot** is a flat, heavy punch.

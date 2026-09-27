@@ -1,4 +1,5 @@
 import type { MayhemEntry, MayhemKind } from "./sim/mayhem.js";
+import type { TrickKind } from "./sim/tricks.js";
 
 export interface ReviewInput {
   won: boolean;
@@ -11,6 +12,8 @@ export interface ReviewInput {
   title: string;
   /** Who was hiding the star, if it was found. */
   starFrom?: string;
+  /** The named trick shots he cracked with. */
+  tricks?: readonly TrickKind[];
 }
 
 export interface Review {
@@ -23,6 +26,7 @@ export interface Review {
 /** What the morning papers made of the performance, written from the Queen's bill of damages. */
 export function review(input: ReviewInput, pick: (count: number) => number = (count) => Math.floor(Math.random() * count)): Review {
   const count = (kind: MayhemKind): number => input.tally.get(kind)?.count ?? 0;
+  const trick = (kind: TrickKind): boolean => input.tricks?.includes(kind) ?? false;
   const choose = <T>(options: readonly T[]): T => options[pick(options.length)]!;
   if (!input.won) {
     return {
@@ -40,8 +44,14 @@ export function review(input: ReviewInput, pick: (count: number) => number = (co
   const stories: Array<[boolean, number, () => string]> = [
     [count("star") > 0, 95, () => `STAR FOUND HIDING IN ${(input.starFrom ?? "the scenery").toUpperCase()}`],
     [count("royal") > 0, 90, () => "KING COLE OUTRAGED IN HIS OWN BOX"],
-    [count("combo") >= 2, 88, () => `${count("combo")} TRICK SHOTS IN ONE EVENING; GUNNER DEMANDS A BIGGER STAGE`],
-    [count("combo") === 1, 64, () => "ONE SHOT, A DOZEN DISASTERS: QUEEN'S TRICK SHOT STUNS STALLS"],
+    [trick("double-bank"), 93, () => "DOUBLE BANK! SHOT GLANCES TWICE AND FELLS EGG"],
+    [trick("mid-air"), 89, () => "EGG STRUCK IN MID-AIR; KING CALLS IT UNSPORTING"],
+    [trick("powder"), 74, () => "POWDER KEG SENDS EGG SKYWARD"],
+    [trick("bank"), 70, () => "BANK SHOT FELLS EGG FROM AN IMPOSSIBLE ANGLE"],
+    [trick("rug-pull"), 68, () => "PERCH PULLED FROM UNDER EGG; QUEEN “NEVER LAID A FINGER ON HIM”"],
+    [trick("last-round"), 61, () => "QUEEN'S LAST ROUND FINDS ITS MARK"],
+    [count("combo") >= 2, 88, () => `${count("combo")} COMBOS IN ONE EVENING; GUNNER DEMANDS A BIGGER STAGE`],
+    [count("combo") === 1, 64, () => "ONE SHOT, A DOZEN DISASTERS: QUEEN'S COMBO STUNS STALLS"],
     [count("tower") > 0, 72, () => "ROYAL BOX SHAKEN TO ITS STILTS; FIDDLERS MISS A BEAT"],
     [count("slip") > 0, 78, () => (count("slip") > 1 ? "BANANA SKINS FLOOR THE KING'S MEN, TWICE" : "STRETCHER CREW SLIPS ON BANANA SKIN")],
     [count("mousetrap") > 0, 82, () => "RAT CAUGHT IN THE ACT; ROYAL POWDER SAVED BY A WEDGE OF CHEESE"],

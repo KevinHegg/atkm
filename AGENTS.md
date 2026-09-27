@@ -70,6 +70,14 @@ Core promises:
 - Each stock shot opens a combo tally (`Game.combo`); it closes at the next shot, at the crack
   (before the crack is billed) or after two quiet seconds, and three or more distinct mayhem
   kinds earn `comboBonus`. Par lines rarely combo, so mayhem targets still come from the solver.
+- Named trick shots (`src/sim/tricks.ts`) are judged at the crack (`judgeTricks`, after the combo
+  closes, before the crack is billed) from the blows on him since he last sat still, at most
+  `TRICK_WINDOW` seconds back: a munition that glanced off fixtures or the theatre's walls (not
+  the boards) is a bank; Mid-Air needs a different shot from the one that knocked him off. Where
+  every winning line of a verse earns a trick (its banks, its keg, its rope), its mayhem target
+  includes that trick's bonus.
+- After a crack the instant replay plays by itself, then the result card (or the finale). It
+  starts just before `Game.fallShot` and follows the newest munition in flight until he falls.
 - Teetering (`checkTeeter`) is a query only: a probe a hand's breadth past him, the way he was
   last shoved. It never pushes him; rides are exempt.
 - The King's china (`Mason.dresser`, `dresserChina`) is sensors on a fixed dresser, like

@@ -55,6 +55,8 @@ const SWEAT = new pc.Color(0.55, 0.78, 0.95);
 /** How long a released star rises on stage before flying off to its chip in the HUD. */
 const STAR_RISE = 1.9;
 const UNBATCHED = new Set(["daze", "sandwich", "mopper", "cat"]);
+/** What the replay's ball-cam follows: the Queen's munitions, not the blunderbuss's pellets. */
+const MUNITIONS = new Set<string>(["shot", "shell", "bomb", "grape", "chain"]);
 /** The Queen stands on a podium stage-left of her battery. */
 const QUEEN_SPOT = { x: -4.4, y: 0.42, z: 7.4 };
 const smoothstep = (k: number): number => k * k * (3 - 2 * k);
@@ -1961,12 +1963,19 @@ export class StageView {
       ease = Math.min(1, dt * 1.6);
     }
     if (this.cameraMode === "replay") {
-      // Down on the boards beside him, turning slowly, like a newsreel.
+      // Down on the boards to one side, turning slowly, like a newsreel: the shot in flight and
+      // him both in frame, then him all the way down.
       const subject = humpty ?? this.crackAt;
-      if (subject) target.set(subject.x, Math.max(1, subject.y), subject.z);
+      const ball = falling ? undefined : this.flyingShot();
+      if (subject && ball) {
+        target.set((ball.x + subject.x) / 2, Math.max(1, (ball.y + subject.y) / 2), (ball.z + subject.z) / 2);
+        distance = Math.min(26, Math.max(12, 8 + ball.distance(subject) * 1.1));
+      } else {
+        if (subject) target.set(subject.x, Math.max(1, subject.y), subject.z);
+        distance = 13;
+      }
       yaw = level.yaw + 32 + Math.sin(this.elapsed * 0.3) * 8;
       pitch = -12;
-      distance = 13;
       ease = Math.min(1, dt * 2.2);
     }
     if (this.cameraMode === "intro") {
@@ -1991,6 +2000,20 @@ export class StageView {
     this.camera.lookAt(this.camTarget);
     const aspect = this.host.clientWidth / Math.max(1, this.host.clientHeight);
     this.camera.camera!.fov = aspect < 0.8 ? 56 : aspect < 1.2 ? 46 : 35;
+  }
+
+  /** The replay's ball-cam: the newest munition still flying (not one lying about on the boards). */
+  private flyingShot(): pc.Vec3 | undefined {
+    let newest: BodyView | undefined;
+    for (const visual of this.visuals.values()) {
+      const body = visual.view;
+      if (body.removed || !MUNITIONS.has(body.kind)) continue;
+      const { position: p, prevPosition: q } = body;
+      // Moving faster than a brisk roll (3 m/s).
+      if (Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < 0.05) continue;
+      if (!newest || body.id > newest.id) newest = body;
+    }
+    return newest && V(newest.position.x, newest.position.y, newest.position.z);
   }
 
   private resize(): void {

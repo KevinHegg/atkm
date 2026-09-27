@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { AMMO, arcPoint, arcVelocity, solveLaunch } from "./ballistics.js";
 import { CREW_SPECS, TRAP_TIME, callLunch, createCrewState, crownWithBucket, dropThroughTrap, formation, slotWorld, steerCrew, sting, type CrewState, type Threat } from "./crew.js";
 import { eggHullPoints } from "./egg.js";
+import { TRICKS, judgeTricks, type Blow, type TrickKind } from "./tricks.js";
 import {
   BUCKET_SIZE,
   CHEST_SIZE,
@@ -121,6 +122,8 @@ function chainOffset(t: number): { across: number; forward: number } {
 }
 /** How fast a struck weathercock swings round to its next setting (rad/s). */
 const VANE_TURN = 3;
+/** How far back a trick shot's story goes: blows on him longer ago than this are forgotten. */
+const TRICK_WINDOW = 4;
 /** How long a carousel child struck by a shot lies flat before she's up again. */
 const CHILD_DOWN = 5;
 /**
@@ -236,6 +239,9 @@ interface Entity {
   peel?: { armed: boolean; spent: boolean; flickedBy?: number; ghostUntil?: number };
   /** A mousetrap: knocked out into the open (armed), and snapped shut (sprung). */
   mousetrap?: { armed: boolean; sprung: boolean; flickedBy?: number; ghostUntil?: number };
+  /** A munition: which shot in the log fired it, and the scenery it has glanced off so far. */
+  shot?: number;
+  banked?: Set<number>;
 }
 
 export interface RopeView {
@@ -323,6 +329,16 @@ export class Game {
   readonly stats = { shots: 0, bowled: 0, fall: 0, blocksMoved: 0, catches: 0 };
   /** Did he crack with the verse's side challenge done? (Judged at the crack.) */
   challengeMet = false;
+  /** The named trick shots he cracked with (judged at the crack). */
+  tricks: TrickKind[] = [];
+  /** For the instant replay: the shot in the log that set his last fall going, and the step he cracked. */
+  fallShot: number | undefined;
+  crackStep = 0;
+  /** What the Queen's fire has done to him lately, and when he last sat still. */
+  private blows: Blow[] = [];
+  private stillAt = 0;
+  /** The boards: shots roll along them, they don't bank off them. */
+  private floorHandle = -1;
   private vaneTurns = 0;
   private spins = 0;
   /** Everything the Queen has broken, up to the crack. */
@@ -377,7 +393,7 @@ export class Game {
   private releaseTime = -10;
   /** Perches he slid off without being shot; the stagehands avoid them. */
   private readonly badPerches: Vec3[] = [];
-  private pendingExplosions: Array<{ at: Vec3; radius: number; power: number; keg: boolean; ammo?: StockKind }> = [];
+  private pendingExplosions: Array<{ at: Vec3; radius: number; power: number; keg: boolean; ammo?: StockKind; shot?: number }> = [];
   /** Set by a safe landing: the stagehands will fetch him once he is still. */
   private needsHoist = false;
   private lastStock: StockKind = "shot";
@@ -1077,7 +1093,7 @@ export class Game {
   }
 
   private buildStage(): void {
-    const fixed = (x: number, y: number, z: number, hx: number, hy: number, hz: number, kind: BodyKind = "ground"): void => {
+    const fixed = (x: number, y: number, z: number, hx: number, hy: number, hz: number, kind: BodyKind = "ground"): number => {
       const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z));
       const collider = this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(hx, hy, hz).setFriction(0.9).setRestitution(0.05).setCollisionGroups(GROUPS.static),
@@ -1103,12 +1119,13 @@ export class Game {
         restFor: 0,
         structural: false,
       });
+      return collider.handle;
     };
     const width = STAGE.maxX - STAGE.minX;
     const depth = STAGE.maxZ - STAGE.minZ;
     const cx = (STAGE.maxX + STAGE.minX) / 2;
     const cz = (STAGE.maxZ + STAGE.minZ) / 2;
-    fixed(cx, -0.5, cz, width / 2 + 1, 0.5, depth / 2 + 1);
+    this.floorHandle = fixed(cx, -0.5, cz, width / 2 + 1, 0.5, depth / 2 + 1);
     fixed(cx, 6, STAGE.minZ - 0.25, width / 2 + 1, 6, 0.25);
     fixed(STAGE.minX - 0.25, 6, cz, 0.25, 6, depth / 2 + 1);
     fixed(STAGE.maxX + 0.25, 6, cz, 0.25, 6, depth / 2 + 1);
@@ -2301,7 +2318,9 @@ export class Game {
       .setCollisionGroups(GROUPS.proj)
       .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     const collider = this.world.createCollider(desc, body);
-    return this.register(kind, kind, { x: radius * 2, y: radius * 2, z: radius * 2 }, body, [collider], { ammo });
+    const entity = this.register(kind, kind, { x: radius * 2, y: radius * 2, z: radius * 2 }, body, [collider], { ammo });
+    entity.shot = this.log.length - 1;
+    return entity;
   }
 
   private addCrew(def: LevelDef["crews"][number]): void {
@@ -2405,6 +2424,47 @@ export class Game {
     }
   }
 
+  /** Something the Queen fired has reached him. Only the last few seconds' worth matter. */
+  private addBlow(blow: Blow): void {
+    this.blows = this.blows.filter((earlier) => earlier.time > this.time - TRICK_WINDOW);
+    this.blows.push(blow);
+  }
+
+  /** Scenery a shot can bank off on its way to him: fixtures and the theatre's walls, not the boards. */
+  private glancesOff(owner: Entity, handle: number): boolean {
+    if (handle === this.floorHandle) return false;
+    if (owner.view.kind === "ground") return true;
+    return owner.view.kind === "fixture" && owner.look !== "revolve";
+  }
+
+  /** He's cracking: how did he come off? Named trick shots go on the bill before the crack. */
+  private judgeTricks(): void {
+    const humpty = this.humpty;
+    if (!humpty || !this.log.some((shot) => shot.ammo !== "blunderbuss")) return;
+    // Everything that reached him since he last sat still (and no more than a few seconds ago).
+    const since = Math.max(this.stillAt - STEP * 2, this.time - TRICK_WINDOW);
+    const blows = this.blows.filter((blow) => blow.time >= since);
+    this.tricks = judgeTricks({ blows, stock: this.ammoLeft });
+    // The replay starts from whichever came first: a shot that reached him, or the last one fired
+    // before he left his perch (the one that shot it out from under him).
+    const still = Math.round(this.stillAt / STEP) + 2;
+    const causes = blows.map((blow) => blow.shot).filter((shot) => shot >= 0);
+    let before = -1;
+    this.log.forEach((shot, index) => {
+      if (shot.ammo !== "blunderbuss" && shot.step <= still) before = index;
+    });
+    if (before >= 0) causes.push(before);
+    this.fallShot = causes.length ? Math.min(...causes) : undefined;
+    this.crackStep = this.steps;
+    const at = { ...humpty.view.position };
+    for (const trick of this.tricks) {
+      const rule = TRICKS[trick];
+      const points = this.mayhem.add("trick", rule.points);
+      this.events.push({ type: "mayhem", kind: "trick", points, at, label: `${rule.name}!` });
+      this.events.push({ type: "trick", trick, at });
+    }
+  }
+
   /** He's cracking: was the verse's side challenge done first? */
   private judgeChallenge(): void {
     const challenge = CHALLENGES[this.level.id];
@@ -2476,7 +2536,7 @@ export class Game {
     for (const shell of bursting) {
       if (shell.view.removed) continue;
       const at = shell.body.translation();
-      this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.1, power: 620, keg: false, ammo: "shell" });
+      this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.1, power: 620, keg: false, ammo: "shell", shot: shell.shot });
       this.remove(shell);
     }
     for (const [first, second] of touches) {
@@ -2525,6 +2585,10 @@ export class Game {
         }
         const owner = this.byCollider.get(other);
         if (!owner) continue;
+        if (!free) {
+          if (owner === this.humpty) this.addBlow({ time: this.time, shot: shot.shot ?? -1, banks: shot.banked?.size ?? 0, airborne: this.humptyAirborne });
+          else if (this.glancesOff(owner, other)) (shot.banked ??= new Set()).add(other);
+        }
         if (owner.view.kind === "chest" && !free) this.openChest(owner, shot.ammo === "blunderbuss" ? undefined : shot.ammo);
         if (owner.peel && !owner.peel.spent && !free) this.flickPeel(owner, shot);
         // A shot knocks the mousetrap a little way out into the open, where the rat will smell it.
@@ -2656,7 +2720,7 @@ export class Game {
         this.startPositions.delete(entity.view.id);
         this.remove(entity);
       } else if (entity.view.kind === "bomb") {
-        this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.4, power: 820, keg: false, ammo: "bomb" });
+        this.pendingExplosions.push({ at: { x: at.x, y: at.y, z: at.z }, radius: 3.4, power: 820, keg: false, ammo: "bomb", shot: entity.shot });
         this.remove(entity);
       }
     }
@@ -2695,7 +2759,10 @@ export class Game {
           { x: (this.rng() - 0.5) * impulse * 0.3, y: (this.rng() - 0.5) * impulse * 0.3, z: (this.rng() - 0.5) * impulse * 0.3 },
           true,
         );
-        if (entity === this.humpty) this.lastNearMiss = this.time;
+        if (entity === this.humpty) {
+          this.lastNearMiss = this.time;
+          this.addBlow({ time: this.time, shot: blast.shot ?? -1, banks: 0, blast: blast.keg ? "keg" : "bomb", airborne: this.humptyAirborne });
+        }
       }
     }
   }
@@ -2729,8 +2796,9 @@ export class Game {
   private crackHumpty(speed: number): void {
     const humpty = this.humpty;
     if (!humpty || this.cracked || this.phase === "lost") return;
-    // The shot that did it is a trick shot too, if it earned it: that goes on the bill first.
+    // The shot that did it is a combo too, if it earned it: that goes on the bill first.
     this.closeCombo();
+    this.judgeTricks();
     this.judgeChallenge();
     this.cracked = true;
     this.won = true;
@@ -2841,7 +2909,10 @@ export class Game {
 
     const resting = speed < REST_SPEED && spin < 0.6;
     this.restTimer = resting ? this.restTimer + STEP : 0;
-    if (resting && this.restTimer > 0.1) this.humptyAirborne = false;
+    if (resting && this.restTimer > 0.1) {
+      this.humptyAirborne = false;
+      this.stillAt = this.time;
+    }
 
     const surface = this.restTimer > 0.7 ? this.supportKind(humpty) : "ground";
     if (this.restTimer > 0.7 && surface !== "ground") this.holdCarriers(humpty);

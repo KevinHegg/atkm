@@ -1,6 +1,7 @@
 import { CURIOS } from "./curios.js";
 import { Game, STEP } from "./game.js";
 import { dresserChina, hopperFrame, type LevelDef } from "./level.js";
+import type { TrickKind } from "./tricks.js";
 import type { StockKind, Vec3 } from "./types.js";
 
 export interface PlannedShot {
@@ -31,6 +32,8 @@ export interface PlayResult {
   mayhem: number;
   /** He cracked with the verse's side challenge done. */
   challenge: boolean;
+  /** The named trick shots he cracked with. */
+  tricks: TrickKind[];
   landing?: Vec3;
 }
 
@@ -73,6 +76,7 @@ export async function playOut(level: LevelDef, shots: readonly PlannedShot[], ma
             shotsFired: game.stats.shots,
             mayhem: game.mayhem.total,
             challenge: game.challengeMet,
+            tricks: [...game.tricks],
             ...(landing ? { landing } : {}),
           };
         }
@@ -90,6 +94,7 @@ export async function playOut(level: LevelDef, shots: readonly PlannedShot[], ma
       shotsFired: game.stats.shots,
       mayhem: game.mayhem.total,
       challenge: game.challengeMet,
+      tricks: [...game.tricks],
       ...(landing ? { landing } : {}),
     };
   } catch (error) {
