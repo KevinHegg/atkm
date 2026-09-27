@@ -1973,13 +1973,14 @@ export class StageView {
     const game = this.game;
     const level = game?.level.view ?? { yaw: 0, pitch: -14, distance: 20, target: { x: 0, y: 2.2, z: -1 } };
     let yaw = level.yaw + this.userYaw;
-    // A tall phone screen is narrow: stand further back so the whole set fits across. Anywhere else,
+    // A tall phone screen is narrow: stand a little further back (though not so far that the Queen's
+    // gun is lost in the middle of the screen: it sits just above the tray, as on a laptop). Anywhere else,
     // stand back and look a little less steeply, so the whole toy theatre is in view: the moon on the
     // backdrop, the stagehands in the wings, and the Queen at her gun by the footlights.
     const portrait = this.host.clientWidth / Math.max(1, this.host.clientHeight) < 0.8;
     const lift = !portrait && level.pitch < STAND_BACK.steep;
     let pitch = level.pitch + (lift ? STAND_BACK.pitch : 0) + this.userPitch;
-    let distance = (portrait ? Math.min(level.distance * 1.45, 35) : Math.max(level.distance, STAND_BACK.distance)) + this.userZoom;
+    let distance = (portrait ? Math.min(level.distance * 1.2, 30) : Math.max(level.distance, STAND_BACK.distance)) + this.userZoom;
     const target = V(level.target.x, level.target.y + (lift ? STAND_BACK.up : 0), level.target.z + (lift ? STAND_BACK.forward : 0));
     if (this.cameraMode === "title") {
       yaw = Math.sin(this.elapsed * 0.12) * 16;
