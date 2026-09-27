@@ -170,9 +170,9 @@ export class StageView {
   private thunderOwed = false;
   /** Royal difficulty: the aim arc shows only its first half, and no markers. */
   private royal = false;
-  /** The ghost of the player's best line on this verse: faint blue studs where its shots flew. */
-  private ghost: pc.Entity | undefined;
-  private ghostMaterial: pc.StandardMaterial | undefined;
+  /** Where the shot that found this verse's hidden star flew, last time: faint gold studs. */
+  private starTrace: pc.Entity | undefined;
+  private starTraceMaterial: pc.StandardMaterial | undefined;
   /** The bees, when they're out, and when their hive was last struck. */
   private readonly swarm: pc.Entity;
   private hiveStruckAt = -99;
@@ -497,46 +497,44 @@ export class StageView {
   }
 
   /**
-   * Trace the ghost of a best line: a stud every half metre along each shot's flight, baked into
-   * one mesh (one draw call however many shots). Undefined clears it.
+   * Trace the flight of the shot that found the hidden star: a stud every 0.7 m, baked into one
+   * mesh (one draw call). Undefined clears it.
    */
-  setGhost(paths: ReadonlyArray<ReadonlyArray<Vec3>> | undefined): void {
-    // The mesh is the ghost's own (not one of the kit's shared ones), so it goes with the entity.
-    this.ghost?.destroy();
-    this.ghost = undefined;
+  setStarTrace(path: ReadonlyArray<Vec3> | undefined): void {
+    // The mesh is the trace's own (not one of the kit's shared ones), so it goes with the entity.
+    this.starTrace?.destroy();
+    this.starTrace = undefined;
     const points: Vec3[] = [];
-    for (const path of paths ?? []) {
-      let carried = 0.3;
-      for (let index = 1; index < path.length; index += 1) {
-        const a = path[index - 1]!;
-        const b = path[index]!;
-        const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-        let along = carried;
-        for (; along < length; along += 0.5) {
-          const k = along / length;
-          points.push({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k });
-        }
-        carried = along - length;
+    let carried = 0.4;
+    for (let index = 1; index < (path?.length ?? 0); index += 1) {
+      const a = path![index - 1]!;
+      const b = path![index]!;
+      const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+      let along = carried;
+      for (; along < length; along += 0.7) {
+        const k = along / length;
+        points.push({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, z: a.z + (b.z - a.z) * k });
       }
+      carried = along - length;
     }
     if (!points.length) return;
-    if (!this.ghostMaterial) {
+    if (!this.starTraceMaterial) {
       const material = new pc.StandardMaterial();
-      material.name = "ghost-line";
-      material.diffuse = new pc.Color(0.62, 0.74, 0.95);
-      material.emissive = new pc.Color(0.3, 0.42, 0.72);
-      material.opacity = 0.62;
+      material.name = "star-trace";
+      material.diffuse = new pc.Color(1, 0.9, 0.62);
+      material.emissive = new pc.Color(0.62, 0.5, 0.24);
+      material.opacity = 0.6;
       material.blendType = pc.BLEND_NORMAL;
       material.depthWrite = false;
       material.update();
-      this.ghostMaterial = material;
+      this.starTraceMaterial = material;
     }
-    this.ghost = this.kit.meshEntity("ghost-line", this.kit.studs(points, 0.07), this.ghostMaterial, this.effects, false);
+    this.starTrace = this.kit.meshEntity("star-trace", this.kit.studs(points, 0.065), this.starTraceMaterial, this.effects, false);
   }
 
-  /** The ghost shows while aiming, and not in Royal difficulty (no hints there). */
-  showGhost(on: boolean): void {
-    if (this.ghost) this.ghost.enabled = on && !this.royal;
+  /** The star's trace shows while aiming, and not in Royal difficulty (no hints there). */
+  showStarTrace(on: boolean): void {
+    if (this.starTrace) this.starTrace.enabled = on && !this.royal;
   }
 
   kingHead(): Vec3 {
@@ -1980,7 +1978,9 @@ export class StageView {
       target.set(level.target.x, level.target.y + 2.4, level.target.z);
     }
     const humpty = this.humpty?.root.getPosition() ?? (game?.cracked ? this.crackAt : undefined);
-    const falling = Boolean(game?.humptyAirborne) || Boolean(game?.cracked && game.phase === "won");
+    // While he falls and the Queen has shot left for a parting round, the stage holds still under
+    // her aim; once he's cracked (or she's out of shot) the camera goes after him.
+    const falling = Boolean(game?.humptyAirborne && !game.ammoLeft) || Boolean(game?.cracked && game.phase === "won");
     this.follow += ((falling ? 1 : 0) - this.follow) * Math.min(1, dt * (falling ? 2.5 : 1.2));
     if (humpty && this.follow > 0.001) {
       target.lerp(target, V(humpty.x, Math.max(0.8, humpty.y), humpty.z), this.follow * 0.6);

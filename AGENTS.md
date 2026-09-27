@@ -73,6 +73,9 @@ Core promises:
 - Each stock shot opens a combo tally (`Game.combo`); it closes at the next shot, at the crack
   (before the crack is billed) or after two quiet seconds, and three or more distinct mayhem
   kinds earn `comboBonus`. Par lines rarely combo, so mayhem targets still come from the solver.
+- On a phone the HUD is compact: the verse plate is one line with its clue under it (both fold
+  away, `foldHud`), the star chips sit in one row, and the bottom bar is one row (tools behind
+  ⋯). A finger aims `TOUCH_LIFT` px above itself so it never hides the target.
 - Named trick shots (`src/sim/tricks.ts`) are judged at the crack (`judgeTricks`, after the combo
   closes, before the crack is billed) from the blows on him since he last sat still, at most
   `TRICK_WINDOW` seconds back: a munition that glanced off fixtures or the theatre's walls (not
@@ -82,7 +85,7 @@ Core promises:
 - The Verse of the Day (`src/sim/daily.ts`) plays a verse under a twist and another sky. It never
   reads the clock (the day comes in as a string) and offers only twists its par line still wins
   under (`dailyRules`; tests replay each). It keeps its own record (`progress.daily`) and touches
-  none of the verse's stars, bests, ghosts, challenges or crowns. Re-check it after re-solving.
+  none of the verse's stars, bests, star traces, challenges or crowns. Re-check it after re-solving.
 - Where it makes sense, a verse's title points to its hidden star (Hey Diddle Diddle's moon,
   Hanging by a Thread's spider, Came Tumbling After's well, Remember Remember's king).
 - After a crack the instant replay plays by itself, then the result card (or the finale). It
@@ -97,11 +100,19 @@ Core promises:
 - The crowd and pit orchestra (`listenToCrowd` in `src/main.ts`) only listen: a snare roll
   while he teeters or falls, a cymbal on the crack, near-miss gasps scaled by how close each
   shot passed his shell. Sound only; nothing in the sim depends on it.
-- The gun reloads `FALLING_RELOAD` times faster while Humpty is airborne, so a parting
-  shot or two can add mayhem before he lands, but never a volley.
+- Parting shots: once a shot knocks him flying the gun is ready within `PARTING_READY` s of
+  his fall (never sooner than `PARTING_GAP` after that shot, and only once a shot), then reloads
+  `FALLING_RELOAD` times faster while he falls: a parting shot or two, never a volley. A shot
+  fired while he falls (`partingShots`) still scores where it lands after the crack, for up to
+  `PARTING_GRACE` s (`curtainDown`): mayhem, a bowled crew, the hidden star. The shot that
+  knocked him off gets no such grace (so par lines and mayhem targets are unaffected), nothing
+  can be fired after the crack, and tricks and challenges are still judged at the crack. While he
+  falls and she has shot left, the camera holds still under her aim (it follows once he cracks).
+- On a phone, speech is thinned (one line at a time, a pause between lines, only `TELLING` cues
+  always said) and brief; on any screen a bubble the aim or a dragging finger passes over goes.
 - The verse ends when Humpty cracks. Mayhem (`src/sim/mayhem.ts`) is scored in the
   simulation, frozen at the crack (the crack and its great-fall bonus are the last
-  entries); each curio pays once. Stars, all registered only if he cracks: crack, mayhem
+  entries, save what parting shots still in flight add); each curio pays once. Stars, all registered only if he cracks: crack, mayhem
   target (`LevelDef.mayhem`), and the hidden star (`LevelDef.star`: a crew id, a curio,
   or the rat; released when a munition knocks that figure down). Set mayhem targets with
   `npm run solve -- --mayhem`: about the par line's mayhem plus one good exploring shot.
@@ -113,8 +124,9 @@ Core promises:
 - The tray runs in the order a verse lists its `ammo` (`Game.tray`): list the verse's most
   useful kind first. It's loaded at the start, the number keys follow the tray, and an empty
   rack moves on to the next one to the right.
-- A carousel child struck by a stock shot goes flat for `CHILD_DOWN` seconds (her paddle's
-  collider off, so the aim arc and the physics agree) and pays `child` mayhem.
+- A carousel child struck by a stock shot stands `CHILD_TOPPLE` seconds (so the shot is seen to
+  glance off her upright), then goes flat for `CHILD_DOWN` seconds (her paddle's collider off, so
+  the aim arc and the physics agree) and pays `child` mayhem.
 - With the battery empty, the verse is lost as soon as Humpty has come down safe and
   nothing is flying, fizzing or about to blow; it does not wait for swinging scenery.
 - A shot that strikes one of the King's men fair and square bowls his crew over, as well
@@ -190,7 +202,7 @@ Core promises:
   hoist a perch to return him to; fall back to the highest perch when the ride is
   spent.
 - Browser storage holds only per-player progress (stars, best mayhem, whether the
-  finale has played, mute, the ghost of each verse's best line: where its shots flew, from
-  `Game.flights`, and the Verses of the Day done) and must tolerate being unavailable. Bump `STORAGE_KEY` in
+  finale has played, mute, the flight of the shot that found each verse's hidden star, from
+  `Game.flights`, traced in faint gold next time, and the Verses of the Day done) and must tolerate being unavailable. Bump `STORAGE_KEY` in
   `src/main.ts` (listing the old key for removal) only when a scoring change makes old
   stars meaningless. Winning all `LEVELS.length * 3` stars plays the Grand Finale once.

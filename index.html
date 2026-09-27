@@ -24,18 +24,20 @@
       <div id="replay-banner" hidden><span>Replay</span><button type="button" id="replay-skip">Skip</button></div>
 
       <header id="hud-top" hidden>
-        <div class="verse-tag">
+        <button type="button" class="verse-tag" id="verse-tag" aria-expanded="true" aria-controls="hint" title="Fold the verse and its clue away (V)">
           <span id="hud-number">Verse I</span>
           <strong id="hud-title">Sat on a Wall</strong>
+          <b id="hud-numeral" aria-hidden="true">I</b>
           <em id="royal-badge" hidden><i class="crown"></i>Royal</em>
           <em id="daily-badge" hidden>Verse of the Day</em>
-        </div>
+          <i class="fold" aria-hidden="true"></i>
+        </button>
         <div class="hud-notes">
           <ol id="objectives" aria-label="Stars for this verse">
             <li data-star="cracked"><i></i><span>Crack him</span></li>
-            <li data-star="mayhem" title="Everything you break, bowl, ring or startle before he cracks"><i></i><span>Mayhem <b id="mayhem-now">0</b> / <b id="mayhem-target">500</b></span></li>
+            <li data-star="mayhem" title="Everything you break, bowl, ring or startle before he cracks"><i></i><span><span class="long">Mayhem </span><b id="mayhem-now">0</b> / <b id="mayhem-target">500</b></span></li>
             <li data-star="star" title="A star is hidden in one of the figures on stage. Knock it loose, then crack him to keep it."><i></i><span id="star-state">A hidden star</span></li>
-            <li data-info="fall" title="A great fall earns a mayhem bonus. Measured from where he falls from to where he lands."><b class="ruler" aria-hidden="true"></b><span>Great fall <b id="great-fall">3</b> m <em id="height-now"></em></span></li>
+            <li data-info="fall" title="A great fall earns a mayhem bonus. Measured from where he falls from to where he lands."><b class="ruler" aria-hidden="true"></b><span><span class="long">Great fall </span><b id="great-fall">3</b> m <em id="height-now"></em></span></li>
           </ol>
           <p id="hint"></p>
           <p id="status" hidden></p>
@@ -44,20 +46,22 @@
 
       <footer id="hud-bottom" hidden>
         <div id="tray-row">
-          <nav class="tools" aria-label="Verse">
-            <button type="button" data-action="menu" title="Verses (Esc)" aria-label="Verses"><i data-lucide="scroll-text"></i></button>
-            <button type="button" data-action="restart" title="Restart the verse (R)" aria-label="Restart the verse"><i data-lucide="rotate-ccw"></i></button>
+          <nav class="tools" id="tools" aria-label="Verse and view">
+            <button type="button" data-action="more" id="more-button" title="Verses, restart, view and sound" aria-label="More" aria-expanded="false"><i data-lucide="ellipsis"></i></button>
+            <div class="tool-set" id="tool-set">
+              <button type="button" data-action="menu" title="Verses (Esc)" aria-label="Verses"><i data-lucide="scroll-text"></i><span>Verses</span></button>
+              <button type="button" data-action="restart" title="Restart the verse (R)" aria-label="Restart the verse"><i data-lucide="rotate-ccw"></i><span>Restart</span></button>
+              <button type="button" data-action="look-left" title="Look around to the left (←)" aria-label="Look left"><i data-lucide="chevrons-left"></i><span>Look left</span></button>
+              <button type="button" data-action="look-right" title="Look around to the right (→)" aria-label="Look right"><i data-lucide="chevrons-right"></i><span>Look right</span></button>
+              <button type="button" data-action="camera" title="Reset the view (C)" aria-label="Reset the view"><i data-lucide="scan"></i><span>Reset view</span></button>
+              <button type="button" data-action="mute" title="Sound (M)" aria-label="Toggle sound"><i data-lucide="volume-2" class="sound-on"></i><i data-lucide="volume-x" class="sound-off"></i><span>Sound</span></button>
+            </div>
           </nav>
           <div id="ammo-tray" role="toolbar" aria-label="Ammunition"></div>
           <button type="button" id="fire-button" hidden><span>Fire!</span></button>
-          <nav class="tools" aria-label="View">
-            <button type="button" data-action="look-left" title="Look around to the left (←)" aria-label="Look left"><i data-lucide="chevrons-left"></i></button>
-            <button type="button" data-action="look-right" title="Look around to the right (→)" aria-label="Look right"><i data-lucide="chevrons-right"></i></button>
-            <button type="button" data-action="camera" title="Reset the view (C)" aria-label="Reset the view"><i data-lucide="scan"></i></button>
-            <button type="button" data-action="mute" title="Sound (M)" aria-label="Toggle sound"><i data-lucide="volume-2" class="sound-on"></i><i data-lucide="volume-x" class="sound-off"></i></button>
-          </nav>
         </div>
       </footer>
+      <div id="sight" hidden aria-hidden="true"><i class="line"></i><i class="ring"></i></div>
 
       <div id="toast" aria-live="assertive"></div>
 
@@ -69,7 +73,7 @@
         <p class="ammo-list" id="verse-ammo"></p>
         <p class="daily-note" id="verse-daily" hidden></p>
         <p class="secrets">A star is hidden in one of the figures on stage, and a chest of spare shot is somewhere about.</p>
-        <p class="ghost-note" id="verse-ghost" hidden></p>
+        <p class="trace-note" id="verse-star-trace" hidden>The shot that found its star last time is traced in faint gold.</p>
         <p class="challenge" id="verse-challenge"><i class="rosette"></i><span></span></p>
         <button type="button" id="verse-go">Begin</button>
       </section>

@@ -95,6 +95,17 @@ export const CRACK_SPEED = 6.6;
 export const HUMPTY_MASS = 90;
 /** How much faster the gun reloads while Humpty is in the air. */
 const FALLING_RELOAD = 2.5;
+/**
+ * Once a shot knocks him flying, the gun is ready this soon (s), for a parting shot if she's quick,
+ * though never sooner than `PARTING_GAP` after the shot before: no volleys.
+ */
+const PARTING_READY = 0.2;
+const PARTING_GAP = 0.6;
+/**
+ * A parting shot (fired while he fell) still scores where it lands after the crack, for up to this
+ * long (s): the curtain waits for it. Nothing can be fired once he's cracked.
+ */
+const PARTING_GRACE = 1.8;
 /** Largest blow (N·s) the chain of a chain shot deals to one body in one pass. */
 const CHAIN_BLOW = 420;
 /**
@@ -122,11 +133,15 @@ function chainOffset(t: number): { across: number; forward: number } {
 }
 /** How fast a struck weathercock swings round to its next setting (rad/s). */
 const VANE_TURN = 3;
-/** How long a shot's flight is traced for the ghost of a best line. */
+/** How long a shot's flight is traced (for the gold trace of the shot that found a hidden star). */
 const FLIGHT_TRACE = 2.2;
 /** How far back a trick shot's story goes: blows on him longer ago than this are forgotten. */
 const TRICK_WINDOW = 4;
-/** How long a carousel child struck by a shot lies flat before she's up again. */
+/**
+ * A carousel child struck by a shot stands long enough to be seen batting it away, then goes flat
+ * on her back for a few seconds before she's up again.
+ */
+const CHILD_TOPPLE = 0.4;
 const CHILD_DOWN = 3;
 /**
  * How far round the carousel has turned `time` seconds into the verse, how fast it is turning
@@ -335,6 +350,12 @@ export class Game {
   cracked = false;
   won = false;
   resultAt: number | undefined;
+  /** While a parting shot is still on its way after the crack, the bill stays open until then. */
+  private partingUntil: number | undefined;
+  /** The shot (by count) whose knock-off last readied the gun early. */
+  private partingFor = 0;
+  /** Shots (by their place in the log) fired while he was falling: parting shots. */
+  private readonly partingShots = new Set<number>();
   readonly stats = { shots: 0, bowled: 0, fall: 0, blocksMoved: 0, catches: 0 };
   /** Did he crack with the verse's side challenge done? (Judged at the crack.) */
   challengeMet = false;
@@ -345,7 +366,8 @@ export class Game {
   crackStep = 0;
   /**
    * Where each of the Queen's shots flew, by its place in the log: a point every few steps (the
-   * middle of a grapeshot volley or a chain's pair), for the ghost of a best line. Presentation only.
+   * middle of a grapeshot volley or a chain's pair), for the gold trace of the shot that found
+   * the hidden star. Presentation only.
    */
   readonly flights: Array<Vec3[] | undefined> = [];
   private tracing = new Map<number, { entities: Entity[]; from: number }>();
@@ -414,8 +436,11 @@ export class Game {
   private lastStock: StockKind = "shot";
   private turntable: { entity: Entity; def: TurntableDef; angle: number; omega: number } | undefined;
   private readonly vanes: Array<{ entity: Entity; angle: number; target: number; step: number }> = [];
-  /** The carousel: how far round it is, and when each knocked-flat child gets back up (-1: standing). */
-  private carousel: { entity: Entity; def: CarouselDef; angle: number; down: number[] } | undefined;
+  /**
+   * The carousel: how far round it is, and for each child struck by a shot, when she topples and
+   * when she's up again (-1: not due to).
+   */
+  private carousel: { entity: Entity; def: CarouselDef; angle: number; topple: number[]; down: number[] } | undefined;
   /** The revolving stage: how far round it has been turned, and when its current turn began. */
   private revolve: { entity: Entity; def: RevolveDef; angle: number; startedAt: number | undefined; previous?: number } | undefined;
   private gate: { entity: Entity; def: GateDef; openedAt: number } | undefined;
@@ -831,16 +856,17 @@ export class Game {
   }
 
   /**
-   * A shot has struck one of the carousel's children (after bouncing off her): she goes flat on her
-   * back for a few seconds, and her board with her, so the ring has a gap in it until she's up.
+   * A shot has struck one of the carousel's children (after bouncing off her): a moment later she
+   * goes flat on her back for a few seconds, and her board with her, so the ring has a gap in it
+   * until she's up. (She stands meanwhile, so the shot is seen to glance off her upright board.)
    */
   private knockChild(carousel: Entity, handle: number): void {
     const state = this.carousel;
     if (!state || state.entity !== carousel) return;
     const index = carousel.colliders.findIndex((collider) => collider.handle === handle);
     if (index < 0 || state.down[index]! >= 0) return;
-    state.down[index] = this.time + CHILD_DOWN;
-    carousel.colliders[index]!.setEnabled(false);
+    state.topple[index] = this.time + CHILD_TOPPLE;
+    state.down[index] = state.topple[index]! + CHILD_DOWN;
     const turn = state.angle + (index / state.def.paddles) * Math.PI * 2;
     const reach = (state.def.inner + state.def.outer) / 2;
     const at = { x: state.def.pos.x + Math.cos(turn) * reach, y: state.def.y, z: state.def.pos.z - Math.sin(turn) * reach };
@@ -850,7 +876,8 @@ export class Game {
 
   /** Which of the carousel's children are standing (false: knocked flat for now). */
   get carouselView(): boolean[] | undefined {
-    return this.carousel?.down.map((until) => until < 0);
+    const carousel = this.carousel;
+    return carousel?.down.map((until, index) => until < 0 || carousel.topple[index]! >= 0);
   }
 
   /** Have the carousel's children stopped between steps to do the actions? */
@@ -936,6 +963,7 @@ export class Game {
       this.combo = { kinds: new Set(), at: { ...target }, opened: this.time, last: this.time };
     }
     this.log.push({ step: this.steps, ammo: kind, at: { ...target } });
+    if (this.humptyAirborne && kind !== "blunderbuss") this.partingShots.add(this.log.length - 1);
     const preview = this.aim(target, kind);
     const { from, velocity } = preview;
     if (kind === "blunderbuss") {
@@ -1313,7 +1341,7 @@ export class Game {
       ));
     }
     const entity = this.register("fixture", "carousel", { x: def.outer * 2, y: def.height, z: def.outer * 2 }, body, colliders, { look: "carousel", bounce: PADDLE_BOUNCE });
-    this.carousel = { entity, def, angle: def.angle, down: colliders.map(() => -1) };
+    this.carousel = { entity, def, angle: def.angle, topple: colliders.map(() => -1), down: colliders.map(() => -1) };
   }
 
   /**
@@ -1515,7 +1543,12 @@ export class Game {
     if (carousel) {
       carousel.angle = carouselTurn(carousel.def, this.time + STEP).angle;
       carousel.entity.body.setNextKinematicRotation(yawQuat(carousel.angle));
-      // Knocked-flat children scramble back up and dance on.
+      // Struck children topple over, then scramble back up and dance on.
+      carousel.topple.forEach((at, index) => {
+        if (at < 0 || this.time < at) return;
+        carousel.topple[index] = -1;
+        carousel.entity.colliders[index]?.setEnabled(false);
+      });
       carousel.down.forEach((until, index) => {
         if (until < 0 || this.time < until) return;
         carousel.down[index] = -1;
@@ -2455,7 +2488,7 @@ export class Game {
 
   private stun(crew: CrewState, at: Vec3, how: "bowled" | "slip" = "bowled"): void {
     // Nobody can bowl over a man who is already down, or down the trapdoor.
-    if (crew.mode === "stunned" || crew.mode === "trapped" || this.won) return;
+    if (crew.mode === "stunned" || crew.mode === "trapped" || this.curtainDown) return;
     crew.mode = "stunned";
     crew.modeUntil = this.time + (crew.kind === "cart" ? 3.2 : 3.8);
     crew.threatSince = -1;
@@ -2468,7 +2501,7 @@ export class Game {
 
   /** The hidden star pops out of whatever it was hiding in. It counts if he cracks later. */
   private releaseStar(at: Vec3): void {
-    if (this.starFound || this.cracked || !this.log.length) return;
+    if (this.starFound || this.curtainDown || !this.log.length) return;
     this.starFound = true;
     this.events.push({ type: "star", at: { ...at } });
     this.score("star", at);
@@ -2477,7 +2510,7 @@ export class Game {
   /** Put something on the King's bill, unless the curtain is already down. */
   private score(kind: MayhemKind, at: Vec3, points?: number): void {
     // The crack and its great-fall bonus are the last things on the bill.
-    if (this.cracked && kind !== "crack" && kind !== "great") return;
+    if (this.curtainDown && kind !== "crack" && kind !== "great") return;
     // The bill starts with the Queen's first shot: nothing that happens on its own counts.
     if (!this.log.length) return;
     const earned = this.mayhem.add(kind, points);
@@ -2870,6 +2903,7 @@ export class Game {
     this.won = true;
     this.phase = "won";
     this.resultAt = this.time + 2.4;
+    if (this.partingPending()) this.partingUntil = this.time + PARTING_GRACE;
     const p = humpty.body.translation();
     const v = humpty.body.linvel();
     const at = { x: p.x, y: p.y, z: p.z };
@@ -2957,6 +2991,12 @@ export class Game {
     if (!this.humptyAirborne && this.freeSteps >= 3 && speed > 1.5 && this.peakY - p.y > 0.3) {
       this.humptyAirborne = true;
       this.awaitingLanding = true;
+      // Knocked flying: the gun crew have the next round ready in a trice (once a shot, no volleys).
+      if (this.log.length && this.partingFor !== this.log.length) {
+        this.partingFor = this.log.length;
+        // (Reload runs FALLING_RELOAD times faster while he falls: these are seconds of falling.)
+        this.reload = Math.min(this.reload, Math.max(PARTING_READY, PARTING_GAP - (this.time - this.lastShotAt)) * FALLING_RELOAD);
+      }
       this.events.push({ type: "airborne", at: { x: p.x, y: p.y, z: p.z } });
     } else if (this.humptyAirborne && this.contactSteps >= 5) {
       this.humptyAirborne = false;
@@ -3355,6 +3395,22 @@ export class Game {
   }
 
   /** No shot still in the air or rolling fast, no lit fuse and no blast waiting to go off. */
+  /** Is a parting shot still flying, fizzing or about to blow? */
+  private partingPending(): boolean {
+    if (!this.partingShots.size) return false;
+    if (this.pendingExplosions.some((blast) => blast.shot !== undefined && this.partingShots.has(blast.shot))) return true;
+    for (const entity of this.entities.values()) {
+      if (entity.shot === undefined || !this.partingShots.has(entity.shot) || entity.view.removed) continue;
+      if (entity.fuseAt !== undefined || lengthOf(entity.body.linvel()) > 1.5) return true;
+    }
+    return false;
+  }
+
+  /** The King's bill is closed: he has cracked, and no parting shot is still on its way. */
+  private get curtainDown(): boolean {
+    return this.cracked && this.partingUntil === undefined;
+  }
+
   private nothingPending(): boolean {
     if (this.pendingExplosions.length) return false;
     for (const entity of this.entities.values()) {
@@ -3381,6 +3437,7 @@ export class Game {
     // While he falls the gun crew works double-quick: time for a parting shot or two, never a volley.
     if (this.reload > 0) this.reload = Math.max(0, this.reload - STEP * (this.humptyAirborne ? FALLING_RELOAD : 1));
     if (this.phase === "won") {
+      if (this.partingUntil !== undefined && (this.time >= this.partingUntil || !this.partingPending())) this.partingUntil = undefined;
       if (this.resultAt !== undefined && this.time >= this.resultAt) {
         this.resultAt = undefined;
         this.finishStats();

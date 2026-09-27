@@ -22,7 +22,8 @@ unlock every verse.
   will pass through one). A dotted arc shows the shot, and a red ring means it hits Humpty.
   Off a bronze bumper the arc keeps going, so you can line up a bank shot. The gold ring on the
   rug marks the gun that will fire, and you can see what it's loaded with in its mouth.
-- **Fire:** click. On touch screens, drag to aim and tap **Fire**.
+- **Fire:** click. On touch screens, drag to aim and tap **Fire**: the sight rides a thumb's
+  width above your finger (a dotted thread joins them) so you can see what you're aiming at.
 - **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom. **C** resets the view.
   Some verses hide things behind scenery; it pays to look.
 - **Change shot:** right-click to step along the tray (left to right, then round again), the
@@ -33,7 +34,9 @@ unlock every verse.
   top says how high he sits, and a surveyor's line from his feet to the boards shows it on stage
   at the start of each verse, whenever you aim at him, or when you hover over the chip.
 - **R** restarts the verse, **Esc** opens the verse list, **M** mutes. These controls sit in the bottom bar,
-  next to the tray.
+  next to the tray; on a phone they fold behind its **⋯** button, so the bar is one short row.
+- **The verse and its clue** fold away: tap the verse's name (or press **V**). On a phone the
+  plate is one line with the clue under it and the star chips in one row beneath.
 
 ## Rules
 
@@ -58,8 +61,11 @@ unlock every verse.
 - **The house is watching.** The pit orchestra's snare roll builds while he teeters and runs on
   through a fall, ending in a cymbal crash when he cracks (or a relieved sigh from the audience
   if he settles). A shot that shaves past him draws a gasp: the closer it came, the bigger.
-- **Parting shots.** While he's falling the gun crew reloads at double-quick time, so
-  there's room for one more shot (perhaps two) of mayhem before he lands. Never a volley.
+- **Parting shots.** Knock him flying and the gun is ready again almost at once, then reloads
+  at double-quick time while he falls: room for one more shot (perhaps two), never a volley. The
+  stage holds still while you aim it. Bowl the crew running to catch him, or send it at the
+  scenery or the figure hiding the star: a shot fired while he falls still counts where it lands,
+  even a moment after he cracks.
 - **Stars:** crack him; reach the verse's target of mayhem; and find the **hidden star**.
   Every verse hides a star inside one figure (always the same one: a guard, a stretcher
   crew, the horse cart, the rat, or a curio such as the cow or Old King Cole). Knock that
@@ -78,9 +84,9 @@ unlock every verse.
   flight and then him all the way down (click or press a key to skip). After the curtain the
   morning papers review the performance, and **Replay** shows it again. The simulation is
   deterministic, so the replay is exact.
-- **The ghost of your best line.** Come back to a verse you've cracked and faint blue studs
-  trace where each shot of your best attempt flew (most stars, then most mayhem), bounces and
-  all. Beat it and the ghost is yours again. Royal difficulty goes without.
+- **Where the star was.** Once you've knocked a verse's hidden star loose, faint gold studs
+  trace the shot that found it whenever you come back, up to the figure it was hiding in.
+  Royal difficulty goes without.
 - **Verse of the Day.** Each day one of the verses you've opened comes round again under a
   twist (Round Shot Only, Short Rations, Not a Round to Spare, or Royal Rules) and another
   sky. It keeps its own record, lights a rosette on the verses screen when it's done, and
@@ -129,7 +135,7 @@ unlock every verse.
   The Queen's weathercock is a bronze plate on a pole that turns an eighth of a turn each
   time it's struck: set it with one shot, bank the next off it. A bomb dropped in a chute's
   hopper rolls down the trough, fuse fizzing, to wherever it leads. The mulberry-bush
-  carousel's cut-out children skip a step round, then stop five seconds to do the actions:
+  carousel's three cut-out children skip a step round, then stop five seconds to do the actions:
   while they're still, a shot glanced off the child at the front right comes back at Humpty
   from behind his gilt trellis. The aim arc draws that bounce while she stands still (and
   stops at a child who's dancing past), and aiming at them holds steady while they turn.

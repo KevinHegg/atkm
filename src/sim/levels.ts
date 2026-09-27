@@ -725,13 +725,13 @@ function cameTumblingAfter(): LevelDef {
 
 function roundTheMulberryBush(): LevelDef {
   const m = new Mason();
-  // He sits behind a gilt trellis that stops anything fired straight at him. Upstage, the
+  // He sits behind a gilt trellis that stops anything fired straight at him. Upstage, three
   // children go round the mulberry bush on a carousel: they skip a step round, then stop a good
-  // while to do the actions, and while they're still, the child who has come round to the front
-  // right faces him: a shot glanced off her comes back at him from behind.
+  // while to do the actions. While they're still, the one who has come round to the front right
+  // (the only one out front) faces him: a shot glanced off her comes back at him from behind.
   m.fixture("trellis", -1.5, 0, -1.6, 3.6, 5.4, 0.1);
   const top = m.pillar("stone", -1.5, -3.8, 4, { size: 1, height: 0.9 });
-  m.carousel(4, -7, { y: 4, height: 1.6, outer: 1.9, speed: 1.5, rest: 5, angle: 0.75 });
+  m.carousel(4, -7, { y: 4, height: 1.6, outer: 1.9, paddles: 3, speed: 1.75, rest: 5, angle: -0.82 });
   for (const x of [-3.6, -2.4]) m.hay(x, -5.4);
   m.chest(-5, -2.2, { yaw: 0.3 });
   return {
@@ -742,7 +742,7 @@ function roundTheMulberryBush(): LevelDef {
     hint: "Nothing fired straight at him gets through the trellis. The carousel children skip a step round, then stop to do the actions: while they're still, glance a shot off the child at the front right and it comes back at him from behind (the arc shows it). A child you hit goes flat for a moment.",
     ammo: { shot: 5, grape: 2, chain: 1 },
     greatFall: 3.4,
-    mayhem: 1000,
+    mayhem: 950,
     star: { crew: "bush-guard" },
     humpty: perchAt(-1.5, top, -3.8),
     pieces: m.pieces,

@@ -383,7 +383,7 @@ test("the par lines earn the tricks their verses are built on: banks, a rug pull
   }
 });
 
-test("each shot's flight is traced for the ghost of a best line: from the gun until it stops", async () => {
+test("each shot's flight is traced (for the gold trace of the shot that found a star): from the gun until it stops", async () => {
   const game = await Game.create(arena((mason) => perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1), { ammo: { shot: 1, grape: 1 } }));
   await stepUntilReady(game);
   assert.ok(game.fire({ x: 3, y: 1, z: -1 }));
@@ -438,6 +438,30 @@ test("mayhem is tallied until the crack and not a moment after", async () => {
   assert.equal(game.mayhem.entries.get("crack")?.count, 1);
   await run(game, 3);
   assert.equal(game.mayhem.total, atCrack, "debris after the crack earns nothing");
+  game.destroy();
+});
+
+test("a parting shot fired while he falls still scores where it lands, just after the crack", async () => {
+  const game = await Game.create(arena((mason) => {
+    mason.keg(5, -8);
+    return perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1);
+  }, { ammo: { shot: 3 } }));
+  await stepUntilReady(game);
+  const h = game.humptyPosition!;
+  assert.ok(game.fire({ x: h.x, y: h.y + 0.2, z: h.z }));
+  // Knocked flying, he's barely left the wall before the gun is ready again.
+  let steps = 0;
+  while (!(game.humptyAirborne && game.canFire()) && steps < 300) {
+    game.step();
+    steps += 1;
+  }
+  assert.ok(game.humptyAirborne && game.canFire(), "the gun is ready while he's still falling");
+  assert.ok(game.fire({ x: 5, y: 0.45, z: -8 }));
+  const events = await run(game, 4);
+  const crack = events.findIndex((event) => event.type === "crack");
+  const keg = events.findIndex((event) => event.type === "mayhem" && event.kind === "keg");
+  assert.ok(crack >= 0 && keg > crack, "the keg goes up after the crack");
+  assert.equal(game.mayhem.entries.get("keg")?.count, 1, "and it's on the bill");
   game.destroy();
 });
 
@@ -1082,7 +1106,7 @@ test("every verse's side challenge can be done: a recorded line cracks him with 
     "ring-of-roses": [S("shot", 0, 1, 1), S("shot", 3.2, 1, -2.2), S("shot", 6.6, 0.85, 0.2), H("shot", 0, 0.2, 0)],
     "ride-a-cock-horse": [S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.48, 4.35, -4.74)],
     "came-tumbling-after": [S("bomb", 1.8, 0.402, -3.75)],
-    "round-the-mulberry-bush": [S("shot", 6, 4, -7), S("shot", 5.1, 4, -5.82, 5)],
+    "round-the-mulberry-bush": [S("shot", 6, 4, -7), S("shot", 5.57, 4, -7.36, 5)],
     "london-bridge": [S("shot", -4.6, 0.4, -5.4), S("shot", 3, 1.35, -1.6), S("shot", -0.95, 1.45, -4.6)],
   };
   for (const level of LEVELS) {
@@ -1141,7 +1165,7 @@ test("the carousel's children stop between steps, and a shot glanced off one the
   const game = await Game.create(levelById("round-the-mulberry-bush")!);
   await stepUntilReady(game);
   assert.ok(game.carouselResting, "they start out doing the actions");
-  const preview = game.aim({ x: 5.1, y: 4, z: -5.82 }, "shot");
+  const preview = game.aim({ x: 5.57, y: 4, z: -7.36 }, "shot");
   assert.equal(preview.hitKind, "humpty", "the arc glances off a child and on to him");
   assert.ok(preview.glance, "and marks where");
   // Pointing at the child at the front right picks her face.
@@ -1154,12 +1178,12 @@ test("the carousel's children stop between steps, and a shot glanced off one the
   // on where the next child will stand.
   await run(game, 4.8);
   assert.ok(!game.carouselResting, "dancing");
-  assert.ok(!game.aim({ x: 5.1, y: 4, z: -5.82 }, "shot").glance, "no bounce drawn off a dancing child");
+  assert.ok(!game.aim({ x: 5.57, y: 4, z: -7.36 }, "shot").glance, "no bounce drawn off a dancing child");
   const during = game.raycast(eye, ray)!;
   assert.ok(Math.hypot(during.x - picked.x, during.y - picked.y, during.z - picked.z) < 0.01, "the aim point stays put");
-  await run(game, 1.1);
+  await run(game, 1.4);
   assert.ok(game.carouselResting, "stopped again");
-  assert.equal(game.aim({ x: 5.1, y: 4, z: -5.82 }, "shot").hitKind, "humpty", "and the next child sends it at him");
+  assert.equal(game.aim({ x: 5.57, y: 4, z: -7.36 }, "shot").hitKind, "humpty", "and the next child sends it at him");
   game.destroy();
 });
 
@@ -1171,7 +1195,9 @@ test("a carousel child struck by a shot goes flat on her back (mayhem), and is u
   const events = await run(game, 3, (event) => event.type === "child");
   const child = events.find((event) => event.type === "child");
   assert.ok(child && child.type === "child", "the shot knocks a child flat");
-  assert.equal(game.carouselView?.[child.index], false);
+  assert.equal(game.carouselView?.[child.index], true, "she stands a moment, batting it away");
+  await run(game, 0.5);
+  assert.equal(game.carouselView?.[child.index], false, "then goes flat");
   assert.equal(game.mayhem.entries.get("child")?.count, 1);
   await run(game, 6);
   assert.ok(game.carouselView?.every((standing) => standing), "she's up again");

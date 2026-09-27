@@ -1,4 +1,4 @@
-import { ChevronsLeft, ChevronsRight, createIcons, RotateCcw, Scan, ScrollText, Volume2, VolumeX } from "lucide";
+import { ChevronsLeft, ChevronsRight, createIcons, Ellipsis, RotateCcw, Scan, ScrollText, Volume2, VolumeX } from "lucide";
 import { TheatreAudio } from "./audio.js";
 import { CURIO_LINES, LINES, WEATHER_LINES, type Cue, type Speaker } from "./lines.js";
 import { review } from "./review.js";
@@ -45,8 +45,8 @@ interface Progress {
   crowns?: Record<string, true>;
   /** Named trick shots pulled off, anywhere. */
   tricks?: Partial<Record<TrickKind, true>>;
-  /** The ghost of the best line per verse: its stars, mayhem, and where each shot flew (x, y, z, ...). */
-  ghosts?: Record<string, Ghost>;
+  /** Where the shot that found each verse's hidden star flew (x, y, z, ...), traced in gold next time. */
+  starTraces?: Record<string, number[]>;
   /** Verses of the Day done, by day (YYYY-MM-DD): which verse, under what, and the best result. */
   daily?: Record<string, DailyDone>;
 }
@@ -57,12 +57,6 @@ interface DailyDone {
   weather: Weather;
   stars: number;
   mayhem: number;
-}
-
-interface Ghost {
-  stars: number;
-  mayhem: number;
-  paths: number[][];
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
@@ -77,7 +71,7 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {}, ghosts: parsed.ghosts ?? {}, daily: parsed.daily ?? {} };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {}, starTraces: parsed.starTraces ?? {}, daily: parsed.daily ?? {} };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
@@ -98,14 +92,16 @@ const unlockAll = new URLSearchParams(location.search).has("all");
 const audio = new TheatreAudio(BASE);
 audio.setMuted(progress.muted);
 document.documentElement.classList.toggle("muted", progress.muted);
-createIcons({ icons: { ChevronsLeft, ChevronsRight, RotateCcw, Scan, ScrollText, Volume2, VolumeX } });
+createIcons({ icons: { ChevronsLeft, ChevronsRight, Ellipsis, RotateCcw, Scan, ScrollText, Volume2, VolumeX } });
 
 const view = new StageView($("#stage"));
 const canvas = view.canvas;
 const touchDevice = matchMedia("(pointer: coarse)").matches;
+/** A phone-sized screen: the HUD is compact, and the chips say less. */
+const narrow = matchMedia("(max-width: 720px)");
 if (touchDevice) {
   for (const hint of document.querySelectorAll<HTMLElement>("#title-screen .controls")) {
-    hint.textContent = "Drag to aim · tap Fire · two fingers to look around";
+    hint.textContent = "Drag to aim (the sight rides above your finger) · tap Fire · two fingers to look around";
   }
 }
 
@@ -162,9 +158,19 @@ interface Box {
 const bubbles: Bubble[] = [];
 const lastLine = new Map<Cue, string>();
 const cueCooldown = new Map<Cue, number>();
+/** When anyone last spoke (performance.now()). */
+let lastSpoke = -1e9;
+/** Lines that explain what just happened to the play; on a phone they're the only ones never dropped. */
+const TELLING: ReadonlySet<Cue> = new Set<Cue>(["caught", "ratEnter", "ratSteal", "lose"]);
+/** On a phone, a pause between lines (ms): speech covers a lot of a small stage. */
+const PHONE_HUSH = 7000;
 
 function say(speaker: Speaker, text: string, seconds = 3.4): void {
-  for (const bubble of bubbles.filter((item) => item.speaker === speaker)) dismissBubble(bubble);
+  // On a phone speech covers a lot of the stage: one line at a time, and briefly.
+  const small = narrow.matches;
+  for (const bubble of bubbles.filter((item) => small || item.speaker === speaker)) dismissBubble(bubble);
+  if (small) seconds = Math.min(seconds, 1.5 + text.length * 0.02, 2.6);
+  lastSpoke = performance.now();
   const element = document.createElement("div");
   element.className = `bubble ${speaker}`;
   const name = document.createElement("b");
@@ -175,6 +181,14 @@ function say(speaker: Speaker, text: string, seconds = 3.4): void {
   if (!audio.voice(text)) audio.mumble(speaker, text);
   if (speaker !== "king") view.talk(speaker, Math.min(seconds, 0.4 + text.length * 0.05));
   positionBubbles();
+}
+
+/** Speech brushed aside: a bubble the player's aim or dragging finger passes over goes at once. */
+function brushSpeech(x: number, y: number): void {
+  for (const bubble of [...bubbles]) {
+    const box = bubble.element.getBoundingClientRect();
+    if (x >= box.left - 4 && x <= box.right + 4 && y >= box.top - 4 && y <= box.bottom + 4) dismissBubble(bubble);
+  }
 }
 
 function dismissBubble(bubble: Bubble): void {
@@ -252,26 +266,28 @@ function recordStars(current: Game): void {
   if (current.challengeMet) (progress.challenges ??= {})[id] = true;
   if (royalRun) (progress.crowns ??= {})[id] = true;
   for (const trick of current.tricks) (progress.tricks ??= {})[trick] = true;
-  recordGhost(current);
   // Marked as seen only once it actually plays (a restart or reload before then keeps it owed).
   if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = true;
   saveProgress();
 }
 
-/** The attempt the ghost was last taken from: it may be retaken as its shots finish flying. */
-let ghostFrom: Game | undefined;
-
-/** A crack better than the ghost on file (more stars, or as many and more mayhem) becomes the new ghost. */
-function recordGhost(current: Game): void {
-  const id = current.level.id;
-  const stars = current.stars().count;
-  const mayhem = current.mayhem.total;
-  const old = progress.ghosts?.[id];
-  if (old && ghostFrom !== current && (old.stars > stars || (old.stars === stars && old.mayhem >= mayhem))) return;
-  ghostFrom = current;
+/**
+ * The hidden star has popped out: keep the flight of the shot that found it (the one that passed
+ * nearest), up to where it came closest, to trace in gold next time as a reminder.
+ */
+function recordStarTrace(current: Game, at: Vec3): void {
+  let best: { path: Vec3[]; end: number; distance: number } | undefined;
+  for (const path of current.flights) {
+    if (!path || path.length < 2) continue;
+    path.forEach((point, index) => {
+      const distance = Math.hypot(point.x - at.x, point.y - at.y, point.z - at.z);
+      if (!best || distance < best.distance) best = { path, end: index, distance };
+    });
+  }
+  if (!best || best.end < 1) return;
   const round = (value: number): number => Math.round(value * 100) / 100;
-  const paths = current.flights.flatMap((path) => (path && path.length > 1 ? [path.flatMap((p) => [round(p.x), round(p.y), round(p.z)])] : []));
-  (progress.ghosts ??= {})[id] = { stars, mayhem, paths };
+  (progress.starTraces ??= {})[current.level.id] = best.path.slice(0, best.end + 1).flatMap((p) => [round(p.x), round(p.y), round(p.z)]);
+  saveProgress();
 }
 
 // ------------------------------------------------------------------ verse of the day
@@ -348,19 +364,19 @@ function skyWords(weather: Weather | undefined): string {
   return `Played ${sky[weather ?? "dusk"]}.`;
 }
 
-/** Trace the ghost of the player's best line on this verse, if there is one. */
-function traceGhost(level: LevelDef | undefined): void {
-  const ghost = level ? progress.ghosts?.[level.id] : undefined;
-  const paths = ghost?.paths.map((flat) => Array.from({ length: Math.floor(flat.length / 3) }, (_, index) => ({ x: flat[index * 3]!, y: flat[index * 3 + 1]!, z: flat[index * 3 + 2]! })));
-  view.setGhost(paths);
-  const note = $("#verse-ghost");
-  note.hidden = !ghost || !paths?.length || royalRun;
-  if (ghost) note.textContent = `Your best line so far (${ghost.mayhem.toLocaleString("en-GB")} mayhem, ${ghost.stars} ${ghost.stars === 1 ? "star" : "stars"}) is traced in pale blue.`;
+/** Trace, in faint gold, the shot that found this verse's hidden star last time, if one has. */
+function traceStar(level: LevelDef | undefined): void {
+  const flat = level ? progress.starTraces?.[level.id] : undefined;
+  const path = flat && Array.from({ length: Math.floor(flat.length / 3) }, (_, index) => ({ x: flat[index * 3]!, y: flat[index * 3 + 1]!, z: flat[index * 3 + 2]! }));
+  view.setStarTrace(path);
+  $("#verse-star-trace").hidden = !path?.length || royalRun;
 }
 
 function cue(kind: Cue, chance = 1, cooldown = 4): void {
-  if (Math.random() > chance) return;
   const now = performance.now();
+  // On a phone most chatter is dropped: half as often, and never hard on the heels of another line.
+  if (narrow.matches && !TELLING.has(kind) && (now - lastSpoke < PHONE_HUSH || Math.random() > 0.5)) return;
+  if (Math.random() > chance) return;
   if (now < (cueCooldown.get(kind) ?? 0)) return;
   cueCooldown.set(kind, now + cooldown * 1000);
   const { speaker, lines } = LINES[kind];
@@ -456,7 +472,8 @@ function show(next: Screen): void {
   if (next !== "finale") $("#finale-screen").hidden = true;
   $("#replay-banner").hidden = next !== "replay";
   document.body.classList.toggle("replaying", next === "replay");
-  view.showGhost(next === "play");
+  openTools(false);
+  view.showStarTrace(next === "play");
   const playing = next === "play" || next === "result";
   $("#hud-top").hidden = !playing;
   $("#hud-bottom").hidden = next !== "play";
@@ -543,6 +560,7 @@ async function startLevel(index: number, today?: Daily): Promise<void> {
     $("#daily-badge").hidden = !today;
     if (today) $("#daily-badge").textContent = DAILY_RULES[today.rule].name;
     $("#hud-title").textContent = level.title;
+    $("#hud-numeral").textContent = today ? "Day" : numeral(index);
     $("#great-fall").textContent = String(level.greatFall);
     $("#mayhem-target").textContent = level.mayhem.toLocaleString("en-GB");
     $("#mayhem-now").textContent = "0";
@@ -570,9 +588,9 @@ async function startLevel(index: number, today?: Daily): Promise<void> {
     hintShot = !royalRun && (losses.get(level.id) ?? 0) > 0 ? PAR[level.id]?.[0] : undefined;
     $("#royal-badge").hidden = !royalRun;
     view.setRoyal(royalRun);
-    // Today's racks aren't the verse's, so its ghost stays away.
-    traceGhost(today ? undefined : level);
-    view.showGhost(true);
+    // Today's racks aren't the verse's, so the star's trace stays away.
+    traceStar(today ? undefined : level);
+    view.showStarTrace(true);
     const timing = hintShot && !hintShot.relativeToHumpty && next.onCarousel(hintShot.at)
       ? " It shows while the child stands still: fire then."
       : hintShot?.wait ? " Timing matters: the stars are fickle." : "";
@@ -704,10 +722,11 @@ function closeVerse(): void {
   plumbUntil = performance.now() + 6000;
   if (hintShot) toast("The Astrologer", true, "has marked a winning shot in green");
   later(0.5, () => cue("start", 1, 0));
-  later(3.6, () => !game?.cracked && cue("retort", 1, 0));
+  // On a phone the Queen's opening line is enough; the stage is small.
+  if (!narrow.matches) later(3.6, () => !game?.cracked && cue("retort", 1, 0));
   // Now and then, a word about the weather.
   const remarks = game ? WEATHER_LINES[game.level.weather ?? "dusk"] : undefined;
-  if (remarks && Math.random() < 0.6) later(9, () => screen === "play" && !game?.cracked && say("humpty", remarks[Math.floor(Math.random() * remarks.length)]!));
+  if (remarks && !narrow.matches && Math.random() < 0.6) later(9, () => screen === "play" && !game?.cracked && say("humpty", remarks[Math.floor(Math.random() * remarks.length)]!));
 }
 
 function showResult(): void {
@@ -755,6 +774,9 @@ function showResult(): void {
     .sort((a, b) => Number(b.kind === "crack" || b.kind === "great") - Number(a.kind === "crack" || a.kind === "great") || b.points - a.points)
     .slice(0, BILL_LINES - 1));
   const sundries = lines.filter((line) => !kept.has(line));
+  // The crack and his great fall close the bill, even if a parting shot was still landing after.
+  const last = (line: (typeof lines)[number]): number => (line.kind === "crack" ? 1 : line.kind === "great" ? 2 : 0);
+  lines.sort((a, b) => last(a) - last(b));
   const billLine = (bill: string, detail: string, points: number): string =>
     `<li><span>${bill}${detail ? ` <em>${detail}</em>` : ""}</span><b>${points.toLocaleString("en-GB")}</b></li>`;
   $("#bill-lines").innerHTML = lines.length
@@ -938,7 +960,9 @@ function updateObjectives(): void {
   // Found but not yet earned: it only counts once he cracks.
   const starChip = document.querySelector<HTMLElement>("#objectives [data-star=\"star\"]");
   starChip?.classList.toggle("found", current.starFound && !stars.star);
-  const starText = stars.star ? "The hidden star" : current.starFound ? "Star found! Now crack him" : "A hidden star";
+  const starText = narrow.matches
+    ? stars.star ? "Star kept" : current.starFound ? "Star found" : "Hidden star"
+    : stars.star ? "The hidden star" : current.starFound ? "Star found! Now crack him" : "A hidden star";
   const starState = $("#star-state");
   if (starState.textContent !== starText) starState.textContent = starText;
   const shown = $("#mayhem-now");
@@ -1139,6 +1163,34 @@ function hintAim(current: Game): { aim: Vec3; ring: Vec3; ammo: StockKind } | un
   return { aim, ring: preview.hit ?? aim, ammo: hintShot.ammo };
 }
 
+/** The sight above an aiming finger, and a thread down to the finger so it's clear whose it is. */
+function updateSight(): void {
+  const sight = $("#sight");
+  const finger = sightFinger;
+  const show = Boolean(finger) && screen === "play" && !verseOpen && Boolean(game?.canFire());
+  sight.hidden = !show;
+  if (!show || !finger) return;
+  sight.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`;
+  sight.style.setProperty("--thread", `${Math.max(0, finger.y - pointer.y - 40)}px`);
+}
+
+/** The verse's plate and its clue, folded away to give the stage more room (for this visit). */
+let hudFolded = false;
+
+function foldHud(folded: boolean): void {
+  hudFolded = folded;
+  $("#hud-top").classList.toggle("folded", folded);
+  const tag = $("#verse-tag");
+  tag.setAttribute("aria-expanded", String(!folded));
+  tag.title = folded ? "Show the verse and its clue (V)" : "Fold the verse and its clue away (V)";
+}
+
+/** The tools behind the ⋯ button, on a small screen. */
+function openTools(open: boolean): void {
+  $("#tools").classList.toggle("open", open);
+  $("#more-button").setAttribute("aria-expanded", String(open));
+}
+
 function fire(): void {
   const current = game;
   if (!current || screen !== "play" || verseOpen || !aimTarget) return;
@@ -1161,9 +1213,28 @@ function fire(): void {
 
 const pointers = new Map<number, { x: number; y: number; startX: number; startY: number; start: number; button: number; type: string; dragged: boolean }>();
 
+/** How far above a fingertip a touch aims, so the finger doesn't hide what it's aiming at (CSS px). */
+const TOUCH_LIFT = 84;
+/** Where the aiming finger is, while one is down: the sight rides above it. */
+let sightFinger: { x: number; y: number } | undefined;
+
+/** A mouse aims where it points; one finger aims a little above itself; two fingers turn the view. */
+function aimFrom(event: PointerEvent): void {
+  const touch = event.pointerType === "touch";
+  if (touch && pointers.size > 1) {
+    sightFinger = undefined;
+    return;
+  }
+  pointer.x = event.clientX;
+  pointer.y = touch ? event.clientY - TOUCH_LIFT : event.clientY;
+  pointer.inside = true;
+  sightFinger = touch ? { x: event.clientX, y: event.clientY } : undefined;
+}
+
 canvas.addEventListener("pointerdown", (event) => {
   audio.unlock();
   canvas.setPointerCapture(event.pointerId);
+  openTools(false);
   pointers.set(event.pointerId, {
     x: event.clientX,
     y: event.clientY,
@@ -1174,18 +1245,17 @@ canvas.addEventListener("pointerdown", (event) => {
     type: event.pointerType,
     dragged: false,
   });
-  pointer.x = event.clientX;
-  pointer.y = event.clientY;
-  pointer.inside = true;
+  aimFrom(event);
   if (verseOpen) closeVerse();
 });
 
 canvas.addEventListener("pointermove", (event) => {
   const tracked = pointers.get(event.pointerId);
   if (event.pointerType === "mouse" || tracked?.type === "touch") {
-    pointer.x = event.clientX;
-    pointer.y = event.clientY;
-    pointer.inside = true;
+    aimFrom(event);
+    // Speech in the way of the aim (or under a dragging finger) is brushed aside.
+    brushSpeech(pointer.x, pointer.y);
+    if (tracked) brushSpeech(event.clientX, event.clientY);
   }
   if (!tracked) return;
   const dx = event.clientX - tracked.x;
@@ -1203,6 +1273,7 @@ canvas.addEventListener("pointermove", (event) => {
 function release(event: PointerEvent): void {
   const tracked = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
+  if (tracked?.type === "touch") sightFinger = undefined;
   if (!tracked || event.type === "pointercancel") return;
   if (tracked.type === "mouse" && tracked.button === 0 && !tracked.dragged) fire();
   // A right-click (not a right-drag, which turns the view) steps to the next kind of shot.
@@ -1238,6 +1309,7 @@ window.addEventListener("keydown", (event) => {
       return;
     }
     if (event.key === "r" || event.key === "R") restartVerse();
+    if (event.key === "v" || event.key === "V") foldHud(!hudFolded);
     if (event.key === "c" || event.key === "C") view.resetCamera();
     if (event.key === "Escape") show("levels");
     if (event.key === "ArrowLeft") view.look(-30);
@@ -1276,6 +1348,9 @@ $("#hud-bottom").addEventListener("click", (event) => {
   audio.unlock();
   audio.click();
   const action = button.dataset.action;
+  if (action === "more") openTools(!$("#tools").classList.contains("open"));
+  // The view's turns stay open for another turn; the rest are done with the menu.
+  if (action === "menu" || action === "restart" || action === "mute") openTools(false);
   if (action === "menu") show("levels");
   if (action === "restart") restartVerse();
   if (action === "camera") view.resetCamera();
@@ -1285,6 +1360,11 @@ $("#hud-bottom").addEventListener("click", (event) => {
 });
 
 $("#fire-button").addEventListener("click", () => fire());
+$("#verse-tag").addEventListener("click", () => {
+  audio.unlock();
+  audio.click();
+  foldHud(!hudFolded);
+});
 const greatChip = $("#objectives [data-info=\"fall\"]");
 greatChip.addEventListener("pointerenter", () => { plumbHover = true; });
 greatChip.addEventListener("pointerleave", () => { plumbHover = false; });
@@ -1608,6 +1688,7 @@ function handle(event: GameEvent): void {
     }
     case "star":
       audio.starChime();
+      if (live && !daily && game) recordStarTrace(game, event.at);
       if (live) {
         audio.gasp();
         audio.applause(1.2);
@@ -1898,6 +1979,7 @@ function tick(realDt: number): void {
   }
   attract(realDt);
   updateAim();
+  updateSight();
   const ring = screen === "play" && hintShot ? hintAim(current)?.ring : undefined;
   if (screen === "play" && hintShot) view.setHint(ring);
   updateRingTag(ring);

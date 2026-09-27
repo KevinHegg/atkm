@@ -667,16 +667,18 @@ export function buildCarousel(kit: Kit, parent: pc.Entity, def: { inner: number;
   const reach = (def.inner + def.outer) / 2;
   const frocks = [palette.queen, palette.king, new pc.Color(0.25, 0.4, 0.7), new pc.Color(0.85, 0.55, 0.2), new pc.Color(0.5, 0.3, 0.6), new pc.Color(0.3, 0.55, 0.3)];
   kit.primitive("hub", "cylinder", root, V(0, def.height / 2 - 0.05, 0), { x: def.inner * 2 + 0.2, y: 0.14, z: def.inner * 2 + 0.2 }, gold);
-  kit.primitive("hub-low", "cylinder", root, V(0, -def.height / 2 + 0.05, 0), { x: def.inner * 2 + 0.2, y: 0.1, z: def.inner * 2 + 0.2 }, gold);
+  // A shade deeper than the frames it holds, so no face of theirs lies flush with its own.
+  kit.primitive("hub-low", "cylinder", root, V(0, -def.height / 2 + 0.05, 0), { x: def.inner * 2 + 0.2, y: 0.12, z: def.inner * 2 + 0.2 }, gold);
   for (let index = 0; index < def.paddles; index += 1) {
     const turn = (index / def.paddles) * 360;
     const turnGroup = kit.group("paddle-arm", root, V(), V(0, turn, 0));
     // Hinged along her arm, so a child struck by a shot can go flat on her back.
     const arm = kit.group("paddle", turnGroup);
     const frock = frocks[index % frocks.length]!;
-    // A painted board with a child on each face, arms out, holding hands round the bush.
+    // A painted board with a child on each face, arms out, holding hands round the bush. The board
+    // stops just inside its oak frame, so none of its edges lies flush with the frame's (they'd flicker).
     const parts: Box[] = [
-      { center: [reach, 0, 0], size: [length, def.height, 0.1], color: palette.cream },
+      { center: [reach - 0.02, 0, 0], size: [length - 0.04, def.height - 0.1, 0.1], color: palette.cream },
       { center: [reach, def.height / 2 - 0.05, 0], size: [length + 0.04, 0.1, 0.14], color: palette.oakDark },
       { center: [reach, -def.height / 2 + 0.05, 0], size: [length + 0.04, 0.1, 0.14], color: palette.oakDark },
       { center: [def.outer - 0.04, 0, 0], size: [0.08, def.height, 0.14], color: palette.oakDark },
