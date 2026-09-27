@@ -345,7 +345,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
 #fire-button:disabled { opacity: 0.5; }
 
-/* The sight that rides above an aiming finger, and its thread down to the fingertip. */
+/* The sight a finger nudges: a ring where the shot will aim. */
 #sight {
   position: fixed;
   z-index: 6;
@@ -376,15 +376,6 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   height: 4px;
   border-radius: 50%;
   background: var(--gold);
-}
-
-#sight .line {
-  position: absolute;
-  left: -1px;
-  top: 16px;
-  width: 2px;
-  height: var(--thread, 40px);
-  background: repeating-linear-gradient(rgb(239 230 207 / 0.8) 0 3px, transparent 3px 7px);
 }
 
 /* ------------------------------------------------------------------ World overlays */

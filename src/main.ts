@@ -101,7 +101,7 @@ const touchDevice = matchMedia("(pointer: coarse)").matches;
 const narrow = matchMedia("(max-width: 720px)");
 if (touchDevice) {
   for (const hint of document.querySelectorAll<HTMLElement>("#title-screen .controls")) {
-    hint.textContent = "Tap or drag to aim (dragging, the sight rides above your finger) · tap Fire · two fingers to look around, pinch to zoom";
+    hint.textContent = "Tap to aim, drag anywhere to nudge · tap Fire · two fingers to look around, pinch to zoom";
   }
 }
 
@@ -1164,15 +1164,12 @@ function hintAim(current: Game): { aim: Vec3; ring: Vec3; ammo: StockKind } | un
   return { aim, ring: preview.hit ?? aim, ammo: hintShot.ammo };
 }
 
-/** The sight above an aiming finger, and a thread down to the finger so it's clear whose it is. */
+/** The sight a finger is nudging: a ring where the shot will aim, while the finger drags. */
 function updateSight(): void {
   const sight = $("#sight");
-  const finger = sightFinger;
-  const show = Boolean(finger) && screen === "play" && !verseOpen && Boolean(game?.canFire());
+  const show = nudging && screen === "play" && !verseOpen && Boolean(game?.canFire());
   sight.hidden = !show;
-  if (!show || !finger) return;
-  sight.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`;
-  sight.style.setProperty("--thread", `${Math.max(0, finger.y - pointer.y - 40)}px`);
+  if (show) sight.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`;
 }
 
 /** The verse's plate and its clue, folded away to give the stage more room (for this visit). */
@@ -1214,27 +1211,22 @@ function fire(): void {
 
 const pointers = new Map<number, { x: number; y: number; startX: number; startY: number; start: number; button: number; type: string; dragged: boolean }>();
 
-/** How far above a fingertip a touch aims, so the finger doesn't hide what it's aiming at (CSS px). */
-const TOUCH_LIFT = 84;
-/** Where the aiming finger is, while one is dragging: the sight rides above it. */
-let sightFinger: { x: number; y: number } | undefined;
+/**
+ * On a touch screen a tap puts the sight right where it lands, and one finger dragged from
+ * anywhere nudges it from where it is, by this fraction of the drag: fine aim, and the finger
+ * never has to cover the target or reach for the edge of the screen.
+ */
+const NUDGE = 0.5;
+/** A finger is nudging the sight just now (its ring shows where the shot will aim). */
+let nudging = false;
 /** More than one finger has been down since the screen was last clear: no tap, whatever lifts last. */
 let multiTouch = false;
 
-/**
- * A mouse aims where it points; one finger dragging aims a little above itself (a tap aims right
- * where it lands: see `release`); two fingers turn the view.
- */
-function aimFrom(event: PointerEvent): void {
-  const touch = event.pointerType === "touch";
-  if (touch && pointers.size > 1) {
-    sightFinger = undefined;
-    return;
-  }
-  pointer.x = event.clientX;
-  pointer.y = touch ? event.clientY - TOUCH_LIFT : event.clientY;
+/** Aim at a point on the screen (kept on it). A mouse aims wherever it points. */
+function aimAt(x: number, y: number): void {
+  pointer.x = Math.min(window.innerWidth - 1, Math.max(0, x));
+  pointer.y = Math.min(window.innerHeight - 1, Math.max(0, y));
   pointer.inside = true;
-  sightFinger = touch ? { x: event.clientX, y: event.clientY } : undefined;
 }
 
 canvas.addEventListener("pointerdown", (event) => {
@@ -1255,22 +1247,25 @@ canvas.addEventListener("pointerdown", (event) => {
     // A finger doesn't move the aim until it drags (or lifts, as a tap).
     if (pointers.size > 1) {
       multiTouch = true;
-      sightFinger = undefined;
+      nudging = false;
     }
   } else {
-    aimFrom(event);
+    aimAt(event.clientX, event.clientY);
   }
   if (verseOpen) closeVerse();
 });
 
 canvas.addEventListener("pointermove", (event) => {
   const tracked = pointers.get(event.pointerId);
-  if (tracked && Math.hypot(event.clientX - tracked.startX, event.clientY - tracked.startY) > 8) tracked.dragged = true;
-  if (event.pointerType === "mouse" || (tracked?.type === "touch" && tracked.dragged && !multiTouch)) {
-    aimFrom(event);
-    // Speech in the way of the aim (or under a dragging finger) is brushed aside.
+  if (tracked && !tracked.dragged && Math.hypot(event.clientX - tracked.startX, event.clientY - tracked.startY) > 8) {
+    tracked.dragged = true;
+    // With nothing aimed at yet, a first drag nudges from where the finger went down.
+    if (tracked.type === "touch" && !multiTouch && !pointer.inside) aimAt(tracked.startX, tracked.startY);
+  }
+  if (event.pointerType === "mouse") {
+    aimAt(event.clientX, event.clientY);
+    // Speech in the way of the aim is brushed aside.
     brushSpeech(pointer.x, pointer.y);
-    if (tracked) brushSpeech(event.clientX, event.clientY);
   }
   if (!tracked) return;
   const dx = event.clientX - tracked.x;
@@ -1287,6 +1282,12 @@ canvas.addEventListener("pointermove", (event) => {
         view.zoom((before - after) * 0.04);
       }
       view.orbit(dx / pointers.size, dy / pointers.size);
+    } else if (tracked.dragged && !multiTouch) {
+      // One finger, dragged from anywhere: nudge the sight from where it is.
+      aimAt(pointer.x + dx * NUDGE, pointer.y + dy * NUDGE);
+      nudging = true;
+      brushSpeech(pointer.x, pointer.y);
+      brushSpeech(event.clientX, event.clientY);
     }
   } else if (tracked.dragged || tracked.button !== 0) {
     view.orbit(dx, dy);
@@ -1297,12 +1298,10 @@ function release(event: PointerEvent): void {
   const tracked = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
   if (tracked?.type === "touch") {
-    sightFinger = undefined;
+    nudging = false;
     // A tap (one finger, no drag) aims right where it landed.
     if (!tracked.dragged && !multiTouch && !pointers.size && event.type !== "pointercancel") {
-      pointer.x = event.clientX;
-      pointer.y = event.clientY;
-      pointer.inside = true;
+      aimAt(event.clientX, event.clientY);
       brushSpeech(pointer.x, pointer.y);
     }
     if (!pointers.size) multiTouch = false;
