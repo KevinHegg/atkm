@@ -75,7 +75,8 @@ Core promises:
   kinds earn `comboBonus`. Par lines rarely combo, so mayhem targets still come from the solver.
 - On a phone the HUD is compact: the verse plate is one line with its clue under it (both fold
   away, `foldHud`), the star chips sit in one row, and the bottom bar is one row (tools behind
-  ⋯). A finger aims `TOUCH_LIFT` px above itself so it never hides the target.
+  ⋯). A dragging finger aims `TOUCH_LIFT` px above itself so it never hides the target; a tap
+  aims right where it lands.
 - Named trick shots (`src/sim/tricks.ts`) are judged at the crack (`judgeTricks`, after the combo
   closes, before the crack is billed) from the blows on him since he last sat still, at most
   `TRICK_WINDOW` seconds back: a munition that glanced off fixtures or the theatre's walls (not

@@ -101,7 +101,7 @@ const touchDevice = matchMedia("(pointer: coarse)").matches;
 const narrow = matchMedia("(max-width: 720px)");
 if (touchDevice) {
   for (const hint of document.querySelectorAll<HTMLElement>("#title-screen .controls")) {
-    hint.textContent = "Drag to aim (the sight rides above your finger) · tap Fire · two fingers to look around, pinch to zoom";
+    hint.textContent = "Tap or drag to aim (dragging, the sight rides above your finger) · tap Fire · two fingers to look around, pinch to zoom";
   }
 }
 
@@ -1215,10 +1215,15 @@ const pointers = new Map<number, { x: number; y: number; startX: number; startY:
 
 /** How far above a fingertip a touch aims, so the finger doesn't hide what it's aiming at (CSS px). */
 const TOUCH_LIFT = 84;
-/** Where the aiming finger is, while one is down: the sight rides above it. */
+/** Where the aiming finger is, while one is dragging: the sight rides above it. */
 let sightFinger: { x: number; y: number } | undefined;
+/** More than one finger has been down since the screen was last clear: no tap, whatever lifts last. */
+let multiTouch = false;
 
-/** A mouse aims where it points; one finger aims a little above itself; two fingers turn the view. */
+/**
+ * A mouse aims where it points; one finger dragging aims a little above itself (a tap aims right
+ * where it lands: see `release`); two fingers turn the view.
+ */
 function aimFrom(event: PointerEvent): void {
   const touch = event.pointerType === "touch";
   if (touch && pointers.size > 1) {
@@ -1245,13 +1250,22 @@ canvas.addEventListener("pointerdown", (event) => {
     type: event.pointerType,
     dragged: false,
   });
-  aimFrom(event);
+  if (event.pointerType === "touch") {
+    // A finger doesn't move the aim until it drags (or lifts, as a tap).
+    if (pointers.size > 1) {
+      multiTouch = true;
+      sightFinger = undefined;
+    }
+  } else {
+    aimFrom(event);
+  }
   if (verseOpen) closeVerse();
 });
 
 canvas.addEventListener("pointermove", (event) => {
   const tracked = pointers.get(event.pointerId);
-  if (event.pointerType === "mouse" || tracked?.type === "touch") {
+  if (tracked && Math.hypot(event.clientX - tracked.startX, event.clientY - tracked.startY) > 8) tracked.dragged = true;
+  if (event.pointerType === "mouse" || (tracked?.type === "touch" && tracked.dragged && !multiTouch)) {
     aimFrom(event);
     // Speech in the way of the aim (or under a dragging finger) is brushed aside.
     brushSpeech(pointer.x, pointer.y);
@@ -1262,7 +1276,6 @@ canvas.addEventListener("pointermove", (event) => {
   const dy = event.clientY - tracked.y;
   tracked.x = event.clientX;
   tracked.y = event.clientY;
-  if (Math.hypot(event.clientX - tracked.startX, event.clientY - tracked.startY) > 8) tracked.dragged = true;
   if (tracked.type === "touch") {
     if (pointers.size >= 2) {
       // Two fingers: drag to look round, pinch to come closer or stand back.
@@ -1282,7 +1295,17 @@ canvas.addEventListener("pointermove", (event) => {
 function release(event: PointerEvent): void {
   const tracked = pointers.get(event.pointerId);
   pointers.delete(event.pointerId);
-  if (tracked?.type === "touch") sightFinger = undefined;
+  if (tracked?.type === "touch") {
+    sightFinger = undefined;
+    // A tap (one finger, no drag) aims right where it landed.
+    if (!tracked.dragged && !multiTouch && !pointers.size && event.type !== "pointercancel") {
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      pointer.inside = true;
+      brushSpeech(pointer.x, pointer.y);
+    }
+    if (!pointers.size) multiTouch = false;
+  }
   if (!tracked || event.type === "pointercancel") return;
   if (tracked.type === "mouse" && tracked.button === 0 && !tracked.dragged) fire();
   // A right-click (not a right-drag, which turns the view) steps to the next kind of shot.

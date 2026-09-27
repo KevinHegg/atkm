@@ -566,7 +566,7 @@ function heyDiddleDiddle(): LevelDef {
     ],
     // Well back, so the moon he's to jump over (and its hidden star) is in the sky above him, and
     // the Queen's gun at the footlights is still in view.
-    view: view({ pitch: -20, distance: 28, target: { x: -1.5, y: 2.6, z: -3.5 } }),
+    view: view({ pitch: -17, distance: 26, target: { x: -1.5, y: 3.6, z: -3.5 } }),
   };
 }
 
@@ -777,7 +777,7 @@ function londonBridge(): LevelDef {
     crews: [],
     // Well back, so the moon (and its hidden star) clears the hint above the stage, and the
     // Queen's gun at the footlights is still in view.
-    view: view({ pitch: -20, distance: 28, target: { x: -0.8, y: 2.6, z: -3.5 } }),
+    view: view({ pitch: -17, distance: 26, target: { x: -0.8, y: 3.6, z: -3.5 } }),
   };
 }
 

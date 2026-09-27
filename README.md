@@ -22,11 +22,12 @@ unlock every verse.
   will pass through one). A dotted arc shows the shot, and a red ring means it hits Humpty.
   Off a bronze bumper the arc keeps going, so you can line up a bank shot. The gold ring on the
   rug marks the gun that will fire, and you can see what it's loaded with in its mouth.
-- **Fire:** click. On touch screens, drag to aim and tap **Fire**: the sight rides a thumb's
-  width above your finger (a dotted thread joins them) so you can see what you're aiming at.
+- **Fire:** click. On touch screens, tap or drag to aim and tap **Fire**. A tap aims right where
+  it lands; while you drag, the sight rides a thumb's width above your finger (a dotted thread
+  joins them) so you can see what you're aiming at.
 - **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom (on a phone, two
   fingers look around and a pinch zooms). **C** resets the view. The opening view stands back far
-  enough to show the whole theatre, from the moon to the footlights.
+  enough to show the whole set, the moon and the wings included.
   Some verses hide things behind scenery; it pays to look.
 - **Change shot:** right-click to step along the tray (left to right, then round again), the
   number keys (**1** is the leftmost rack), or the tray. **6** is the Queen's blunderbuss when a

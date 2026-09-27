@@ -54,7 +54,7 @@ const DEG = 180 / Math.PI;
  * back (m); and a verse looked at more steeply than `steep` is looked at this much less steeply
  * (degrees), with the aim point this much higher and nearer the house (m), so the footlights show.
  */
-const STAND_BACK = { distance: 24, steep: -16, pitch: 3, up: 0.8, forward: 1 };
+const STAND_BACK = { distance: 22, steep: -16, pitch: 1.5, up: 0.4, forward: 0.5 };
 /** Bodies that last the whole verse: worth batching. Shots and debris come and go too often. */
 const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag", "peel", "mousetrap"]);
 const SWEAT = new pc.Color(0.55, 0.78, 0.95);
@@ -2045,7 +2045,7 @@ export class StageView {
     );
     this.camera.lookAt(this.camTarget);
     const aspect = this.host.clientWidth / Math.max(1, this.host.clientHeight);
-    this.camera.camera!.fov = aspect < 0.8 ? 56 : aspect < 1.2 ? 46 : 44;
+    this.camera.camera!.fov = aspect < 0.8 ? 56 : aspect < 1.2 ? 46 : 40;
   }
 
   /** The replay's ball-cam: the newest munition still flying (not one lying about on the boards). */
