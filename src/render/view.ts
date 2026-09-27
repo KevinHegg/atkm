@@ -447,7 +447,7 @@ export class StageView {
   }
 
   zoom(delta: number): void {
-    this.userZoom = pc.math.clamp(this.userZoom + delta, -8, 8);
+    this.userZoom = pc.math.clamp(this.userZoom + delta, -10, 10);
   }
 
   resetCamera(): void {

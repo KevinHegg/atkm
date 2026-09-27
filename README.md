@@ -24,7 +24,8 @@ unlock every verse.
   rug marks the gun that will fire, and you can see what it's loaded with in its mouth.
 - **Fire:** click. On touch screens, drag to aim and tap **Fire**: the sight rides a thumb's
   width above your finger (a dotted thread joins them) so you can see what you're aiming at.
-- **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom. **C** resets the view.
+- **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom (on a phone, two
+  fingers look around and a pinch zooms). **C** resets the view.
   Some verses hide things behind scenery; it pays to look.
 - **Change shot:** right-click to step along the tray (left to right, then round again), the
   number keys (**1** is the leftmost rack), or the tray. **6** is the Queen's blunderbuss when a

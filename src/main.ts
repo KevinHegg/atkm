@@ -101,7 +101,7 @@ const touchDevice = matchMedia("(pointer: coarse)").matches;
 const narrow = matchMedia("(max-width: 720px)");
 if (touchDevice) {
   for (const hint of document.querySelectorAll<HTMLElement>("#title-screen .controls")) {
-    hint.textContent = "Drag to aim (the sight rides above your finger) · tap Fire · two fingers to look around";
+    hint.textContent = "Drag to aim (the sight rides above your finger) · tap Fire · two fingers to look around, pinch to zoom";
   }
 }
 
@@ -1264,7 +1264,16 @@ canvas.addEventListener("pointermove", (event) => {
   tracked.y = event.clientY;
   if (Math.hypot(event.clientX - tracked.startX, event.clientY - tracked.startY) > 8) tracked.dragged = true;
   if (tracked.type === "touch") {
-    if (pointers.size >= 2) view.orbit(dx / pointers.size, dy / pointers.size);
+    if (pointers.size >= 2) {
+      // Two fingers: drag to look round, pinch to come closer or stand back.
+      const other = [...pointers.values()].find((item) => item !== tracked && item.type === "touch");
+      if (other) {
+        const before = Math.hypot(tracked.x - dx - other.x, tracked.y - dy - other.y);
+        const after = Math.hypot(tracked.x - other.x, tracked.y - other.y);
+        view.zoom((before - after) * 0.04);
+      }
+      view.orbit(dx / pointers.size, dy / pointers.size);
+    }
   } else if (tracked.dragged || tracked.button !== 0) {
     view.orbit(dx, dy);
   }
