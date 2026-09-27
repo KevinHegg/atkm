@@ -10,9 +10,10 @@ import { HUMPTY_BASE } from "./sim/level.js";
 import { MAYHEM, type MayhemKind } from "./sim/mayhem.js";
 import { LEVELS } from "./sim/levels.js";
 import { TRICKS, type TrickKind } from "./sim/tricks.js";
+import { DAILY_RULES, dailyLevel, dailyRules, pickDaily, type DailyRule } from "./sim/daily.js";
 import parSolutions from "./sim/par.json" with { type: "json" };
 import type { PlannedShot } from "./sim/autoplay.js";
-import type { LevelDef } from "./sim/level.js";
+import type { LevelDef, Weather } from "./sim/level.js";
 import type { AmmoKind, CurioId, GameEvent, StockKind, Vec3 } from "./sim/types.js";
 
 const BASE = import.meta.env.BASE_URL;
@@ -46,6 +47,16 @@ interface Progress {
   tricks?: Partial<Record<TrickKind, true>>;
   /** The ghost of the best line per verse: its stars, mayhem, and where each shot flew (x, y, z, ...). */
   ghosts?: Record<string, Ghost>;
+  /** Verses of the Day done, by day (YYYY-MM-DD): which verse, under what, and the best result. */
+  daily?: Record<string, DailyDone>;
+}
+
+interface DailyDone {
+  id: string;
+  rule: DailyRule;
+  weather: Weather;
+  stars: number;
+  mayhem: number;
 }
 
 interface Ghost {
@@ -66,7 +77,7 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {}, ghosts: parsed.ghosts ?? {} };
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {}, ghosts: parsed.ghosts ?? {}, daily: parsed.daily ?? {} };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
@@ -218,6 +229,21 @@ function startFinale(): void {
 
 function recordStars(current: Game): void {
   if (!current.cracked) return;
+  // The Verse of the Day is played under its own rules: it keeps its own record, and none of the verse's.
+  if (daily) {
+    for (const trick of current.tricks) (progress.tricks ??= {})[trick] = true;
+    const stars = current.stars().count;
+    const mayhem = current.mayhem.total;
+    const done = progress.daily?.[daily.day];
+    if (!done || stars > done.stars || (stars === done.stars && mayhem > done.mayhem)) {
+      const days = (progress.daily ??= {});
+      days[daily.day] = { id: daily.level.id, rule: daily.rule, weather: daily.level.weather ?? "dusk", stars, mayhem };
+      // A couple of months is plenty for the streak.
+      for (const day of Object.keys(days).sort().slice(0, -60)) delete days[day];
+    }
+    saveProgress();
+    return;
+  }
   const id = current.level.id;
   progress.stars[id] = Math.max(progress.stars[id] ?? 0, current.stars().count);
   progress.best[id] = Math.max(progress.best[id] ?? 0, current.mayhem.total);
@@ -246,13 +272,87 @@ function recordGhost(current: Game): void {
   (progress.ghosts ??= {})[id] = { stars, mayhem, paths };
 }
 
+// ------------------------------------------------------------------ verse of the day
+
+interface Daily {
+  day: string;
+  index: number;
+  rule: DailyRule;
+  /** The verse as it's played today: today's racks and sky. */
+  level: LevelDef;
+}
+
+/** Today's Verse of the Day, while it's being played (undefined for the ordinary verses). */
+let daily: Daily | undefined;
+
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dayLabel(day: string): string {
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+  return new Date(year, month - 1, date).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+}
+
+/**
+ * Today's verse, picked by the date from the verses the player has opened (once played, the day
+ * keeps the verse it was played on, even if more verses open later that day).
+ */
+function todaysVerse(): Daily | undefined {
+  const day = dayKey(new Date());
+  const done = progress.daily?.[day];
+  const kept = done ? LEVELS.findIndex((level) => level.id === done.id) : -1;
+  if (done && kept >= 0) {
+    const base = LEVELS[kept]!;
+    return { day, index: kept, rule: done.rule, level: dailyLevel(base, done.rule, done.weather, PAR[base.id]) };
+  }
+  const offers = LEVELS.flatMap((level, index) => (unlocked(index) ? [{ index, level, rules: dailyRules(level, PAR[level.id]) }] : []));
+  const pick = pickDaily(day, offers);
+  if (!pick) return undefined;
+  const base = LEVELS[pick.index]!;
+  return { day, index: pick.index, rule: pick.rule, level: dailyLevel(base, pick.rule, pick.weather, PAR[base.id]) };
+}
+
+/** Days in a row with the Verse of the Day done, back from today (or yesterday, if today's is still to do). */
+function dailyStreak(): number {
+  const done = progress.daily ?? {};
+  const date = new Date();
+  if (!done[dayKey(date)]) date.setDate(date.getDate() - 1);
+  let streak = 0;
+  while (done[dayKey(date)]) {
+    streak += 1;
+    date.setDate(date.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderDailyCard(): void {
+  const today = todaysVerse();
+  const card = $("#daily-card");
+  card.hidden = !today;
+  if (!today) return;
+  const done = progress.daily?.[today.day];
+  const streak = dailyStreak();
+  const status = done ? "done" : "to play";
+  card.querySelector(".daily-kicker")!.textContent = `Verse of the Day · ${dayLabel(today.day)} · ${status}${streak > 1 ? ` · ${streak} days running` : ""}`;
+  card.querySelector(".daily-name")!.textContent = `${today.level.title}: ${DAILY_RULES[today.rule].name}`;
+  card.title = `${DAILY_RULES[today.rule].text} ${skyWords(today.level.weather)}`;
+  card.querySelector(".rosette")!.classList.toggle("lit", Boolean(done));
+}
+
+/** Today's sky, in words. */
+function skyWords(weather: Weather | undefined): string {
+  const sky: Record<Weather, string> = { dusk: "at dusk", dawn: "at dawn", day: "on a fine day", night: "on a clear night", rain: "in the rain", storm: "in a storm", snow: "in the snow" };
+  return `Played ${sky[weather ?? "dusk"]}.`;
+}
+
 /** Trace the ghost of the player's best line on this verse, if there is one. */
-function traceGhost(level: LevelDef): void {
-  const ghost = progress.ghosts?.[level.id];
+function traceGhost(level: LevelDef | undefined): void {
+  const ghost = level ? progress.ghosts?.[level.id] : undefined;
   const paths = ghost?.paths.map((flat) => Array.from({ length: Math.floor(flat.length / 3) }, (_, index) => ({ x: flat[index * 3]!, y: flat[index * 3 + 1]!, z: flat[index * 3 + 2]! })));
   view.setGhost(paths);
   const note = $("#verse-ghost");
-  note.hidden = !ghost || !paths?.length || Boolean(progress.royal);
+  note.hidden = !ghost || !paths?.length || royalRun;
   if (ghost) note.textContent = `Your best line so far (${ghost.mayhem.toLocaleString("en-GB")} mayhem, ${ghost.stars} ${ghost.stars === 1 ? "star" : "stars"}) is traced in pale blue.`;
 }
 
@@ -404,11 +504,11 @@ function renderLevelList(): void {
   $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "") + (crowns ? ` · ${crowns} won in Royal` : "") + (tricks ? ` · ${tricks} of ${Object.keys(TRICKS).length} trick shots` : "");
   $("#royal-toggle").setAttribute("aria-pressed", String(Boolean(progress.royal)));
   $("#star-total").classList.toggle("all", all);
+  renderDailyCard();
   $("#build-tag").textContent = `v${__BUILD__.version} · ${__BUILD__.commit} · ${__BUILD__.date}`;
 }
 
-async function loadGame(index: number): Promise<Game> {
-  const level = LEVELS[index]!;
+async function loadGame(index: number, level: LevelDef = LEVELS[index]!): Promise<Game> {
   const next = await Game.create(level);
   game?.destroy();
   game = next;
@@ -425,25 +525,31 @@ async function loadGame(index: number): Promise<Game> {
   return next;
 }
 
-async function startLevel(index: number): Promise<void> {
+/** Start a verse (`today`: as the Verse of the Day). */
+async function startLevel(index: number, today?: Daily): Promise<void> {
   if (loading) return;
   loading = true;
   try {
-    const next = await loadGame(index);
+    const next = await loadGame(index, today?.level);
+    daily = today;
     const level = next.level;
     for (const bubble of [...bubbles]) dismissBubble(bubble);
     $("#toast").replaceChildren();
     show("play");
     view.setCameraMode("intro");
-    $("#hud-number").textContent = `Verse ${numeral(index)}`;
+    $("#hud-number").textContent = today ? "Verse of the Day" : `Verse ${numeral(index)}`;
+    $("#daily-badge").hidden = !today;
+    if (today) $("#daily-badge").textContent = DAILY_RULES[today.rule].name;
     $("#hud-title").textContent = level.title;
     $("#great-fall").textContent = String(level.greatFall);
     $("#mayhem-target").textContent = level.mayhem.toLocaleString("en-GB");
     $("#mayhem-now").textContent = "0";
-    previousBest = progress.best[level.id] ?? 0;
+    previousBest = today ? (progress.daily?.[today.day]?.mayhem ?? 0) : (progress.best[level.id] ?? 0);
     $("#popups").replaceChildren();
     for (const item of document.querySelectorAll<HTMLElement>("#objectives li")) item.classList.remove("lit", "lost");
-    $("#verse-number").textContent = `Verse ${numeral(index)}`;
+    $("#verse-number").textContent = today ? `Verse of the Day · ${dayLabel(today.day)} · Verse ${numeral(index)}` : `Verse ${numeral(index)}`;
+    $("#verse-daily").hidden = !today;
+    if (today) $("#verse-daily").textContent = `${DAILY_RULES[today.rule].name}: ${DAILY_RULES[today.rule].text} ${skyWords(level.weather)}`;
     $("#verse-title").textContent = level.title;
     $("#verse-lines").innerHTML = "";
     level.verse.forEach((line, lineIndex) => {
@@ -452,15 +558,18 @@ async function startLevel(index: number): Promise<void> {
     });
     $("#verse-hint").textContent = level.hint;
     showChallenge($("#verse-challenge"), level, Boolean(progress.challenges?.[level.id]));
+    // Side challenges are for the ordinary verses.
+    if (today) $("#verse-challenge").hidden = true;
     $("#verse-ammo").textContent = (Object.keys(level.ammo) as StockKind[]).filter((kind) => (level.ammo[kind] ?? 0) > 0)
       .map((kind) => `${level.ammo[kind]} × ${AMMO[kind].name}`)
       .join("  ·  ");
-    // Royal difficulty: no help from the Court Astrologer.
-    hintShot = !progress.royal && (losses.get(level.id) ?? 0) > 0 ? PAR[level.id]?.[0] : undefined;
-    royalRun = Boolean(progress.royal);
+    // Royal difficulty (or a day of Royal Rules): no help from the Court Astrologer.
+    royalRun = Boolean(progress.royal) || today?.rule === "royal";
+    hintShot = !royalRun && (losses.get(level.id) ?? 0) > 0 ? PAR[level.id]?.[0] : undefined;
     $("#royal-badge").hidden = !royalRun;
     view.setRoyal(royalRun);
-    traceGhost(level);
+    // Today's racks aren't the verse's, so its ghost stays away.
+    traceGhost(today ? undefined : level);
     view.showGhost(true);
     const timing = hintShot?.wait ? " Timing matters: the stars are fickle." : "";
     $("#hint").textContent = hintShot
@@ -477,6 +586,11 @@ async function startLevel(index: number): Promise<void> {
   } finally {
     loading = false;
   }
+}
+
+/** Play the same verse again (today's, if it's the Verse of the Day). */
+function restartVerse(): void {
+  void startLevel(levelIndex, daily);
 }
 
 // ------------------------------------------------------------------ replay
@@ -599,10 +713,21 @@ function showResult(): void {
   const stars = current.stars();
   const won = current.cracked;
   recordStars(current);
-  $("#result-kicker").textContent = `Verse ${numeral(levelIndex)} · ${level.title}`;
+  $("#result-kicker").textContent = daily ? `Verse of the Day · ${dayLabel(daily.day)} · ${level.title}` : `Verse ${numeral(levelIndex)} · ${level.title}`;
   $("#result-title").textContent = won ? "Humpty had a great fall" : "All the King's men win";
   $("#result-stars").innerHTML = [0, 1, 2].map((star) => `<i class="star${star < stars.count ? " lit" : ""}"></i>`).join("");
   showChallenge($("#result-challenge"), level, won && current.challengeMet, won && current.challengeMet ? "Side challenge done" : undefined);
+  const dailyLine = $("#result-daily");
+  dailyLine.hidden = !daily;
+  if (daily) {
+    $("#result-challenge").hidden = true;
+    const streak = dailyStreak();
+    dailyLine.classList.toggle("done", won);
+    dailyLine.querySelector(".rosette")!.classList.toggle("lit", won);
+    dailyLine.querySelector("span")!.textContent = won
+      ? `Verse of the Day done (${DAILY_RULES[daily.rule].name})${streak > 1 ? `: ${streak} days running` : ""}. Come back tomorrow for another.`
+      : `Verse of the Day: ${DAILY_RULES[daily.rule].name}. Not today... yet.`;
+  }
   const notice = review({
     won,
     fall: current.stats.fall,
@@ -634,16 +759,16 @@ function showResult(): void {
       .join("")
     : `<li class="none"><span>Nothing broken. Not even the egg.</span><b>0</b></li>`;
   $("#bill-total").textContent = current.mayhem.total.toLocaleString("en-GB");
-  const best = progress.best[level.id] ?? 0;
+  const best = daily ? (progress.daily?.[daily.day]?.mayhem ?? 0) : (progress.best[level.id] ?? 0);
   $("#bill-best").textContent = !won
     ? `Mayhem only counts once he cracks. ${level.mayhem.toLocaleString("en-GB")} for the mayhem star.`
     : current.mayhem.total > previousBest
       ? `A new record for this verse!${stars.mayhem ? "" : ` ${level.mayhem.toLocaleString("en-GB")} for the mayhem star.`}`
       : `Best so far: ${best.toLocaleString("en-GB")}.${stars.mayhem ? "" : ` ${level.mayhem.toLocaleString("en-GB")} for the mayhem star.`}`;
   const hasNext = levelIndex + 1 < LEVELS.length;
-  $("#next-button").hidden = !won || !hasNext;
+  $("#next-button").hidden = !won || !hasNext || Boolean(daily);
   $("#replay-button").hidden = !won || current.log.length === 0;
-  $("#retry-button").classList.toggle("primary", !won || !hasNext);
+  $("#retry-button").classList.toggle("primary", !won || !hasNext || Boolean(daily));
   show("result");
   if (won) audio.fanfare();
   else audio.sadTrombone();
@@ -1095,7 +1220,7 @@ window.addEventListener("keydown", (event) => {
       else fire();
       return;
     }
-    if (event.key === "r" || event.key === "R") void startLevel(levelIndex);
+    if (event.key === "r" || event.key === "R") restartVerse();
     if (event.key === "c" || event.key === "C") view.resetCamera();
     if (event.key === "Escape") show("levels");
     if (event.key === "ArrowLeft") view.look(-30);
@@ -1105,7 +1230,8 @@ window.addEventListener("keydown", (event) => {
     endReplay();
   } else if (screen === "result" && (event.key === "Enter" || event.key === " ")) {
     event.preventDefault();
-    if (game?.cracked && levelIndex + 1 < LEVELS.length) void startLevel(levelIndex + 1);
+    if (daily) show("levels");
+    else if (game?.cracked && levelIndex + 1 < LEVELS.length) void startLevel(levelIndex + 1);
     else void startLevel(levelIndex);
   } else if (screen === "levels" && event.key === "Escape") {
     show(levelsReturn);
@@ -1134,7 +1260,7 @@ $("#hud-bottom").addEventListener("click", (event) => {
   audio.click();
   const action = button.dataset.action;
   if (action === "menu") show("levels");
-  if (action === "restart") void startLevel(levelIndex);
+  if (action === "restart") restartVerse();
   if (action === "camera") view.resetCamera();
   if (action === "look-left") view.look(-30);
   if (action === "look-right") view.look(30);
@@ -1205,7 +1331,13 @@ canvas.addEventListener("click", () => {
 });
 $("#retry-button").addEventListener("click", () => {
   audio.click();
-  void startLevel(levelIndex);
+  restartVerse();
+});
+$("#daily-card").addEventListener("click", () => {
+  audio.unlock();
+  audio.click();
+  const today = todaysVerse();
+  if (today) void startLevel(today.index, today);
 });
 $("#royal-toggle").addEventListener("click", () => {
   audio.unlock();

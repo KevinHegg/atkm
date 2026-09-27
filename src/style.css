@@ -737,6 +737,18 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .challenge.done { color: var(--crimson); }
 #verse-card .challenge { justify-content: flex-start; margin: -6px 0 16px; }
 #level-list .foot .rosette { width: 14px; height: 14px; margin-left: auto; }
+
+/* The Verse of the Day: a gilt bill pasted up in the header, beside the title. */
+#daily-card { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; max-width: 460px; padding: 6px 12px; text-align: left; background: #fff3cf; border: 2px solid var(--gold-dark); color: var(--ink); transition: transform 0.12s, box-shadow 0.12s; }
+#daily-card:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--ink); }
+#daily-card[hidden] { display: none; }
+#daily-card .rosette { width: 20px; height: 20px; }
+#daily-card .daily-text { display: grid; gap: 3px; min-width: 0; }
+#daily-card .daily-kicker { font: 700 11px/1 var(--ui); letter-spacing: 0.14em; color: var(--crimson); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#daily-card .daily-name { font: 400 19px/1 var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#verse-card .daily-note { margin: -8px 0 16px; font: italic 15px/1.3 var(--serif); color: var(--crimson); }
+#daily-badge { display: inline-flex; margin-top: 3px; font: 700 11px/1 var(--ui); font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: var(--crimson); }
+#daily-badge[hidden] { display: none; }
 #level-list .foot .rosette::after { left: 3px; top: 10px; width: 8px; height: 7px; }
 
 .playbill.result { width: min(820px, 100%); }

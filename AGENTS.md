@@ -76,6 +76,12 @@ Core promises:
   the boards) is a bank; Mid-Air needs a different shot from the one that knocked him off. Where
   every winning line of a verse earns a trick (its banks, its keg, its rope), its mayhem target
   includes that trick's bonus.
+- The Verse of the Day (`src/sim/daily.ts`) plays a verse under a twist and another sky. It never
+  reads the clock (the day comes in as a string) and offers only twists its par line still wins
+  under (`dailyRules`; tests replay each). It keeps its own record (`progress.daily`) and touches
+  none of the verse's stars, bests, ghosts, challenges or crowns. Re-check it after re-solving.
+- Where it makes sense, a verse's title points to its hidden star (Hey Diddle Diddle's moon,
+  Hanging by a Thread's spider, Came Tumbling After's well, Remember Remember's king).
 - After a crack the instant replay plays by itself, then the result card (or the finale). It
   starts just before `Game.fallShot` and follows the newest munition in flight until he falls.
 - Teetering (`checkTeeter`) is a query only: a probe a hand's breadth past him, the way he was
@@ -180,7 +186,7 @@ Core promises:
   hoist a perch to return him to; fall back to the highest perch when the ride is
   spent.
 - Browser storage holds only per-player progress (stars, best mayhem, whether the
-  finale has played, mute, and the ghost of each verse's best line: where its shots flew, from
-  `Game.flights`) and must tolerate being unavailable. Bump `STORAGE_KEY` in
+  finale has played, mute, the ghost of each verse's best line: where its shots flew, from
+  `Game.flights`, and the Verses of the Day done) and must tolerate being unavailable. Bump `STORAGE_KEY` in
   `src/main.ts` (listing the old key for removal) only when a scoring change makes old
   stars meaningless. Winning all `LEVELS.length * 3` stars plays the Grand Finale once.

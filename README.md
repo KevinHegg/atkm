@@ -81,6 +81,11 @@ unlock every verse.
 - **The ghost of your best line.** Come back to a verse you've cracked and faint blue studs
   trace where each shot of your best attempt flew (most stars, then most mayhem), bounces and
   all. Beat it and the ghost is yours again. Royal difficulty goes without.
+- **Verse of the Day.** Each day one of the verses you've opened comes round again under a
+  twist (Round Shot Only, Short Rations, Not a Round to Spare, or Royal Rules) and another
+  sky. It keeps its own record, lights a rosette on the verses screen when it's done, and
+  counts the days you've kept it up. Every twist a verse is offered is one its par line
+  still wins under.
 - **Ordnance:**
   - **Round shot** is a flat, heavy punch.
   - **Mortar shells** lob over walls and burst on contact.
@@ -143,7 +148,7 @@ unlock every verse.
   blunderbuss (key **6**) sends him packing without spending a shot. Or use the mousetrap
   in his verses: left where it is he pays it no mind, but knock it out into the open with a
   shot and he can't resist the cheese. Snap: he steals nothing that visit.
-- **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the moon, Jack and
+- **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the man in the moon, Jack and
   Jill's hill, the cuckoo clock, the well, the spider, the Grand Old Duke of York's men
   on the painted hill, Old King Cole in his royal box (or the stilts it stands on), or the
   two stagehands at the fly line, and see what happens. The King's supper hangs from the

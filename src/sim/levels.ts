@@ -396,7 +396,8 @@ function hangingByAThread(): LevelDef {
     ammo: { chain: 2, shot: 3 },
     greatFall: 4,
     mayhem: 910,
-    star: { crew: "guard-h1" },
+    // Hanging by a thread, like the spider over stage right.
+    star: { curio: "spider" },
     humpty: perchAt(seat.x, seat.y, seat.z),
     pieces: m.pieces,
     crews: [
@@ -772,7 +773,8 @@ function londonBridge(): LevelDef {
     humpty: perchAt(0, deck, -4.6),
     pieces: m.pieces,
     crews: [],
-    view: view({ pitch: -18, distance: 21, target: { x: 0.4, y: 2.6, z: -2.2 } }),
+    // Up and back a little, so the moon (and its hidden star) clears the hint above the stage.
+    view: view({ pitch: -14, distance: 24, target: { x: -0.8, y: 4.6, z: -3.5 } }),
   };
 }
 

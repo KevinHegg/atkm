@@ -6,7 +6,8 @@ import type { CurioId, Vec3 } from "./types.js";
  */
 export const CURIOS: ReadonlyArray<{ id: CurioId; at: Vec3; size: Vec3 }> = [
   { id: "cow", at: { x: -11, y: 4.7, z: -9.6 }, size: { x: 1.8, y: 1.3, z: 0.7 } },
-  { id: "moon", at: { x: -9, y: 11.5, z: -9.7 }, size: { x: 4.2, y: 4.2, z: 0.5 } },
+  // Low enough to hang clear of the status chips and the hint over the stage in every framing.
+  { id: "moon", at: { x: -8.5, y: 8.9, z: -9.7 }, size: { x: 4.2, y: 4.2, z: 0.5 } },
   { id: "jack-and-jill", at: { x: 4.2, y: 5.3, z: -9.6 }, size: { x: 1.8, y: 1.4, z: 0.7 } },
   // A big cuckoo clock flown in over stage left, low enough to clear the header and the cow.
   { id: "cuckoo", at: { x: -7.5, y: 3.9, z: -1.5 }, size: { x: 1.4, y: 3, z: 0.8 } },
@@ -25,6 +26,9 @@ export const CURIOS: ReadonlyArray<{ id: CurioId; at: Vec3; size: Vec3 }> = [
   // The Grand Old Duke of York's men, marching up the painted hill and down again.
   { id: "duke", at: { x: -5.6, y: 3.3, z: -9.75 }, size: { x: 7, y: 2.2, z: 0.8 } },
 ];
+
+/** Where the painted crescent's bite sits on the moon (its shadow is painted the colour of the sky there). */
+export const MOON_BITE = { x: 0.65, y: 0.3, radius: 0.9 };
 
 /** The painted hill the Duke's men march over: centre and radius on the backdrop. */
 export const DUKE_HILL = { x: -5.6, y: -1.6, radius: 5.2, z: -9.9 };

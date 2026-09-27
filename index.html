@@ -28,6 +28,7 @@
           <span id="hud-number">Verse I</span>
           <strong id="hud-title">Sat on a Wall</strong>
           <em id="royal-badge" hidden><i class="crown"></i>Royal</em>
+          <em id="daily-badge" hidden>Verse of the Day</em>
         </div>
         <div class="hud-notes">
           <ol id="objectives" aria-label="Stars for this verse">
@@ -66,6 +67,7 @@
         <p class="couplet" id="verse-lines"></p>
         <p class="hint" id="verse-hint"></p>
         <p class="ammo-list" id="verse-ammo"></p>
+        <p class="daily-note" id="verse-daily" hidden></p>
         <p class="secrets">A star is hidden in one of the figures on stage, and a chest of spare shot is somewhere about.</p>
         <p class="ghost-note" id="verse-ghost" hidden></p>
         <p class="challenge" id="verse-challenge"><i class="rosette"></i><span></span></p>
@@ -89,6 +91,10 @@
         <div class="playbill wide">
           <header>
             <h2>The Verses</h2>
+            <button type="button" id="daily-card" hidden>
+              <i class="rosette"></i>
+              <span class="daily-text"><span class="daily-kicker"></span><span class="daily-name"></span></span>
+            </button>
             <div class="levels-tools">
               <button type="button" id="royal-toggle" aria-pressed="false" title="Royal difficulty: the aim arc shows only its first half, with no ring where the shot lands and no Court Astrologer. Verses won this way earn a crown."><i class="crown"></i><span>Royal</span></button>
               <button type="button" id="levels-back">Back</button>
@@ -122,6 +128,7 @@
           <h2 id="result-title">Humpty had a great fall</h2>
           <div id="result-stars" aria-label="Stars"></div>
           <p class="challenge" id="result-challenge"><i class="rosette"></i><span></span></p>
+          <p class="challenge" id="result-daily" hidden><i class="rosette"></i><span></span></p>
           <div class="result-body">
             <article class="newspaper" aria-label="The morning papers">
               <header><span id="paper-name">The Nursery Times</span><small id="paper-date"></small></header>

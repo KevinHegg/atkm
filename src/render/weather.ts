@@ -1,4 +1,5 @@
 import * as pc from "playcanvas";
+import { CURIOS, MOON_BITE } from "../sim/curios.js";
 import { STAGE } from "../sim/game.js";
 import type { Weather } from "../sim/level.js";
 import { palette, type Kit } from "./kit.js";
@@ -113,7 +114,14 @@ export function paintSky(kit: Kit, sky: Sky = DUSK): void {
     material.diffuse.set(r, g, b);
     material.update();
   });
+  // The crescent's bite is sky, so it matches whatever sky is painted behind it.
+  const [r, g, b] = skyAt(sky.stops, MOON_Y + MOON_BITE.y);
+  const bite = kit.material("moon-shadow", new pc.Color(r, g, b), 0.02);
+  bite.diffuse.set(r, g, b);
+  bite.update();
 }
+
+const MOON_Y = CURIOS.find((curio) => curio.id === "moon")!.at.y;
 
 /** A seeded scatter, so the rain and snow look the same every time. */
 function scatter(index: number, k: number): number {

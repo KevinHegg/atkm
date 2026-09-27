@@ -399,6 +399,33 @@ test("each shot's flight is traced for the ghost of a best line: from the gun un
   game.destroy();
 });
 
+test("every Verse of the Day twist a verse is offered is one its par line still wins under", async () => {
+  const { LEVELS } = await import("../src/sim/levels.js");
+  const { dailyLevel, dailyRules, pickDaily } = await import("../src/sim/daily.js");
+  const { playOut } = await import("../src/sim/autoplay.js");
+  const par = (await import("../src/sim/par.json", { with: { type: "json" } })).default as Record<string, Parameters<typeof playOut>[1]>;
+  let twisted = 0;
+  for (const level of LEVELS) {
+    const line = par[level.id]!;
+    for (const rule of dailyRules(level, line)) {
+      if (rule === "royal") continue;
+      twisted += 1;
+      const today = dailyLevel(level, rule, "snow", line);
+      assert.notDeepEqual(today.ammo, level.ammo, `${level.id} ${rule} changes the racks`);
+      const result = await playOut(today, line, 40);
+      assert.ok(result.won, `${level.id} under ${rule} (${JSON.stringify(today.ammo)})`);
+    }
+  }
+  assert.ok(twisted >= 20, `${twisted} twisted verses on offer`);
+  // The same day always gives the same verse; the sky is never the verse's own.
+  const offers = LEVELS.map((level, index) => ({ index, level, rules: dailyRules(level, par[level.id]) }));
+  assert.deepEqual(pickDaily("2026-09-27", offers), pickDaily("2026-09-27", offers));
+  for (const day of ["2026-09-27", "2026-09-28", "2026-12-25"]) {
+    const pick = pickDaily(day, offers)!;
+    assert.notEqual(pick.weather, LEVELS[pick.index]!.weather ?? "dusk");
+  }
+});
+
 test("mayhem is tallied until the crack and not a moment after", async () => {
   const game = await Game.create(arena((mason) => perchAt(0, mason.wall("oak", 0, -1, 2, 7), -1)));
   await stepUntilReady(game);
@@ -1039,7 +1066,7 @@ test("every verse's side challenge can be done: a recorded line cracks him with 
     "the-queens-billiards": [S("shot", -6.5, 5, -1), S("shot", 6.5, 4.8, -1), S("shot", 6.5, 5, -1)],
     "remember-remember": [S("shot", 2.75, 2.13, 0.15), S("bomb", 1.48, 0.28, -2.6)],
     "the-keep": [S("shot", -8.32, 3.25, 1.2), S("shell", -0.51, 2.9, -2.2)],
-    "the-encore": [S("shot", -12, 0.2, 6), S("shell", 12, 0.2, 6), S("grape", -12, 0.2, 5), S("chain", 12, 0.3, 5), S("bomb", -0.51, 3.45, -2.4, 2.5)],
+    "the-encore": [S("shot", 12, 0.2, 6), S("shell", -12, 0.2, 6), S("grape", 12, 0.2, 5), S("chain", -12, 0.3, 5), S("bomb", -0.51, 3.45, -2.4, 1)],
     "ring-of-roses": [S("shot", 0, 1, 1), S("shot", 3.2, 1, -2.2), S("shot", 6.6, 0.85, 0.2), H("shot", 0, 0.2, 0)],
     "ride-a-cock-horse": [S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.48, 4.35, -4.74)],
     "came-tumbling-after": [S("bomb", 1.8, 0.402, -3.75)],

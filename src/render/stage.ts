@@ -1,4 +1,5 @@
 import * as pc from "playcanvas";
+import { CURIOS, MOON_BITE } from "../sim/curios.js";
 import { STAGE } from "../sim/game.js";
 import { hashUnit, palette, type Kit } from "./kit.js";
 
@@ -72,9 +73,23 @@ export function buildStage(kit: Kit, parent: pc.Entity): StageSet {
     kit.primitive("sky-band", "box", root, V(0, mid, backZ), { x: width + 8, y: height + 0.02, z: 0.1 }, kit.material(`sky-${band}`, color, 0.02), pc.Vec3.ZERO, false);
   }
   const moonMaterial = kit.material("moon", new pc.Color(0.95, 0.85, 0.55), 0.2, 0, { emissive: new pc.Color(0.55, 0.45, 0.22) });
-  const moon = kit.group("moon", root, V(-9, 11.5, backZ + 0.12));
+  const moonAt = CURIOS.find((curio) => curio.id === "moon")!.at;
+  const moon = kit.group("moon", root, V(moonAt.x, moonAt.y, backZ + 0.12));
   kit.primitive("moon-disc", "cylinder", moon, V(), { x: 2.1, y: 0.05, z: 2.1 }, moonMaterial, V(90, 0, 0), false);
-  kit.primitive("moon-bite", "cylinder", moon, V(0.65, 0.3, 0.04), { x: 1.8, y: 0.05, z: 1.8 }, kit.material("moon-shadow", new pc.Color(0.075, 0.13, 0.17), 0.02), V(90, 0, 0), false);
+  // The bite is painted the colour of the sky behind it (the weather repaints it with the sky).
+  kit.primitive("moon-bite", "cylinder", moon, V(MOON_BITE.x, MOON_BITE.y, 0.04), { x: MOON_BITE.radius * 2, y: 0.05, z: MOON_BITE.radius * 2 }, kit.material("moon-shadow", new pc.Color(0.075, 0.13, 0.17), 0.02), V(90, 0, 0), false);
+  // The man in the moon, in profile along the crescent's inner edge, gazing into the bite: a nose
+  // that pokes out past the edge, a closed eye and a small smile, a shade darker than the moon.
+  const toBite = Math.hypot(MOON_BITE.x, MOON_BITE.y);
+  const ux = MOON_BITE.x / toBite;
+  const uy = MOON_BITE.y / toBite;
+  const edge = { x: MOON_BITE.x - ux * MOON_BITE.radius, y: MOON_BITE.y - uy * MOON_BITE.radius };
+  const onFace = (along: number, up: number, z: number): pc.Vec3 => V(edge.x + ux * along - uy * up, edge.y + uy * along + ux * up, z);
+  const facing = Math.atan2(uy, ux) * (180 / Math.PI);
+  const feature = kit.material("moon-feature", new pc.Color(0.62, 0.46, 0.24), 0.2, 0, { emissive: new pc.Color(0.26, 0.18, 0.06) });
+  kit.primitive("moon-nose", "cone", moon, onFace(0.08, 0.02, 0.09), { x: 0.22, y: 0.28, z: 0.06 }, moonMaterial, V(0, 0, facing - 90), false);
+  kit.primitive("moon-eye", "box", moon, onFace(-0.14, 0.24, 0.035), { x: 0.16, y: 0.045, z: 0.02 }, feature, V(0, 0, facing - 18), false);
+  kit.primitive("moon-mouth", "box", moon, onFace(-0.09, -0.21, 0.035), { x: 0.18, y: 0.045, z: 0.02 }, feature, V(0, 0, facing + 22), false);
   const star = kit.material("star", new pc.Color(1, 0.95, 0.75), 0.2, 0, { emissive: new pc.Color(0.8, 0.72, 0.45) });
   for (let index = 0; index < 26; index += 1) {
     const x = (hashUnit(`sx${index}`) - 0.5) * (width + 4);
