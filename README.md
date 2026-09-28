@@ -23,7 +23,7 @@ unlock every verse.
   Off a bronze bumper the arc keeps going, so you can line up a bank shot. The gold ring on the
   rug marks the gun that will fire, and you can see what it's loaded with in its mouth.
 - **Fire:** click. On touch screens, tap to aim and tap **Fire**. A tap aims right where it lands;
-  then drag anywhere on the stage to nudge the sight from where it is, at half the speed of your
+  then drag anywhere on the stage to nudge the sight from where it is, at 70% of the speed of your
   finger, for fine aim (your finger never covers the target or has to reach the edge).
 - **Look around:** drag, the arrow buttons by the tray, or **←/→**. Scroll to zoom (on a phone, two
   fingers look around and a pinch zooms). **C** resets the view. The opening view stands back far

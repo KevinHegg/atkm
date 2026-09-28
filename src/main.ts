@@ -1216,7 +1216,7 @@ const pointers = new Map<number, { x: number; y: number; startX: number; startY:
  * anywhere nudges it from where it is, by this fraction of the drag: fine aim, and the finger
  * never has to cover the target or reach for the edge of the screen.
  */
-const NUDGE = 0.5;
+const NUDGE = 0.7;
 /** A finger is nudging the sight just now (its ring shows where the shot will aim). */
 let nudging = false;
 /** More than one finger has been down since the screen was last clear: no tap, whatever lifts last. */
