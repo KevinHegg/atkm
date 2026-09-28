@@ -343,7 +343,7 @@ function theEncore(): LevelDef {
     hint: "Nothing fired straight at him gets through the gilt trellis, and shells burst on his canopy. Blow the canopy away first, then drop something on him from above. Or give him the greatest fall of all from below.",
     ammo: { bomb: 2, shell: 2, shot: 5, chain: 2, grape: 3 },
     greatFall: 4.6,
-    mayhem: 1175,
+    mayhem: 1075,
     star: { curio: "pie" },
     humpty: perchAt(0, y, -2.4),
     pieces: m.pieces,

@@ -20,8 +20,9 @@ export const CURIOS: ReadonlyArray<{ id: CurioId; at: Vec3; size: Vec3 }> = [
   { id: "box", at: { x: 10.2, y: 5.3, z: -7.3 }, size: { x: 2.4, y: 2.6, z: 2.2 } },
   // ...and the merry old soul himself, on his throne in the middle of it: a target of his own.
   { id: "king", at: { x: 10.15, y: 5.3, z: -7.2 }, size: { x: 1.1, y: 1.6, z: 0.9 } },
-  // Sing a song of sixpence: the King's supper, a pie on a gilt platter, flown in over stage right.
-  { id: "pie", at: { x: 7.6, y: 6.2, z: -2.2 }, size: { x: 0.9, y: 0.5, z: 0.9 } },
+  // Sing a song of sixpence: the King's supper, a pie on a gilt platter, flown in over stage right
+  // (well downstage of the royal box and left of it, so it never hangs in front of the King).
+  { id: "pie", at: { x: 6, y: 6.2, z: -1.2 }, size: { x: 0.9, y: 0.5, z: 0.9 } },
   // The box's stilts and bracing: shake them and the whole box rattles.
   { id: "tower", at: { x: 10.2, y: 2, z: -7.3 }, size: { x: 2.3, y: 4, z: 2.1 } },
   // The two stagehands at the fly line beside it, who work the hoist.

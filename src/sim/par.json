@@ -109,11 +109,11 @@
     {
       "ammo": "bomb",
       "at": {
-        "x": -0.51,
+        "x": 0,
         "y": 3.45,
         "z": -2.4
       },
-      "wait": 2.5
+      "wait": 0
     }
   ],
   "hanging-by-a-thread": [
