@@ -295,6 +295,7 @@ export class Company {
     let position: pc.Vec3;
     let facing: number;
     let scrub = 0;
+    let mopping = false;
     if (t < walk) {
       position = new pc.Vec3().lerp(wing, job.at, t / walk);
       facing = Math.atan2(job.at.x - wing.x, job.at.z - wing.z);
@@ -302,6 +303,7 @@ export class Company {
       position = job.at.clone();
       facing = Math.atan2(-0.7, -0.4);
       scrub = Math.sin((t - walk) * 9);
+      mopping = true;
     } else if (t < walk * 2 + mop) {
       position = new pc.Vec3().lerp(job.at, wing, (t - walk - mop) / walk);
       facing = Math.atan2(wing.x - job.at.x, wing.z - job.at.z);
@@ -316,10 +318,14 @@ export class Company {
     const stride = scrub ? 0 : Math.sin(now * 14);
     hand.legL.setLocalEulerAngles(stride * 35, 0, 0);
     hand.legR.setLocalEulerAngles(-stride * 35, 0, 0);
-    hand.armL.setLocalEulerAngles(55 + scrub * 12, 0, 20);
-    hand.armR.setLocalEulerAngles(55 + scrub * 12, 0, -20);
-    this.mop.setLocalEulerAngles(0, scrub * 30, 0);
+    // He carries the mop out in front, and mops the mess in front of him: stooped a little, arms
+    // reaching forward, the mop head swishing on the boards just ahead of his feet.
+    const reach = mopping ? -30 + scrub * 8 : -15;
+    hand.armL.setLocalEulerAngles(reach, 0, 20);
+    hand.armR.setLocalEulerAngles(reach, 0, -20);
+    this.mop.setLocalEulerAngles(mopping ? 40 : 20, scrub * 30, 0);
     hand.body.setLocalPosition(0, Math.abs(stride) * 0.05, 0);
+    hand.body.setLocalEulerAngles(mopping ? 10 : 0, 0, 0);
   }
 
   private animateKing(now: number): void {
