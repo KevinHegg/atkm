@@ -54,7 +54,9 @@ const DEG = 180 / Math.PI;
  * back (m); and a verse looked at more steeply than `steep` is looked at this much less steeply
  * (degrees), with the aim point this much higher and nearer the house (m), so the footlights show.
  */
-const STAND_BACK = { distance: 22, steep: -16, pitch: 1.5, up: 0.4, forward: 0.5 };
+const STAND_BACK = { distance: 23, steep: -16, pitch: 1.5, up: 0.4, forward: 0.5 };
+/** How much of the set a 16:10 laptop sees across (degrees): squarer landscape screens match it. */
+const WIDE_ACROSS = 63.6;
 /** Bodies that last the whole verse: worth batching. Shots and debris come and go too often. */
 const BATCHED = new Set<string>(["block", "hay", "keg", "fixture", "man", "horse", "litter", "turntable", "bucket", "sandbag", "peel", "mousetrap"]);
 const SWEAT = new pc.Color(0.55, 0.78, 0.95);
@@ -1972,12 +1974,12 @@ export class StageView {
   private updateCamera(dt: number): void {
     const game = this.game;
     const level = game?.level.view ?? { yaw: 0, pitch: -14, distance: 20, target: { x: 0, y: 2.2, z: -1 } };
+    const portrait = this.host.clientWidth / Math.max(1, this.host.clientHeight) < 0.8;
     let yaw = level.yaw + this.userYaw;
     // A tall phone screen is narrow: stand a little further back (though not so far that the Queen's
     // gun is lost in the middle of the screen: it sits just above the tray, as on a laptop). Anywhere else,
     // stand back and look a little less steeply, so the whole toy theatre is in view: the moon on the
     // backdrop, the stagehands in the wings, and the Queen at her gun by the footlights.
-    const portrait = this.host.clientWidth / Math.max(1, this.host.clientHeight) < 0.8;
     const lift = !portrait && level.pitch < STAND_BACK.steep;
     let pitch = level.pitch + (lift ? STAND_BACK.pitch : 0) + this.userPitch;
     let distance = (portrait ? Math.min(level.distance * 1.2, 30) : Math.max(level.distance, STAND_BACK.distance)) + this.userZoom;
@@ -2047,7 +2049,10 @@ export class StageView {
     );
     this.camera.lookAt(this.camTarget);
     const aspect = this.host.clientWidth / Math.max(1, this.host.clientHeight);
-    this.camera.camera!.fov = aspect < 0.8 ? 56 : aspect < 1.2 ? 46 : 40;
+    // A landscape screen squarer than a laptop's sees as much of the set across as a laptop does
+    // (the well and the wings included): a taller lens, up to 50°.
+    const across = 2 * Math.atan(Math.tan((WIDE_ACROSS / 2) / DEG) / aspect) * DEG;
+    this.camera.camera!.fov = aspect < 0.8 ? 56 : aspect < 1.2 ? 46 : Math.min(50, Math.max(42, across));
   }
 
   /** The replay's ball-cam: the newest munition still flying (not one lying about on the boards). */
