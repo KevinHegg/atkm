@@ -44,8 +44,10 @@ Core promises:
   reads it, so it can't bend a shot or break a replay. The sky bands, stars and clouds are
   shared materials repainted per verse (they're static-batched: recolour, don't toggle).
 - Royal difficulty is a per-player setting (`progress.royal`): the view draws half the aim arc
-  and no markers, the Astrologer and Humpty's tells are off, and a crack with it on from the
-  verse's start earns a crown (`progress.crowns`).
+  and no markers, the Astrologer and Humpty's tells are off. Stars won with it on from the verse's
+  start are royal stars too (`progress.royalStars`, the best count per verse, shown as a red inset
+  on the gold); all three in Royal is the verse's crown, and all `LEVELS.length * 3` royal stars
+  play the Royal Command Performance once (`progress.royalFinale`). Old crowns load as one royal star.
 - Side challenges (`src/sim/challenges.ts`) are judged in the simulation at the crack
   (`judgeChallenge`), from the bill and a few counters; like stars, they count only if he
   cracks. Each is proved possible by a recorded line in the tests, and no verse's par line
@@ -87,7 +89,7 @@ Core promises:
 - The Verse of the Day (`src/sim/daily.ts`) plays a verse under a twist and another sky. It never
   reads the clock (the day comes in as a string) and offers only twists its par line still wins
   under (`dailyRules`; tests replay each). It keeps its own record (`progress.daily`) and touches
-  none of the verse's stars, bests, star traces, challenges or crowns. Re-check it after re-solving.
+  none of the verse's stars, bests, star traces, challenges or royal stars. Re-check it after re-solving.
   The verses screen's second tab lists the last `DAILY_BACK` days' verses to play; a day first done
   after its date is recorded `late` and doesn't count towards the streak.
 - Where it makes sense, a verse's title points to its hidden star (Hey Diddle Diddle's moon,

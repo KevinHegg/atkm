@@ -35,14 +35,15 @@ interface Progress {
   /** Best mayhem per verse. */
   best: Record<string, number>;
   muted: boolean;
-  /** The Grand Finale has been played for this player. */
+  /** The Grand Finale has been played for this player (and the Royal Command Performance). */
   finale?: boolean;
+  royalFinale?: boolean;
   /** Side challenges done, per verse. */
   challenges?: Record<string, true>;
   /** Royal difficulty is on: half an aim arc, no markers, no Astrologer. */
   royal?: boolean;
-  /** Verses cracked with Royal difficulty on. */
-  crowns?: Record<string, true>;
+  /** The most stars each verse has been won with in Royal difficulty (all three: its crown). */
+  royalStars?: Record<string, number>;
   /** Named trick shots pulled off, anywhere. */
   tricks?: Partial<Record<TrickKind, true>>;
   /** Where the shot that found each verse's hidden star flew (x, y, z, ...), traced in gold next time. */
@@ -73,7 +74,10 @@ function loadProgress(): Progress {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Progress>;
-      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), crowns: parsed.crowns ?? {}, tricks: parsed.tricks ?? {}, starTraces: parsed.starTraces ?? {}, daily: parsed.daily ?? {} };
+      // Crowns used to mean a verse cracked in Royal: that's one royal star at least.
+      const royalStars = { ...(parsed.royalStars ?? {}) };
+      for (const id of Object.keys((parsed as { crowns?: Record<string, true> }).crowns ?? {})) royalStars[id] = Math.max(royalStars[id] ?? 0, 1);
+      return { stars: parsed.stars ?? {}, best: parsed.best ?? {}, muted: Boolean(parsed.muted), finale: Boolean(parsed.finale), royalFinale: Boolean(parsed.royalFinale), challenges: parsed.challenges ?? {}, royal: Boolean(parsed.royal), royalStars, tricks: parsed.tricks ?? {}, starTraces: parsed.starTraces ?? {}, daily: parsed.daily ?? {} };
     }
   } catch {
     // Storage can be unavailable (private windows, embedded previews); progress is then per-session.
@@ -210,8 +214,13 @@ function later(seconds: number, action: () => void): void {
 
 /** The best mayhem before this attempt, so the result can say whether it was beaten. */
 let previousBest = 0;
-/** The last of all the stars has just been won: the finale plays instead of the usual result. */
-let finalePending = false;
+/**
+ * The last of all the stars has just been won: the finale plays instead of the usual result (the
+ * Royal Command Performance, when it's the last of all the royal stars).
+ */
+let finalePending: false | "grand" | "royal" = false;
+/** Which finale is playing (for its curtain call). */
+let finaleRoyal = false;
 
 /** Small numbers as the Queen would say them: 60 is "sixty", 48 "forty-eight". */
 function inWords(n: number): string {
@@ -226,23 +235,44 @@ function totalStars(): number {
   return LEVELS.reduce((sum, level) => sum + (progress.stars[level.id] ?? 0), 0);
 }
 
-/** The Grand Finale: the Queen marches to the broken egg and plants her standard. */
-function startFinale(): void {
+function totalRoyalStars(): number {
+  return LEVELS.reduce((sum, level) => sum + (progress.royalStars?.[level.id] ?? 0), 0);
+}
+
+/**
+ * The Grand Finale: the Queen marches to the broken egg and plants her standard. With every star
+ * won in Royal too, it's the Royal Command Performance, grander still.
+ */
+function startFinale(royal = finalePending === "royal"): void {
   finalePending = false;
-  $("#finale-kicker").textContent = `All ${inWords(LEVELS.length * 3)} stars`;
+  finaleRoyal = royal;
+  const all = inWords(LEVELS.length * 3);
+  $("#finale-kicker").textContent = royal ? `All ${all} royal stars` : `All ${all} stars`;
+  $("#finale-title").textContent = royal ? "The Royal Command Performance" : "The Queen Takes the Stage";
+  $("#finale-couplet").textContent = royal
+    ? "Humpty Dumpty sat on a wall; the Queen, by royal command, outshot them all."
+    : "Humpty Dumpty sat on a wall; the Queen brought her cannon and cracked him, once and for all.";
+  $("#finale-screen .finale-stars").classList.toggle("royal", royal);
   progress.finale = true;
+  if (royal) progress.royalFinale = true;
   saveProgress();
   for (const bubble of [...bubbles]) dismissBubble(bubble);
   $("#toast").replaceChildren();
   $("#popups").replaceChildren();
   show("finale");
   $("#hud-top").hidden = true;
-  view.startFinale();
+  view.startFinale(royal);
   audio.fanfare();
   audio.applause(4);
   window.setTimeout(() => screen === "finale" && audio.fanfare(), 4600);
   window.setTimeout(() => screen === "finale" && audio.applause(6), 4800);
-  window.setTimeout(() => screen === "finale" && say("queen", `All ${inWords(LEVELS.length * 3)}! The stage is MINE.`, 4), 5200);
+  window.setTimeout(() => screen === "finale" && say("queen", royal ? `All ${all} royal stars! Kneel, the lot of you.` : `All ${all}! The stage is MINE.`, 4), 5200);
+  if (royal) {
+    // The great star comes down to a roll of drums and one more fanfare, and the house goes wild.
+    window.setTimeout(() => screen === "finale" && audio.drumroll(), 5600);
+    window.setTimeout(() => screen === "finale" && audio.fanfare(), 8200);
+    window.setTimeout(() => screen === "finale" && audio.applause(8), 8400);
+  }
 }
 
 function recordStars(current: Game): void {
@@ -268,10 +298,11 @@ function recordStars(current: Game): void {
   progress.stars[id] = Math.max(progress.stars[id] ?? 0, current.stars().count);
   progress.best[id] = Math.max(progress.best[id] ?? 0, current.mayhem.total);
   if (current.challengeMet) (progress.challenges ??= {})[id] = true;
-  if (royalRun) (progress.crowns ??= {})[id] = true;
+  if (royalRun) (progress.royalStars ??= {})[id] = Math.max(progress.royalStars?.[id] ?? 0, current.stars().count);
   for (const trick of current.tricks) (progress.tricks ??= {})[trick] = true;
   // Marked as seen only once it actually plays (a restart or reload before then keeps it owed).
-  if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = true;
+  if (!progress.royalFinale && totalRoyalStars() === LEVELS.length * 3) finalePending = "royal";
+  else if (!progress.finale && totalStars() === LEVELS.length * 3) finalePending = "grand";
   saveProgress();
 }
 
@@ -552,6 +583,7 @@ function renderLevelList(): void {
   let total = 0;
   let challenges = 0;
   let crowns = 0;
+  let royalTotal = 0;
   LEVELS.forEach((level, index) => {
     const stars = progress.stars[level.id] ?? 0;
     total += stars;
@@ -562,9 +594,13 @@ function renderLevelList(): void {
     const best = progress.best[level.id];
     const challenged = Boolean(progress.challenges?.[level.id]);
     if (challenged) challenges += 1;
-    const crowned = Boolean(progress.crowns?.[level.id]);
+    // Stars won in Royal difficulty wear a red star inset (they're stars won all the same); all
+    // three in Royal win the verse its crown.
+    const royal = progress.royalStars?.[level.id] ?? 0;
+    royalTotal += royal;
+    const crowned = royal >= 3;
     if (crowned) crowns += 1;
-    button.innerHTML = `<span class="numeral">Verse ${numeral(index)}</span><span class="name"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>${best ? `<span class="best">Best ${best.toLocaleString("en-GB")}</span>` : ""}${crowned ? `<i class="crown lit" title="Won with Royal difficulty"></i>` : ""}${challenged ? `<i class="rosette lit" title="Side challenge done"></i>` : ""}</span>`;
+    button.innerHTML = `<span class="numeral">Verse ${numeral(index)}</span><span class="name"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}${star < royal ? " royal" : ""}"></i>`).join("")}</span>${best ? `<span class="best">Best ${best.toLocaleString("en-GB")}</span>` : ""}${crowned ? `<i class="crown lit" title="All three stars won in Royal"></i>` : ""}${challenged ? `<i class="rosette lit" title="Side challenge done"></i>` : ""}</span>`;
     button.querySelector(".name")!.textContent = button.disabled ? "Locked" : level.title;
     item.classList.toggle("complete", stars === 3);
     button.addEventListener("click", () => {
@@ -577,7 +613,7 @@ function renderLevelList(): void {
   });
   const all = total === LEVELS.length * 3;
   const tricks = Object.keys(progress.tricks ?? {}).length;
-  $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "") + (crowns ? ` · ${crowns} won in Royal` : "") + (tricks ? ` · ${tricks} of ${Object.keys(TRICKS).length} trick shots` : "");
+  $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "") + (royalTotal ? ` · ${royalTotal} of ${LEVELS.length * 3} in Royal${crowns ? ` (${crowns} crown${crowns === 1 ? "" : "s"})` : ""}` : "") + (tricks ? ` · ${tricks} of ${Object.keys(TRICKS).length} trick shots` : "");
   $("#royal-toggle").setAttribute("aria-pressed", String(Boolean(progress.royal)));
   $("#royal-note").hidden = !progress.royal;
   $("#star-total").classList.toggle("all", all);
@@ -798,7 +834,9 @@ function showResult(): void {
   recordStars(current);
   $("#result-kicker").textContent = daily ? `Verse of the Day · ${dayLabel(daily.day)} · ${level.title}` : `Verse ${numeral(levelIndex)} · ${level.title}`;
   $("#result-title").textContent = won ? "Humpty had a great fall" : "All the King's men win";
-  $("#result-stars").innerHTML = [0, 1, 2].map((star) => `<i class="star${star < stars.count ? " lit" : ""}"></i>`).join("");
+  // Won in Royal difficulty (not a Verse of the Day's Royal Rules), each star wears its red inset.
+  const royalWin = royalRun && !daily;
+  $("#result-stars").innerHTML = [0, 1, 2].map((star) => `<i class="star${star < stars.count ? " lit" : ""}${royalWin && star < stars.count ? " royal" : ""}"></i>`).join("");
   showChallenge($("#result-challenge"), level, won && current.challengeMet, won && current.challengeMet ? "Side challenge done" : undefined);
   const dailyLine = $("#result-daily");
   dailyLine.hidden = !daily;
@@ -1518,7 +1556,7 @@ function revealFinaleCard(): void {
 $("#finale-again").addEventListener("click", () => {
   audio.click();
   $("#finale-screen").hidden = true;
-  view.startFinale();
+  view.startFinale(finaleRoyal);
   audio.fanfare();
   audio.applause(4);
 });
@@ -2164,8 +2202,8 @@ declare global {
       screen: () => Screen;
       start: (index: number) => Promise<void>;
       advance: (seconds: number) => void;
-      /** Play the Grand Finale now (for testing). */
-      finale: () => void;
+      /** Play the Grand Finale (or the Royal Command Performance) now, for testing. */
+      finale: (royal?: boolean) => void;
     };
   }
 }
@@ -2175,8 +2213,8 @@ window.__GREAT_FALL__ = {
   pointer,
   screen: () => screen,
   start: startLevel,
-  finale: () => {
-    if (screen === "play" || screen === "result") startFinale();
+  finale: (royal = false) => {
+    if (screen === "play" || screen === "result") startFinale(royal);
   },
   /** Fast-forward for automated checks when the tab is not painting frames. */
   advance: (seconds: number) => {

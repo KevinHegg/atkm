@@ -805,6 +805,19 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 }
 
 .star.lit { background: var(--gold-dark); }
+/* Won in Royal difficulty: a smaller crimson star set into the gold one. */
+.star { position: relative; }
+.star.royal::after,
+.finale-stars.royal .star::after {
+  content: "";
+  position: absolute;
+  left: 25%;
+  top: 27%;
+  width: 50%;
+  height: 50%;
+  background: var(--crimson);
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
 
 /* A side challenge's rosette: a ribboned prize, pale until it's won. */
 .rosette {

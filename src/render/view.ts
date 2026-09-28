@@ -404,6 +404,8 @@ export class StageView {
     this.swap = 0;
     this.company.reset();
     this.finale = undefined;
+    if (this.greatStar) this.greatStar.enabled = false;
+    if (this.greatStarLight) this.greatStarLight.enabled = false;
     this.queenFlag.enabled = false;
     this.queen.root.setPosition(QUEEN_SPOT.x, QUEEN_SPOT.y, QUEEN_SPOT.z);
     this.queen.body.setLocalPosition(0, 0, 0);
@@ -1179,10 +1181,15 @@ export class StageView {
     else this.queenTalk = seconds;
   }
 
-  /** All forty-eight stars: the Queen marches to the broken egg and plants her standard. */
-  startFinale(): void {
+  /**
+   * All the stars: the Queen marches to the broken egg and plants her standard. All the royal stars
+   * (`royal`): the Royal Command Performance, the same and grander: twice the fireworks in crimson
+   * and gold, confetti the length of the stage, the King and his fiddlers cheering, and a great
+   * gilt star let down from the flies over her.
+   */
+  startFinale(royal = false): void {
     const at = this.crackAt ?? V(0, 0, -2);
-    this.finale = { age: 0, to: V(at.x + 1.3, 0, at.z + 1.1), nextBurst: 4.6, showered: false };
+    this.finale = { age: 0, to: V(at.x + 1.3, 0, at.z + 1.1), nextBurst: 4.6, showered: false, royal, showers: 0, cheered: 0 };
     this.queenFlag.enabled = true;
     this.cameraMode = "finale";
   }
@@ -1225,20 +1232,53 @@ export class StageView {
     this.queenFlagCloth.setLocalEulerAngles(0, Math.sin(t * 5) * 14, Math.sin(t * 3.3) * 4);
     queen.head.setLocalEulerAngles(0, marching ? 0 : Math.sin(t * 2) * 12, -7);
     // Fireworks over the painted sky, and paper confetti from the flies.
-    if (t > finale.nextBurst && t < 13) {
-      finale.nextBurst = t + 0.35 + Math.random() * 0.35;
-      this.firework(V((Math.random() - 0.5) * 18, 8 + Math.random() * 5, -9 + Math.random() * 5));
+    if (t > finale.nextBurst && t < (finale.royal ? 18 : 13)) {
+      finale.nextBurst = t + (0.35 + Math.random() * 0.35) * (finale.royal ? 0.5 : 1);
+      this.firework(V((Math.random() - 0.5) * 18, 8 + Math.random() * 5, -9 + Math.random() * 5), finale.royal);
     }
     if (!finale.showered && t > walk + 0.7) {
       finale.showered = true;
       this.confetti({ x: finale.to.x, y: 0, z: finale.to.z });
     }
+    if (finale.royal) this.royalFinale(finale, t, walk);
     return true;
   }
 
+  /** The Royal Command Performance's extras, on top of the Grand Finale. */
+  private royalFinale(finale: NonNullable<StageView["finale"]>, t: number, walk: number): void {
+    // Confetti the length of the stage, a shower at a time.
+    const showers = [-7, 7, 0, -3.5, 3.5];
+    if (finale.showers < showers.length && t > walk + 1.4 + finale.showers * 1.1) {
+      this.confetti({ x: showers[finale.showers]!, y: 0, z: -2 });
+      finale.showers += 1;
+    }
+    // Old King Cole and his fiddlers cheer her on.
+    if (t > walk && t > finale.cheered) {
+      finale.cheered = t + 3.4;
+      this.company.kingReacts("cheer", this.elapsed);
+    }
+    // A great gilt star is let down from the flies over her, turning and glowing.
+    if (!this.greatStar) {
+      this.greatStar = this.buildStar(this.effects);
+      this.greatStar.setLocalScale(3.2, 3.2, 3.2);
+      this.greatStarLight = new pc.Entity("great-star-light");
+      this.greatStarLight.addComponent("light", { type: "omni", color: new pc.Color(1, 0.8, 0.35), intensity: 3.5, range: 14, castShadows: false });
+      this.effects.addChild(this.greatStarLight);
+    }
+    const down = Math.min(1, Math.max(0, (t - walk - 1) / 3));
+    const ease = down * down * (3 - 2 * down);
+    const y = 16 - ease * 9.2 + Math.sin(t * 1.6) * 0.15 * ease;
+    this.greatStar.enabled = t > walk + 1;
+    this.greatStar.setPosition(finale.to.x - 0.4, y, finale.to.z - 1.6);
+    this.greatStar.setLocalEulerAngles(0, t * 40, 0);
+    this.greatStarLight!.enabled = this.greatStar.enabled;
+    this.greatStarLight!.setPosition(finale.to.x - 0.4, y - 0.6, finale.to.z - 0.8);
+    this.greatStarLight!.light!.intensity = 3.5 * ease;
+  }
+
   /** A firework: a flash and a ring of coloured sparks. */
-  private firework(at: pc.Vec3): void {
-    const colours = [palette.gold, palette.king, palette.queen, palette.cream, new pc.Color(0.35, 0.5, 0.95)];
+  private firework(at: pc.Vec3, royal = false): void {
+    const colours = royal ? [palette.gold, palette.king, palette.gold, palette.cream] : [palette.gold, palette.king, palette.queen, palette.cream, new pc.Color(0.35, 0.5, 0.95)];
     const colour = colours[Math.floor(Math.random() * colours.length)]!;
     this.flash({ x: at.x, y: at.y, z: at.z }, 1.2);
     for (let index = 0; index < 24; index += 1) {
@@ -1618,7 +1658,10 @@ export class StageView {
   private trapRing: { root: pc.Entity; leaves: pc.Entity[]; pit: pc.Entity } | undefined;
   private readonly chutes: pc.Entity[] = [];
   /** The Grand Finale: the Queen marches to centre stage and plants her flag. */
-  private finale: { age: number; to: pc.Vec3; nextBurst: number; showered: boolean } | undefined;
+  private finale: { age: number; to: pc.Vec3; nextBurst: number; showered: boolean; royal: boolean; showers: number; cheered: number } | undefined;
+  /** The Royal Command Performance's great gilt star, and its glow (made the first time it plays). */
+  private greatStar: pc.Entity | undefined;
+  private greatStarLight: pc.Entity | undefined;
   private readonly queenFlag: pc.Entity;
   private readonly queenFlagCloth: pc.Entity;
   /** A warm glow that goes up with a released star. */

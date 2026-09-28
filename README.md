@@ -75,7 +75,10 @@ unlock every verse.
   figure down with a munition and the star floats up off the stage. Like the others, it
   only counts if he cracks. Watch for the occasional glint. Your best mayhem per verse is kept.
 - **The Grand Finale.** Win all sixty stars (three in each of the twenty verses)
-  and the Queen herself takes centre stage to plant her standard beside the broken egg.
+  and the Queen herself takes centre stage to plant her standard beside the broken egg. Win
+  all sixty again in Royal difficulty for the **Royal Command Performance**: twice the
+  fireworks, in crimson and gold, confetti the length of the stage, Old King Cole cheering,
+  and a great gilt star let down from the flies over her.
 - **A great fall** (at least the verse's height, shown by the surveyor's line) earns a
   mayhem bonus on top of the crack.
 - **Treasure chests.** Every verse has an iron-bound chest of spare powder somewhere on
@@ -187,8 +190,9 @@ unlock every verse.
 - **Royal difficulty.** For players who have learned the physics: switch it on from the verse
   list (the crown button). The aim arc shows only its first half, with no ring where the shot
   lands, no red ring on Humpty, no Astrologer, and Humpty gives nothing away when you aim at
-  him. A verse cracked with Royal on from the start earns a crown on the verse list. While
-  it's on, a note under the verses screen's header says so.
+  him. Stars won with Royal on from the start wear a small red star inset on the verse list
+  and the result card (they count as ordinary stars too); all three in Royal win the verse its
+  crown. While it's on, a note under the verses screen's header says so.
 - **Weather.** Every verse has its own painted sky: dusk, dawn, day or night, paper rain on
   strings, a storm (lightning on the backdrop and a stagehand rattling the thunder sheet), or
   paper snow. It's scenery and sound only: no shot flies any differently.
