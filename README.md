@@ -16,7 +16,8 @@ npm run dev
 ```
 
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Add `?all` to the URL to
-unlock every verse.
+unlock every verse. Add `?finale` (or `?finale=royal`) to watch the Grand Finale (or the Royal Command
+Performance) straight away, as a preview: it saves nothing, so the real one still plays when won.
 
 - **Aim:** point at anything, including the curios in the scenery (a gold ring shows the shot
   will pass through one). A dotted arc shows the shot, and a red ring means it hits Humpty.

@@ -95,6 +95,8 @@ function saveProgress(): void {
 
 const progress = loadProgress();
 const unlockAll = new URLSearchParams(location.search).has("all");
+/** `?finale` or `?finale=royal` in the address plays that finale as a preview, saving nothing. */
+const finalePreview = new URLSearchParams(location.search).get("finale");
 const audio = new TheatreAudio(BASE);
 audio.setMuted(progress.muted);
 document.documentElement.classList.toggle("muted", progress.muted);
@@ -241,9 +243,10 @@ function totalRoyalStars(): number {
 
 /**
  * The Grand Finale: the Queen marches to the broken egg and plants her standard. With every star
- * won in Royal too, it's the Royal Command Performance, grander still.
+ * won in Royal too, it's the Royal Command Performance, grander still. A `preview` (for trying it
+ * out) leaves the player's record alone, so the real one still plays when it's won.
  */
-function startFinale(royal = finalePending === "royal"): void {
+function startFinale(royal = finalePending === "royal", preview = false): void {
   finalePending = false;
   finaleRoyal = royal;
   const all = inWords(LEVELS.length * 3);
@@ -253,9 +256,11 @@ function startFinale(royal = finalePending === "royal"): void {
     ? "Humpty Dumpty sat on a wall; the Queen, by royal command, outshot them all."
     : "Humpty Dumpty sat on a wall; the Queen brought her cannon and cracked him, once and for all.";
   $("#finale-screen .finale-stars").classList.toggle("royal", royal);
-  progress.finale = true;
-  if (royal) progress.royalFinale = true;
-  saveProgress();
+  if (!preview) {
+    progress.finale = true;
+    if (royal) progress.royalFinale = true;
+    saveProgress();
+  }
   for (const bubble of [...bubbles]) dismissBubble(bubble);
   $("#toast").replaceChildren();
   $("#popups").replaceChildren();
@@ -2214,7 +2219,7 @@ window.__GREAT_FALL__ = {
   screen: () => screen,
   start: startLevel,
   finale: (royal = false) => {
-    if (screen === "play" || screen === "result") startFinale(royal);
+    if (screen === "play" || screen === "result") startFinale(royal, true);
   },
   /** Fast-forward for automated checks when the tab is not painting frames. */
   advance: (seconds: number) => {
@@ -2222,11 +2227,17 @@ window.__GREAT_FALL__ = {
   },
 };
 
-void loadGame(0).then(() => {
+void loadGame(0).then(async () => {
   view.setCameraMode("title");
   show("title");
   const play = $<HTMLButtonElement>("#play-button");
   play.disabled = false;
   play.textContent = Object.keys(progress.stars).length ? "Continue" : "Play";
   $<HTMLButtonElement>("#verses-button").disabled = false;
+  if (finalePreview !== null) {
+    // Straight to the finale on the first verse's stage, as a preview (nothing is saved).
+    await startLevel(0);
+    closeVerse();
+    startFinale(finalePreview === "royal", true);
+  }
 });
