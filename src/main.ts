@@ -1229,7 +1229,8 @@ function aimAt(x: number, y: number): void {
   pointer.inside = true;
 }
 
-canvas.addEventListener("pointerdown", (event) => {
+/** A press on the stage (or a right-button press on the HUD, passed on to the stage). */
+function pressStage(event: PointerEvent, aim = true): void {
   audio.unlock();
   canvas.setPointerCapture(event.pointerId);
   openTools(false);
@@ -1249,11 +1250,13 @@ canvas.addEventListener("pointerdown", (event) => {
       multiTouch = true;
       nudging = false;
     }
-  } else {
+  } else if (aim) {
     aimAt(event.clientX, event.clientY);
   }
   if (verseOpen) closeVerse();
-});
+}
+
+canvas.addEventListener("pointerdown", (event) => pressStage(event));
 
 canvas.addEventListener("pointermove", (event) => {
   const tracked = pointers.get(event.pointerId);
@@ -1317,11 +1320,24 @@ canvas.addEventListener("pointercancel", release);
 canvas.addEventListener("pointerleave", (event) => {
   if (event.pointerType === "mouse" && !pointers.size) pointer.inside = false;
 });
-canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-canvas.addEventListener("wheel", (event) => {
+const zoomWheel = (event: WheelEvent): void => {
   event.preventDefault();
   view.zoom(event.deltaY * 0.01);
-}, { passive: false });
+};
+canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+canvas.addEventListener("wheel", zoomWheel, { passive: false });
+// Over the tray, the tools and the verse plate, the right button and the wheel still work the
+// stage (drag to look round, click for the next shot, scroll to zoom), and the browser's own
+// menu never pops up.
+for (const hud of [$("#hud-bottom"), $("#hud-top")]) {
+  hud.addEventListener("contextmenu", (event) => event.preventDefault());
+  hud.addEventListener("wheel", zoomWheel, { passive: false });
+  hud.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "mouse" || event.button !== 2) return;
+    event.preventDefault();
+    pressStage(event, false);
+  });
+}
 
 window.addEventListener("keydown", (event) => {
   if (event.repeat && event.key !== " ") return;
