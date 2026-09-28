@@ -88,6 +88,8 @@ Core promises:
   reads the clock (the day comes in as a string) and offers only twists its par line still wins
   under (`dailyRules`; tests replay each). It keeps its own record (`progress.daily`) and touches
   none of the verse's stars, bests, star traces, challenges or crowns. Re-check it after re-solving.
+  The verses screen's second tab lists the last `DAILY_BACK` days' verses to play; a day first done
+  after its date is recorded `late` and doesn't count towards the streak.
 - Where it makes sense, a verse's title points to its hidden star (Hey Diddle Diddle's moon,
   Hanging by a Thread's spider, Came Tumbling After's well, Remember Remember's king).
 - After a crack the instant replay plays by itself, then the result card (or the finale). It

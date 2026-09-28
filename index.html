@@ -94,7 +94,10 @@
       <section id="levels-screen" class="screen" hidden>
         <div class="playbill wide">
           <header>
-            <h2>The Verses</h2>
+            <div class="verse-tabs" role="tablist" aria-label="Verses">
+              <button type="button" role="tab" id="tab-verses" aria-selected="true" aria-controls="level-list">The Verses</button>
+              <button type="button" role="tab" id="tab-daily" aria-selected="false" aria-controls="daily-list">Verses of the Day</button>
+            </div>
             <button type="button" id="daily-card" hidden>
               <i class="rosette"></i>
               <span class="daily-text"><span class="daily-kicker"></span><span class="daily-name"></span></span>
@@ -104,7 +107,9 @@
               <button type="button" id="levels-back">Back</button>
             </div>
           </header>
-          <ol id="level-list"></ol>
+          <p class="royal-note" id="royal-note" hidden><i class="crown lit" aria-hidden="true"></i><span>Royal difficulty is on for every verse: the aim arc shows only its first half, with no ring where the shot lands, and the Court Astrologer keeps his counsel. Crack a verse this way to win its crown. Press Royal again to turn it off.</span></p>
+          <ol id="level-list" class="verse-grid"></ol>
+          <ol id="daily-list" class="verse-grid" hidden></ol>
           <div class="levels-foot">
             <p class="controls" id="star-total"></p>
             <p class="build-tag" id="build-tag"></p>

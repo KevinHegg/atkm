@@ -92,9 +92,11 @@ unlock every verse.
   Royal difficulty goes without.
 - **Verse of the Day.** Each day one of the verses you've opened comes round again under a
   twist (Round Shot Only, Short Rations, Not a Round to Spare, or Royal Rules) and another
-  sky. It keeps its own record, lights a rosette on the verses screen when it's done, and
-  counts the days you've kept it up. Every twist a verse is offered is one its par line
-  still wins under.
+  sky: a new one every day, done or not. It keeps its own record, lights a rosette on the
+  verses screen when it's done, and counts the days you've kept it up. The **Verses of the
+  Day** tab on the verses screen lists today's and the nineteen before it, each to play; a
+  day played late lights its rosette but doesn't add to a run. Every twist a verse is offered
+  is one its par line still wins under.
 - **Ordnance:**
   - **Round shot** is a flat, heavy punch.
   - **Mortar shells** lob over walls and burst on contact.
@@ -185,7 +187,8 @@ unlock every verse.
 - **Royal difficulty.** For players who have learned the physics: switch it on from the verse
   list (the crown button). The aim arc shows only its first half, with no ring where the shot
   lands, no red ring on Humpty, no Astrologer, and Humpty gives nothing away when you aim at
-  him. A verse cracked with Royal on from the start earns a crown on the verse list.
+  him. A verse cracked with Royal on from the start earns a crown on the verse list. While
+  it's on, a note under the verses screen's header says so.
 - **Weather.** Every verse has its own painted sky: dusk, dawn, day or night, paper rain on
   strings, a storm (lightning on the backdrop and a stagehand rattling the thunder sheet), or
   paper snow. It's scenery and sound only: no shot flies any differently.

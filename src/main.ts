@@ -57,6 +57,8 @@ interface DailyDone {
   weather: Weather;
   stars: number;
   mayhem: number;
+  /** First done after its day was over (from the Verses of the Day tab): it doesn't count towards a run. */
+  late?: true;
 }
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string): T => {
@@ -253,7 +255,9 @@ function recordStars(current: Game): void {
     const done = progress.daily?.[daily.day];
     if (!done || stars > done.stars || (stars === done.stars && mayhem > done.mayhem)) {
       const days = (progress.daily ??= {});
-      days[daily.day] = { id: daily.level.id, rule: daily.rule, weather: daily.level.weather ?? "dusk", stars, mayhem };
+      // Done on its day, it stays on time however often it's bettered later; first done late, it's late.
+      const late = done ? done.late === true : daily.day !== dayKey(new Date());
+      days[daily.day] = { id: daily.level.id, rule: daily.rule, weather: daily.level.weather ?? "dusk", stars, mayhem, ...(late ? { late } : {}) };
       // A couple of months is plenty for the streak.
       for (const day of Object.keys(days).sort().slice(0, -60)) delete days[day];
     }
@@ -312,12 +316,14 @@ function dayLabel(day: string): string {
   return new Date(year, month - 1, date).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
 }
 
+/** How many days the Verses of the Day tab goes back, today included. */
+const DAILY_BACK = 20;
+
 /**
- * Today's verse, picked by the date from the verses the player has opened (once played, the day
- * keeps the verse it was played on, even if more verses open later that day).
+ * A day's verse, picked by its date from the verses the player has opened (once played, the day
+ * keeps the verse it was played on, even if more verses open later).
  */
-function todaysVerse(): Daily | undefined {
-  const day = dayKey(new Date());
+function todaysVerse(day = dayKey(new Date())): Daily | undefined {
   const done = progress.daily?.[day];
   const kept = done ? LEVELS.findIndex((level) => level.id === done.id) : -1;
   if (done && kept >= 0) {
@@ -337,7 +343,7 @@ function dailyStreak(): number {
   const date = new Date();
   if (!done[dayKey(date)]) date.setDate(date.getDate() - 1);
   let streak = 0;
-  while (done[dayKey(date)]) {
+  while (done[dayKey(date)] && !done[dayKey(date)]!.late) {
     streak += 1;
     date.setDate(date.getDate() - 1);
   }
@@ -356,6 +362,57 @@ function renderDailyCard(): void {
   card.querySelector(".daily-name")!.textContent = `${today.level.title}: ${DAILY_RULES[today.rule].name}`;
   card.title = `${DAILY_RULES[today.rule].text} ${skyWords(today.level.weather)}`;
   card.querySelector(".rosette")!.classList.toggle("lit", Boolean(done));
+}
+
+/** The Verses of the Day tab: today's and the nineteen before it, newest first, each to play. */
+function renderDailyList(): void {
+  const list = $("#daily-list");
+  list.replaceChildren();
+  const date = new Date();
+  for (let back = 0; back < DAILY_BACK; back += 1) {
+    const day = dayKey(date);
+    date.setDate(date.getDate() - 1);
+    const verse = todaysVerse(day);
+    if (!verse) continue;
+    const done = progress.daily?.[day];
+    const item = document.createElement("li");
+    item.classList.toggle("today", back === 0);
+    item.classList.toggle("complete", done?.stars === 3);
+    const button = document.createElement("button");
+    button.type = "button";
+    const stars = done?.stars ?? 0;
+    button.innerHTML = `<span class="numeral"></span><span class="name"></span><span class="twist"></span><span class="foot"><span class="stars">${[0, 1, 2].map((star) => `<i class="star${star < stars ? " lit" : ""}"></i>`).join("")}</span>${done ? `<span class="best">${done.mayhem.toLocaleString("en-GB")}</span>` : ""}${done?.late ? `<span class="late">late</span>` : ""}<i class="rosette${done ? " lit" : ""}" title="${done ? "Done" : "To play"}"></i></span>`;
+    button.querySelector(".numeral")!.textContent = back === 0 ? `Today · ${dayLabel(day)}` : dayLabel(day);
+    button.querySelector(".name")!.textContent = verse.level.title;
+    button.querySelector(".twist")!.textContent = `${DAILY_RULES[verse.rule].name} · ${skyWords(verse.level.weather).replace(/^Played /, "").replace(/\.$/, "")}`;
+    button.title = `${DAILY_RULES[verse.rule].text} ${skyWords(verse.level.weather)}`;
+    button.addEventListener("click", () => {
+      audio.unlock();
+      audio.click();
+      void startLevel(verse.index, verse);
+    });
+    item.append(button);
+    list.append(item);
+  }
+}
+
+/** Which tab of the verses panel is showing (it stays put for the visit). */
+let versesTab: "verses" | "daily" = "verses";
+
+function showVersesTab(tab: "verses" | "daily"): void {
+  versesTab = tab;
+  $("#tab-verses").setAttribute("aria-selected", String(tab === "verses"));
+  $("#tab-daily").setAttribute("aria-selected", String(tab === "daily"));
+  $("#level-list").hidden = tab !== "verses";
+  $("#daily-list").hidden = tab !== "daily";
+  // Today's card is the first tile of the Verses of the Day: no need for both.
+  if (tab === "daily") $("#daily-card").hidden = true;
+  const done = Object.keys(progress.daily ?? {}).length;
+  const streak = dailyStreak();
+  if (tab === "daily") {
+    $("#star-total").textContent = `${done} Verse${done === 1 ? "" : "s"} of the Day done${streak > 1 ? ` · ${streak} days running` : ""} · a new one every day; ones played late light their day but don't add to a run`;
+    $("#star-total").classList.remove("all");
+  }
 }
 
 /** Today's sky, in words. */
@@ -522,8 +579,11 @@ function renderLevelList(): void {
   const tricks = Object.keys(progress.tricks ?? {}).length;
   $("#star-total").textContent = (all ? `All ${total} stars! The Queen's flag flies over the stage.` : `${total} of ${LEVELS.length * 3} stars`) + (challenges ? ` · ${challenges} of ${LEVELS.length} side challenges` : "") + (crowns ? ` · ${crowns} won in Royal` : "") + (tricks ? ` · ${tricks} of ${Object.keys(TRICKS).length} trick shots` : "");
   $("#royal-toggle").setAttribute("aria-pressed", String(Boolean(progress.royal)));
+  $("#royal-note").hidden = !progress.royal;
   $("#star-total").classList.toggle("all", all);
   renderDailyCard();
+  renderDailyList();
+  showVersesTab(versesTab);
   $("#build-tag").textContent = `v${__BUILD__.version} · ${__BUILD__.commit} · ${__BUILD__.date}`;
 }
 
@@ -747,9 +807,13 @@ function showResult(): void {
     const streak = dailyStreak();
     dailyLine.classList.toggle("done", won);
     dailyLine.querySelector(".rosette")!.classList.toggle("lit", won);
+    const today = daily.day === dayKey(new Date());
+    const late = progress.daily?.[daily.day]?.late;
     dailyLine.querySelector("span")!.textContent = won
-      ? `Verse of the Day done (${DAILY_RULES[daily.rule].name})${streak > 1 ? `: ${streak} days running` : ""}. Come back tomorrow for another.`
-      : `Verse of the Day: ${DAILY_RULES[daily.rule].name}. Not today... yet.`;
+      ? today || !late
+        ? `Verse of the Day done (${DAILY_RULES[daily.rule].name})${streak > 1 ? `: ${streak} days running` : ""}. Come back tomorrow for another.`
+        : `Verse of the Day for ${dayLabel(daily.day)} done (${DAILY_RULES[daily.rule].name}). Done late, it lights the day but doesn't add to a run.`
+      : `Verse of the Day${today ? "" : ` for ${dayLabel(daily.day)}`}: ${DAILY_RULES[daily.rule].name}. Not done... yet.`;
   }
   const notice = review({
     won,
@@ -1484,6 +1548,14 @@ $("#daily-card").addEventListener("click", () => {
   const today = todaysVerse();
   if (today) void startLevel(today.index, today);
 });
+for (const [id, tab] of [["#tab-verses", "verses"], ["#tab-daily", "daily"]] as const) {
+  $(id).addEventListener("click", () => {
+    audio.unlock();
+    audio.click();
+    versesTab = tab;
+    renderLevelList();
+  });
+}
 $("#royal-toggle").addEventListener("click", () => {
   audio.unlock();
   audio.click();
