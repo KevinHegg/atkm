@@ -38,6 +38,9 @@ export class Curios {
   private readonly mouseTrack: pc.Entity[];
   private readonly cat: pc.Entity;
   private readonly bell: pc.Entity;
+  /** Pussy in the well peeks over the rim now and then: when she last did, and when she next will. */
+  private peekAt = -99;
+  private nextPeek = 4;
   private readonly spider: pc.Entity;
   private readonly spiderThread: pc.Entity;
   private readonly spiderHome: pc.Vec3;
@@ -390,13 +393,24 @@ export class Curios {
     this.clockSwing.setLocalEulerAngles(swing, 8, swing * 0.5);
     this.animateMouse(now, age("mouse"));
     this.animatePie(now, age("pie"));
-    // Ding, dong, bell; pussy's in the well.
+    // Ding, dong, bell; pussy's in the well. Struck, she pops right up; and now and then she peeks
+    // over the rim of her own accord, looks this way and that, and ducks down again.
     const well = age("well");
     this.bell.setLocalEulerAngles(well < 2.5 ? Math.sin(well * 14) * 30 * (1 - well / 2.5) : 0, 0, 0);
-    this.cat.enabled = well < 4;
-    if (this.cat.enabled) {
+    if (well >= 4 && now >= this.nextPeek) {
+      this.peekAt = now;
+      this.nextPeek = now + 7 + Math.random() * 6;
+    }
+    const peek = now - this.peekAt;
+    this.cat.enabled = well < 4 || peek < 2.4;
+    if (well < 4) {
       const pop = Math.min(1, well / 0.4) * (well > 3.4 ? Math.max(0, 1 - (well - 3.4) / 0.6) : 1);
       this.cat.setLocalPosition(0, 0.1 + pop * 0.55, 0);
+      this.cat.setLocalEulerAngles(0, 0, 0);
+    } else if (this.cat.enabled) {
+      const up = Math.min(1, peek / 0.35) * (peek > 2.05 ? Math.max(0, 1 - (peek - 2.05) / 0.35) : 1);
+      this.cat.setLocalPosition(0, 0.1 + up * 0.42, 0);
+      this.cat.setLocalEulerAngles(0, Math.sin(peek * 2.6) * 28, 0);
     }
     // The spider scuttles up its thread and lowers itself again later.
     const spider = age("spider");

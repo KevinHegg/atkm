@@ -14,7 +14,8 @@ export const CURIOS: ReadonlyArray<{ id: CurioId; at: Vec3; size: Vec3 }> = [
   { id: "cuckoo", at: { x: -7.5, y: 3.9, z: -1.5 }, size: { x: 1.4, y: 3, z: 0.8 } },
   // Hickory dickory dock: a mouse at home on the clock's long weight, below the case.
   { id: "mouse", at: { x: -7.79, y: 2.05, z: -1.41 }, size: { x: 0.55, y: 0.7, z: 0.55 } },
-  { id: "well", at: { x: 13, y: 0.8, z: 5.3 }, size: { x: 1.5, y: 1.6, z: 1.5 } },
+  // Ding, dong, bell: on the front corner of the lawn at stage right, where every opening view shows it.
+  { id: "well", at: { x: 10.6, y: 0.8, z: 1.8 }, size: { x: 1.5, y: 1.6, z: 1.5 } },
   { id: "spider", at: { x: 6.5, y: 7.6, z: -3 }, size: { x: 0.8, y: 0.8, z: 0.8 } },
   // Old King Cole watches from a royal box high on stilts, stage right, upstage...
   { id: "box", at: { x: 10.2, y: 5.3, z: -7.3 }, size: { x: 2.4, y: 2.6, z: 2.2 } },

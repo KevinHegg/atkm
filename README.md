@@ -159,7 +159,7 @@ unlock every verse.
   in his verses: left where it is he pays it no mind, but knock it out into the open with a
   shot and he can't resist the cheese. Snap: he steals nothing that visit.
 - **Curios.** The scenery is full of nursery rhymes. Shoot the cow, the man in the moon, Jack and
-  Jill's hill, the cuckoo clock, the well, the spider, the Grand Old Duke of York's men
+  Jill's hill, the cuckoo clock, the well (pussy peeks over its rim now and then), the spider, the Grand Old Duke of York's men
   on the painted hill, Old King Cole's royal box (or the stilts it stands on), or the
   two stagehands at the fly line, and see what happens. Old King Cole himself, on his throne in
   the middle of the box, is a target of his own: hit him square and his crown is knocked clean

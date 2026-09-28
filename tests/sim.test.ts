@@ -1144,7 +1144,7 @@ test("every verse's side challenge can be done: a recorded line cracks him with 
     "the-encore": [S("shot", 12, 0.2, 6), S("shell", -12, 0.2, 6), S("grape", 12, 0.2, 5), S("chain", -12, 0.3, 5), S("bomb", -0.51, 3.45, -2.4, 1)],
     "ring-of-roses": [S("shot", 0, 1, 1), S("shot", 3.2, 1, -2.2), S("shot", 6.6, 0.85, 0.2), H("shot", 0, 0.2, 0)],
     "ride-a-cock-horse": [S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.4, 4.35, -4.4), S("shot", 5.48, 4.35, -4.74)],
-    "came-tumbling-after": [S("bomb", 1.8, 0.402, -3.75)],
+    "came-tumbling-after": [S("bomb", 1.4, 0.402, -3.75)],
     "round-the-mulberry-bush": [S("shot", 6, 4, -7), S("shot", 5.57, 4, -7.36, 5)],
     "london-bridge": [S("shot", -4.6, 0.4, -5.4), S("shot", 3, 1.35, -1.6), S("shot", -0.95, 1.45, -4.6)],
   };
